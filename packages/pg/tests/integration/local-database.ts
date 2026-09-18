@@ -36,13 +36,16 @@ export interface ProvisionedDatabase {
   readonly teardown: () => Promise<void>;
 }
 
+/** One `PG*` variable, or its loopback default. */
+const envOr = (name: string, fallback: string): string => process.env[name] ?? fallback;
+
 /** Where a local server is expected, honouring the standard `PG*` vars. */
 function serverConfig() {
   return {
-    host: process.env.PGHOST ?? "127.0.0.1",
-    port: Number(process.env.PGPORT ?? "5432"),
-    user: process.env.PGUSER ?? "postgres",
-    password: process.env.PGPASSWORD ?? "",
+    host: envOr("PGHOST", "127.0.0.1"),
+    port: Number(envOr("PGPORT", "5432")),
+    user: envOr("PGUSER", "postgres"),
+    password: envOr("PGPASSWORD", ""),
   };
 }
 
@@ -116,32 +119,38 @@ async function provisionContainer(): Promise<ProvisionedDatabase> {
  * there is one, otherwise on a Testcontainers-launched server — returning its
  * connection URL and a teardown hook.
  */
+/**
+ * Probe the local server. Unreachable is a plain `false` — unless `PG*` was set
+ * explicitly, in which case it is a hard error: if you pointed the suite
+ * somewhere, it should not quietly run elsewhere.
+ */
+async function probeLocalServer(admin: pg.Client): Promise<boolean> {
+  try {
+    await admin.connect();
+    await admin.query("select 1");
+    return true;
+  } catch (cause) {
+    await admin.end().catch(() => {});
+    if (!serverExplicitlyConfigured()) return false;
+    throw new Error(
+      [
+        `integration global-setup: no PostgreSQL server at ${connectionUrl("postgres")}.`,
+        "PG* variables are set, so this run will not fall back to Testcontainers —",
+        "fix the PG* target, unset it to let the suite start its own server, or set",
+        "DATABASE_URL_TEST to a database the suite may use.",
+      ].join("\n"),
+      { cause },
+    );
+  }
+}
+
 export async function provisionLocalDatabase(): Promise<ProvisionedDatabase> {
   const started = performance.now();
   const admin = new pg.Client({
     connectionString: connectionUrl("postgres"),
     connectionTimeoutMillis: 10_000,
   });
-
-  let reachable = true;
-  try {
-    await admin.connect();
-    await admin.query("select 1");
-  } catch (cause) {
-    reachable = false;
-    await admin.end().catch(() => {});
-    if (serverExplicitlyConfigured()) {
-      throw new Error(
-        [
-          `integration global-setup: no PostgreSQL server at ${connectionUrl("postgres")}.`,
-          "PG* variables are set, so this run will not fall back to Testcontainers —",
-          "fix the PG* target, unset it to let the suite start its own server, or set",
-          "DATABASE_URL_TEST to a database the suite may use.",
-        ].join("\n"),
-        { cause },
-      );
-    }
-  }
+  const reachable = await probeLocalServer(admin);
   const provisioned = reachable ? await provisionOnLocalServer(admin) : await provisionContainer();
   const seconds = ((performance.now() - started) / 1000).toFixed(1);
   process.stderr.write(

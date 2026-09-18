@@ -76,9 +76,6 @@ importers:
       '@changesets/cli':
         specifier: 'catalog:'
         version: 3.0.3
-      '@effect-drizzle-ext/dist-consumer':
-        specifier: workspace:*
-        version: link:tests/dist-consumer
       '@effect/language-service':
         specifier: 'catalog:'
         version: 0.87.2
@@ -191,12 +188,6 @@ importers:
       '@effect/sql-pg':
         specifier: 'catalog:'
         version: 4.0.0-rc.112(effect@4.0.0-rc.112)
-      '@thomasfosterau/effect-drizzle-ext':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@thomasfosterau/effect-drizzle-ext-pg':
-        specifier: workspace:*
-        version: link:../../packages/pg
       '@thomasfosterau/effect-jsonapi':
         specifier: 'catalog:'
         version: 0.14.0(effect@4.0.0-rc.112)
@@ -213,9 +204,6 @@ importers:
       '@types/pg':
         specifier: 'catalog:'
         version: 8.23.1
-      pg:
-        specifier: 'catalog:'
-        version: 8.23.0
 
 packages:
 

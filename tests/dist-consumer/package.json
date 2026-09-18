@@ -6,15 +6,12 @@
   "type": "module",
   "dependencies": {
     "@effect/sql-pg": "catalog:",
-    "@thomasfosterau/effect-drizzle-ext": "workspace:*",
-    "@thomasfosterau/effect-drizzle-ext-pg": "workspace:*",
     "@thomasfosterau/effect-jsonapi": "catalog:",
     "drizzle-orm": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "@types/pg": "catalog:",
-    "pg": "catalog:"
+    "@types/pg": "catalog:"
   }
 }

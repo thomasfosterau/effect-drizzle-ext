@@ -9,20 +9,24 @@
  */
 
 import { existsSync } from "node:fs";
+import * as Option from "effect/Option";
 import { provisionLocalDatabase } from "./local-database.ts";
 
 function loadDotenv(): void {
   if (existsSync(".env")) process.loadEnvFile(".env");
 }
 
-async function resolveDatabase(): Promise<{ url: string; teardown: () => Promise<void> }> {
-  const noTeardown = async () => {};
-  const preset = process.env.DATABASE_URL_TEST ?? process.env.DATABASE_URL;
-  if (preset) return { url: preset, teardown: noTeardown };
-
+/** The explicit database, from the environment first and `.env` second. */
+function explicitDatabaseUrl(): Option.Option<string> {
+  const fromEnvironment = process.env.DATABASE_URL_TEST ?? process.env.DATABASE_URL;
+  if (fromEnvironment) return Option.some(fromEnvironment);
   loadDotenv();
-  const fromDotenv = process.env.DATABASE_URL_TEST ?? process.env.DATABASE_URL;
-  if (fromDotenv) return { url: fromDotenv, teardown: noTeardown };
+  return Option.fromNullishOr(process.env.DATABASE_URL_TEST ?? process.env.DATABASE_URL);
+}
+
+async function resolveDatabase(): Promise<{ url: string; teardown: () => Promise<void> }> {
+  const explicit = explicitDatabaseUrl();
+  if (Option.isSome(explicit)) return { url: explicit.value, teardown: async () => {} };
 
   const provisioned = await provisionLocalDatabase();
   process.env.DATABASE_URL_TEST = provisioned.url;

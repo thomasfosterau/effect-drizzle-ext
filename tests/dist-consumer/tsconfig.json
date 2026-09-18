@@ -9,8 +9,10 @@
     // `Equals<…>` assertion in src/consumer.ts is false against `any`.
     "skipLibCheck": true,
     // Resolve the package names to the EMITTED declarations rather than the
-    // workspace `exports` (which point at `src/` for the in-repo dev loop).
-    // Relative to this file; TypeScript 7 removed `baseUrl`.
+    // workspace `exports` (which point at `src/` for the in-repo dev loop) —
+    // which is also why this package declares no dependency on either: the
+    // mapping below is the whole resolution. Relative to this file;
+    // TypeScript 7 removed `baseUrl`.
     "paths": {
       "@thomasfosterau/effect-drizzle-ext": ["../../packages/core/dist/index.d.ts"],
       "@thomasfosterau/effect-drizzle-ext/jsonapi": ["../../packages/core/dist/jsonapi/index.d.ts"],
