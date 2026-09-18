@@ -1,0 +1,74 @@
+{
+  "name": "@thomasfosterau/effect-drizzle-ext-pg",
+  "version": "0.0.0",
+  "description": "The @effect/sql-pg binding for @thomasfosterau/effect-drizzle-ext: the Database / CurrentTransaction services over drizzle-orm/effect-postgres, PgClient layer helpers, and the sentinel-rollback test transaction runner.",
+  "keywords": [
+    "drizzle",
+    "drizzle-orm",
+    "effect",
+    "pg",
+    "postgres",
+    "typescript"
+  ],
+  "homepage": "https://github.com/thomasfosterau/effect-drizzle-ext#readme",
+  "bugs": {
+    "url": "https://github.com/thomasfosterau/effect-drizzle-ext/issues"
+  },
+  "license": "MIT",
+  "author": "Thomas Foster <me@thomasfoster.au>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thomasfosterau/effect-drizzle-ext.git",
+    "directory": "packages/pg"
+  },
+  "files": [
+    "dist",
+    "src",
+    "!src/**/*.test.ts",
+    "README.md",
+    "CLAUDE.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./testing": {
+        "types": "./dist/testing.d.ts",
+        "default": "./dist/testing.js"
+      }
+    },
+    "access": "public"
+  },
+  "dependencies": {
+    "@thomasfosterau/effect-drizzle-ext": "workspace:^"
+  },
+  "devDependencies": {
+    "@effect/language-service": "catalog:",
+    "@effect/sql-pg": "catalog:",
+    "@testcontainers/postgresql": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "@vitest/coverage-istanbul": "catalog:",
+    "drizzle-orm": "catalog:",
+    "effect": "catalog:",
+    "pg": "catalog:"
+  },
+  "peerDependencies": {
+    "@effect/sql-pg": "catalog:peers",
+    "drizzle-orm": "catalog:peers",
+    "effect": "catalog:peers",
+    "pg": "catalog:peers"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    // The whole point: a consumer reads `dist/*.d.ts`, and an unbound type
+    // reference in an emitted declaration only surfaces with skipLibCheck off.
+    "skipLibCheck": false,
+    // Resolve the package names to the EMITTED declarations rather than the
+    // workspace `exports` (which point at `src/` for the in-repo dev loop).
+    // Relative to this file; TypeScript 7 removed `baseUrl`.
+    "paths": {
+      "@thomasfosterau/effect-drizzle-ext": ["../../packages/core/dist/index.d.ts"],
+      "@thomasfosterau/effect-drizzle-ext/jsonapi": ["../../packages/core/dist/jsonapi/index.d.ts"],
+      "@thomasfosterau/effect-drizzle-ext/*": ["../../packages/core/dist/*.d.ts"],
+      "@thomasfosterau/effect-drizzle-ext-pg": ["../../packages/pg/dist/index.d.ts"],
+      "@thomasfosterau/effect-drizzle-ext-pg/*": ["../../packages/pg/dist/*.d.ts"]
+    }
+  },
+  "include": ["src"]
+}

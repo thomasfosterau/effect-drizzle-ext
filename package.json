@@ -1,0 +1,45 @@
+{
+  "$schema": "https://www.schemastore.org/package",
+  "name": "effect-drizzle-ext-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Workspace for @thomasfosterau/effect-drizzle-ext and @thomasfosterau/effect-drizzle-ext-pg: the Effect ↔ Drizzle bridge extracted from the website, gardeneria and preferenceflow applications.",
+  "license": "MIT",
+  "author": "Thomas Foster <me@thomasfoster.au>",
+  "type": "module",
+  "scripts": {
+    "changeset": "changeset",
+    "version": "changeset version && pnpm install --lockfile-only",
+    "release": "pnpm -r --filter './packages/*' publish --access public --no-git-checks && changeset tag",
+    "fallow": "fallow --summary",
+    "fallow:audit": "fallow audit",
+    "prepare": "vp config && effect-tsgo patch --typescript --oxlint"
+  },
+  "devDependencies": {
+    "@changesets/changelog-github": "catalog:",
+    "@changesets/cli": "catalog:",
+    "@effect-drizzle-ext/dist-consumer": "workspace:*",
+    "@effect/language-service": "catalog:",
+    "@effect/tsgo": "catalog:",
+    "@mpsuesser/oxlint-plugin-effect": "catalog:",
+    "@testcontainers/postgresql": "catalog:",
+    "@thomasfosterau/effect-drizzle-ext": "workspace:*",
+    "@thomasfosterau/effect-drizzle-ext-pg": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "@typescript/native": "catalog:",
+    "effect": "catalog:",
+    "effect-solutions": "catalog:",
+    "fallow": "catalog:",
+    "pg": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=11"
+  },
+  "packageManager": "pnpm@11.18.0"
+}

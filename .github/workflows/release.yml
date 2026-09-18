@@ -1,0 +1,44 @@
+name: Release
+
+# Changesets release flow: on every push to `main`, changesets/action either
+# opens/updates the "Version Packages" PR (when unreleased changesets exist)
+# or, when that PR has merged and no changesets remain, publishes both
+# packages to npm and tags the release.
+#
+# Requires the `NPM_TOKEN` repository secret (an npm automation token with
+# publish rights on the @thomasfosterau scope). Owner-filled; until it exists
+# the publish step fails by design.
+
+on:
+  push:
+    branches: [main]
+
+concurrency: release-${{ github.ref }}
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - name: Build
+        run: vp run -r build
+      - name: Version or publish
+        uses: changesets/action@v1
+        with:
+          version: pnpm run version
+          publish: pnpm run release
+          title: "chore: version packages"
+          commit: "chore: version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true"

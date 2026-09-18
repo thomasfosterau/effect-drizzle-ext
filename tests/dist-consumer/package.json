@@ -1,0 +1,19 @@
+{
+  "name": "@effect-drizzle-ext/dist-consumer",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Type-checks the EMITTED declarations of both packages the way a consumer sees them, with skipLibCheck off — the gate for the declaration-emit hazard versioned-chain.ts documents.",
+  "type": "module",
+  "dependencies": {
+    "@effect/sql-pg": "catalog:",
+    "@thomasfosterau/effect-drizzle-ext": "workspace:*",
+    "@thomasfosterau/effect-drizzle-ext-pg": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "pg": "catalog:"
+  }
+}
