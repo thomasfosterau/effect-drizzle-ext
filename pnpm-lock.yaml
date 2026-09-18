@@ -197,6 +197,9 @@ importers:
       '@thomasfosterau/effect-drizzle-ext-pg':
         specifier: workspace:*
         version: link:../../packages/pg
+      '@thomasfosterau/effect-jsonapi':
+        specifier: 'catalog:'
+        version: 0.14.0(effect@4.0.0-rc.112)
       drizzle-orm:
         specifier: 'catalog:'
         version: 1.0.0-rc.5-ab785fc(@effect/sql-pg@4.0.0-rc.112(effect@4.0.0-rc.112))(@types/pg@8.23.1)(effect@4.0.0-rc.112)(pg@8.23.0)

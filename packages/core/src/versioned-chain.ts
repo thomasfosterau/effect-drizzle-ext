@@ -201,9 +201,11 @@ type SubtypeVersionColumnBuilders<TColumns extends Record<string, ColumnBuilderB
  * where it should get the column's real type — a consuming application's
  * database package degrading a table's `$inferSelect["id"]` from `string` to
  * `any` with no type error anywhere in the chain (website #1579). This
- * package's own `tests/dist-consumer` type-checks the emitted `dist/` with
- * `skipLibCheck: false` precisely to catch this regression, and is the gate
- * this module exists chiefly to satisfy.
+ * package's own `tests/dist-consumer` type-checks a consumer fixture against
+ * the emitted `dist/`, asserting the chain tables' row types precisely to
+ * catch this regression (an unbound name degrades them to `any`, and an
+ * `Equals<…>` assertion against `any` is false); it is the gate this module
+ * exists chiefly to satisfy.
  *
  * An explicit annotation is emitted verbatim as a type *reference*, so the
  * printer never expands the mapped type and `TTableName` stays bound to

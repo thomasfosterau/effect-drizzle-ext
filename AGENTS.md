@@ -7,7 +7,7 @@ Project conventions live here; personal style preferences live in user memory. `
 ## Common pitfalls
 
 - **Drizzle-facing config members are `?: T | undefined`, never `Option`.** Drizzle reads `undefined` as "not supplied" and would emit an `Option` object as a value — wrong DDL that no type error and no unit test catches. Readers the library owns return `Option`; the boundary is stated once in `packages/core/src/derive.ts`.
-- **This package emits declarations; the applications never did.** Any exported generic whose inferred type mentions `PgBuildColumns` / `PgTableWithColumns` / `PgViewWithSelection` needs an explicit, self-contained return annotation, or the declaration printer emits an unbound `TTableName` that `skipLibCheck` hides. `tests/dist-consumer` type-checks the emitted `dist/` with `skipLibCheck: false`; `vp run check` includes it.
+- **This package emits declarations; the applications never did.** Any exported generic whose inferred type mentions `PgBuildColumns` / `PgTableWithColumns` / `PgViewWithSelection` needs an explicit, self-contained return annotation, or the declaration printer emits an unbound `TTableName` that `skipLibCheck` hides. `tests/dist-consumer` type-checks a consumer fixture against the emitted `dist/` declarations with `Equals<…>` assertions on every derived type (an unbound name degrades to `any`, and an assertion against `any` is false); `vp run check` includes it.
 - **The derivation decides column _types_, never column _order_ or _names_.** Both are what a consumer's `db:generate` emits into a migration; a reorder here rewrites their schema.
 - **`transact` is always-open, never join-if-present** (website #1883). A nested call opens a SAVEPOINT. Do not "improve" it.
 - **No application vocabulary.** No `owner_id`, role ladders, `node` / `node_version`, id brands, Hyperdrive, KV caches, migrations tooling. Those stay in the apps.
@@ -24,7 +24,7 @@ Everything else that must be visible when touching a package is in that package'
 
 - `vp install` — dependencies plus the Vite+ git hooks (pre-commit runs `vp staged`: format + lint on staged files). No pre-push hook: run the tests yourself.
 - `vp check` — the built-in format + lint pass (`vp fmt --check` + `vp lint`).
-- `vp run check` — the type gate: both packages' `check` plus the dist-consumer declaration check (which builds `dist/`). Distinct from `vp check`.
+- `vp run check` — the type gate: both packages' `check` plus the dist-consumer declaration check (which builds `dist/` and asserts the emitted types). Distinct from `vp check`.
 - `vp run -r test:unit` — unit tests (pure code; no database).
 - `vp run test:integration` — one root task over `packages/pg`'s vitest project; provisions a fresh database per run on a reachable local PostgreSQL (`PG*` env) or a `pgvector/pgvector:pg17` container via Testcontainers (needs a Docker daemon). An explicit `DATABASE_URL_TEST` / `DATABASE_URL` wins and is used as-is. Filter with `--project pg-integration`.
 - `vp run -r build` — emit `dist/` for both packages.

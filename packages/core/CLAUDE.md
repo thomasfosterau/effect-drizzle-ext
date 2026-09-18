@@ -15,7 +15,7 @@ The driver-free half of the bridge. Peers: `effect`, `drizzle-orm`; `@thomasfost
 
 - **The derivation decides column _types_, never column _order_ or _names_.** Both are what `db:generate` emits into a migration.
 - **Drizzle-facing config members are `?: T | undefined`, never `Option`.** Drizzle reads `undefined` as "not supplied" and would emit an `Option` as a value — wrong DDL no test catches. Readers the library owns return `Option`.
-- **Explicit return annotations wherever the inferred type mentions `PgBuildColumns` / `PgTableWithColumns` / `PgViewWithSelection`.** The declaration printer emits an unbound `TTableName` otherwise, and `skipLibCheck` hides it; `tests/dist-consumer` is the gate.
+- **Explicit return annotations wherever the inferred type mentions `PgBuildColumns` / `PgTableWithColumns` / `PgViewWithSelection`.** The declaration printer emits an unbound `TTableName` otherwise, and `skipLibCheck` hides it; `tests/dist-consumer` is the gate — its `Equals<…>` assertions fail against the resulting `any`.
 - **No application vocabulary**: no `owner_id`, no role ladders, no `node` / `node_version`, no id brands.
 
 ## Boundary

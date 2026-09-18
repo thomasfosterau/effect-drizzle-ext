@@ -143,8 +143,8 @@ export default defineConfig({
   run: {
     tasks: {
       // The CI typecheck gate, as one task: every package's `check`, plus the
-      // dist-consumer check that type-checks the EMITTED declarations with
-      // `skipLibCheck: false` (the declaration-emit hazard versioned-chain.ts
+      // dist-consumer check that type-checks a consumer fixture against the
+      // EMITTED declarations (the declaration-emit hazard versioned-chain.ts
       // documents only shows up there). A pure graph node.
       check: {
         command: "echo 'check: every type gate green'",
