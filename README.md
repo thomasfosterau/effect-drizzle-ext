@@ -11,4 +11,28 @@ Both extend drizzle-orm's own Effect integration (`drizzle-orm/effect-postgres`,
 
 **Disclaimer:** this repository and its packages have been created using Claude Code. The API is in flux; expect churn and breaking changes.
 
-Extracted from the `thomasfosterau/website`, `thomasfosterau/gardeneria` and `thomasfosterau/preferenceflow` applications. Contributing: [CONTRIBUTING.md](CONTRIBUTING.md). Conventions: [AGENTS.md](AGENTS.md).
+## Quick start
+
+```ts
+// db-annotation.ts — pin a column-kind union once, annotate a model field with its column.
+export const dbColumn = dbColumnFor<"text" | "integer">();
+const Article = Schema.Struct({
+  title: dbColumn(Schema.NonEmptyString, { column: "title", pg: "text", notNull: true }),
+});
+
+// derive.ts — a builder registry turns the annotations into Drizzle columns.
+const { fromFields } = makeDeriveColumns({ text, integer });
+export const articleTable = pgTable("article", fromFields(Article.fields));
+
+// database.ts — one `@effect/sql-pg` binding call gives the app its services.
+const database = makePgDatabase({ relations, key: "Database" });
+export const { Database, CurrentTransaction, transact, readHandle } = database;
+```
+
+`transact` opens the write boundary (always a fresh transaction or SAVEPOINT, never a silent join); `readHandle` reads through whichever is already open.
+
+## Documentation
+
+[`packages/core/README.md`](packages/core/README.md) and [`packages/pg/README.md`](packages/pg/README.md) are the two packages' API references; [AGENTS.md](AGENTS.md) carries repository conventions.
+
+Extracted from the `thomasfosterau/website`, `thomasfosterau/gardeneria` and `thomasfosterau/preferenceflow` applications. Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
