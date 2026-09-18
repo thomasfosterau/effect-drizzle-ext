@@ -1,0 +1,117 @@
+{
+  "name": "@thomasfosterau/effect-drizzle-ext",
+  "version": "0.0.0",
+  "description": "The Effect ↔ Drizzle bridge: Effect Schema → Drizzle column derivation with an extensible column-kind system, a versioned-chain interpreter, typed Postgres error classification, pagination and transaction combinators.",
+  "keywords": [
+    "drizzle",
+    "drizzle-orm",
+    "effect",
+    "effect-schema",
+    "postgres",
+    "typescript"
+  ],
+  "homepage": "https://github.com/thomasfosterau/effect-drizzle-ext#readme",
+  "bugs": {
+    "url": "https://github.com/thomasfosterau/effect-drizzle-ext/issues"
+  },
+  "license": "MIT",
+  "author": "Thomas Foster <me@thomasfoster.au>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thomasfosterau/effect-drizzle-ext.git",
+    "directory": "packages/core"
+  },
+  "files": [
+    "dist",
+    "src",
+    "!src/**/*.test.ts",
+    "README.md",
+    "CLAUDE.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./derive": "./src/derive.ts",
+    "./references": "./src/references.ts",
+    "./constraints": "./src/constraints.ts",
+    "./columns": "./src/columns.ts",
+    "./query": "./src/query.ts",
+    "./errors": "./src/errors.ts",
+    "./database": "./src/database.ts",
+    "./versioned-chain": "./src/versioned-chain.ts",
+    "./jsonapi": "./src/jsonapi/index.ts",
+    "./jsonapi/derive": "./src/jsonapi/derive.ts"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./derive": {
+        "types": "./dist/derive.d.ts",
+        "default": "./dist/derive.js"
+      },
+      "./references": {
+        "types": "./dist/references.d.ts",
+        "default": "./dist/references.js"
+      },
+      "./constraints": {
+        "types": "./dist/constraints.d.ts",
+        "default": "./dist/constraints.js"
+      },
+      "./columns": {
+        "types": "./dist/columns.d.ts",
+        "default": "./dist/columns.js"
+      },
+      "./query": {
+        "types": "./dist/query.d.ts",
+        "default": "./dist/query.js"
+      },
+      "./errors": {
+        "types": "./dist/errors.d.ts",
+        "default": "./dist/errors.js"
+      },
+      "./database": {
+        "types": "./dist/database.d.ts",
+        "default": "./dist/database.js"
+      },
+      "./versioned-chain": {
+        "types": "./dist/versioned-chain.d.ts",
+        "default": "./dist/versioned-chain.js"
+      },
+      "./jsonapi": {
+        "types": "./dist/jsonapi/index.d.ts",
+        "default": "./dist/jsonapi/index.js"
+      },
+      "./jsonapi/derive": {
+        "types": "./dist/jsonapi/derive.d.ts",
+        "default": "./dist/jsonapi/derive.js"
+      }
+    },
+    "access": "public"
+  },
+  "devDependencies": {
+    "@effect/language-service": "catalog:",
+    "@thomasfosterau/effect-jsonapi": "catalog:",
+    "@types/node": "catalog:",
+    "@vitest/coverage-istanbul": "catalog:",
+    "drizzle-orm": "catalog:",
+    "effect": "catalog:"
+  },
+  "peerDependencies": {
+    "@thomasfosterau/effect-jsonapi": "catalog:peers",
+    "drizzle-orm": "catalog:peers",
+    "effect": "catalog:peers"
+  },
+  "peerDependenciesMeta": {
+    "@thomasfosterau/effect-jsonapi": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

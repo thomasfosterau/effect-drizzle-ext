@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    // `skipLibCheck` stays ON: with it off, effect-jsonapi's and drizzle's own
+    // declarations fail under these compiler options, which is noise. The
+    // declaration-emit hazard is caught differently — an unbound type name in
+    // an emitted `.d.ts` resolves to the error type, i.e. `any`, and every
+    // `Equals<…>` assertion in src/consumer.ts is false against `any`.
+    "skipLibCheck": true,
+    // Resolve the package names to the EMITTED declarations rather than the
+    // workspace `exports` (which point at `src/` for the in-repo dev loop) —
+    // which is also why this package declares no dependency on either: the
+    // mapping below is the whole resolution. Relative to this file;
+    // TypeScript 7 removed `baseUrl`.
+    "paths": {
+      "@thomasfosterau/effect-drizzle-ext": ["../../packages/core/dist/index.d.ts"],
+      "@thomasfosterau/effect-drizzle-ext/jsonapi": ["../../packages/core/dist/jsonapi/index.d.ts"],
+      "@thomasfosterau/effect-drizzle-ext/*": ["../../packages/core/dist/*.d.ts"],
+      "@thomasfosterau/effect-drizzle-ext-pg": ["../../packages/pg/dist/index.d.ts"],
+      "@thomasfosterau/effect-drizzle-ext-pg/*": ["../../packages/pg/dist/*.d.ts"]
+    }
+  },
+  "include": ["src"]
+}
