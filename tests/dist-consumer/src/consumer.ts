@@ -8,8 +8,12 @@
  */
 
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
+import * as PgClient from "@effect/sql-pg/PgClient";
+import type { SqlError } from "effect/unstable/sql/SqlError";
 import { Resource } from "@thomasfosterau/effect-jsonapi";
 import { sql, type SQL } from "drizzle-orm";
 import { boolean, integer, pgSchema, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
@@ -232,9 +236,25 @@ export const person = pgTable("person", {
   ...deriveResource(PersonResource),
 });
 
-// ── pg (filled in with the pg package) ────────────────────────────────────
+// ── pg ────────────────────────────────────────────────────────────────────
 
-export const pg = { Pg, PgTesting };
+const appDatabase = Pg.makePgDatabase({ relations: {}, key: "AppDb" });
+export type AppDb = typeof appDatabase.Database.Identifier;
+export const appWrite = appDatabase.transact(Effect.map(appDatabase.readHandle, () => "written"));
+export const appLayer: Layer.Layer<"AppDb", never, PgClient.PgClient> = appDatabase.layer;
+export const pooled: Layer.Layer<PgClient.PgClient, SqlError> = Pg.pgClientFromPool({
+  connectionString: Redacted.make("postgresql://postgres@127.0.0.1:5432/app"),
+});
+export const pinged: Layer.Layer<PgClient.PgClient, SqlError> = Pg.pgClientFromUrl({
+  url: Redacted.make("postgresql://postgres@127.0.0.1:5432/app"),
+  maxConnections: 1,
+});
+const testTransaction = PgTesting.makeTestTransaction(appDatabase);
+export const savepointed = testTransaction.attemptInSavepoint(Effect.succeed(1));
+export const retryable: boolean = PgTesting.isRetryableConnectFailure(new Error("x"));
+export const testLayer: Layer.Layer<"AppDb", SqlError> = PgTesting.testDatabaseLayer(appDatabase, {
+  url: Redacted.make("postgresql://postgres@127.0.0.1:5432/test"),
+});
 
 /**
  * Every compile-time assertion, exported so `noUnusedLocals` keeps them and a
@@ -265,5 +285,13 @@ export type Checks = [
   /** _filmRuntime */ Assert<Equals<FilmVersionRow["runtime"], number | null>>,
   /** _viewId */ Assert<Equals<FilmViewRow["id"], string>>,
   /** _viewType */ Assert<Equals<FilmViewRow["type"], string>>,
+  /** _appDbKey */ Assert<Equals<AppDb, "AppDb">>,
+  /** _appTxKey */ Assert<
+    Equals<typeof appDatabase.CurrentTransaction.Identifier, "AppDb/CurrentTransaction">
+  >,
+  /** _appWriteRequiresDb */ Assert<Equals<Effect.Services<typeof appWrite>, "AppDb">>,
+  /** _savepointRequiresTx */ Assert<
+    Equals<Effect.Services<typeof savepointed>, "AppDb/CurrentTransaction">
+  >,
   /** _personName */ Assert<Equals<(typeof person.$inferSelect)["name"], string>>,
 ];
