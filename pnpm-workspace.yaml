@@ -42,7 +42,7 @@ catalog:
   "@thomasfosterau/effect-jsonapi": ^0.14.0
   "@types/node": ^26.4.1
   "@types/pg": ^8.20.3
-  "@vitest/coverage-istanbul": 4.1.11
+  "@vitest/coverage-istanbul": 5.0.1
   # A commit-suffixed prerelease: the first drizzle line to ship the Effect
   # integration (`drizzle-orm/effect-postgres`, `effect-core`, `effect-schema`)
   # this library extends. Same pin as the three applications.
