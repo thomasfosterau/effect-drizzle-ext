@@ -22,8 +22,8 @@ catalogs:
       specifier: 0.41.0
       version: 0.41.0
     '@mpsuesser/oxlint-plugin-effect':
-      specifier: ^0.4.3
-      version: 0.4.3
+      specifier: ^0.5.0
+      version: 0.5.0
     '@testcontainers/postgresql':
       specifier: ^12.1.0
       version: 12.1.0
@@ -84,7 +84,7 @@ importers:
         version: 0.41.0
       '@mpsuesser/oxlint-plugin-effect':
         specifier: 'catalog:'
-        version: 0.4.3
+        version: 0.5.0
       '@testcontainers/postgresql':
         specifier: 'catalog:'
         version: 12.1.0(supports-color@7.2.0)
@@ -516,8 +516,8 @@ packages:
     resolution: {integrity: sha512-6QEf6yqFbETdwGITKq57aYoPfX/3K8XFNwsAlx0C1M7o8cb79sv1M3w+tWuWvIcSbNqrLF7OD7YpZMVVz335hQ==}
     engines: {node: '>=20.0.0'}
 
-  '@mpsuesser/oxlint-plugin-effect@0.4.3':
-    resolution: {integrity: sha512-zUuShvX0nIq7UYnjk1mz7YDQMb6A9cJ7vWnDUBwicmiI87rCfqieYAvQC40Mr9ifzXal07VArrOeZw3Ysikzeg==}
+  '@mpsuesser/oxlint-plugin-effect@0.5.0':
+    resolution: {integrity: sha512-RksB0kBL3aEzMdSgozRgKjVc9++k8EsmoqS9QQ4+AS9TVBVcHyA+Q6dE9gcsRqYWbsGNQQ58STDJAwlwczsAqg==}
 
   '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.4':
     resolution: {integrity: sha512-LCkGo6JDfaBhgST7UpPWgNgLINpcpabaHfyz5OBx75nUYxBsaEPxjnyNjWpeb/xBup/682QnBfRBy2/LvPutZQ==}
@@ -3002,7 +3002,7 @@ snapshots:
       tinyglobby: 0.2.17
       yaml: 2.9.1
 
-  '@mpsuesser/oxlint-plugin-effect@0.4.3':
+  '@mpsuesser/oxlint-plugin-effect@0.5.0':
     dependencies:
       '@oxlint/plugins': 1.83.0
       effect: 4.0.0-rc.112

@@ -34,7 +34,7 @@ catalog:
   # before bumping any of the three.
   "@effect/tsgo": 0.41.0
   "@effect/sql-pg": 4.0.0-rc.112
-  "@mpsuesser/oxlint-plugin-effect": ^0.4.3
+  "@mpsuesser/oxlint-plugin-effect": ^0.5.0
   # Starts the integration suite's ephemeral `pgvector/pgvector` server when no
   # local PostgreSQL is reachable — see packages/pg/tests/integration/global-setup.ts.
   "@testcontainers/postgresql": ^12.1.0
