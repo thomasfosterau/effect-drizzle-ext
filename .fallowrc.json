@@ -7,6 +7,8 @@
     "packages/core/src/constraints.ts",
     "packages/core/src/columns.ts",
     "packages/core/src/query.ts",
+    "packages/core/src/sort.ts",
+    "packages/core/src/update.ts",
     "packages/core/src/errors.ts",
     "packages/core/src/database.ts",
     "packages/core/src/versioned-chain.ts",

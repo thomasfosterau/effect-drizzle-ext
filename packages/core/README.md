@@ -28,10 +28,12 @@ This library **extends** drizzle-orm's own Effect integration (`drizzle-orm/effe
 | `./constraints` | yes | `enumCheck` and the threaded `type`-discriminator toolkit. |
 | `./columns` | yes | `bytea`, `tsvector`, `jsonbSchema`, `timestamps`, the hex codec. |
 | `./query` | yes | The unpaged-total window column, `Page`, `combineFilters`, `boundedPagination`, `executeRows`. |
+| `./sort` | yes | The `?sort=` resolution seam: the derived sortable allow-list, `resolveSortOrder` / `chronologicalOrder` with a total-order `id` tiebreak, `UnsupportedSortError`. |
+| `./update` | no | The update tri-state as a `SET` map: `updateSetMap`, `insertValues`. |
 | `./errors` | no (types only) | Postgres error facts and tagged classification over drizzle / `@effect/sql` error graphs. |
 | `./database` | types only | The driver-agnostic `makeDatabaseServices` factory (`Database`, `CurrentTransaction`, `transact`, `readHandle`). |
-| `./versioned-chain` | yes | `makeSubtypeTables`, `makeCurrentVersionView`. |
-| `./jsonapi` | no | `Resource.*`-shaped readers (optional peer `@thomasfosterau/effect-jsonapi`). |
+| `./versioned-chain` | yes | `makeSubtypeTables`, `makeCurrentVersionView`, the `VersionChainEntry` / `VersionSnapshot` read shapes, `versionTimestamps`. |
+| `./jsonapi` | no | `Resource.*`-shaped readers, including `resourceAttributeProjections` (optional peer `@thomasfosterau/effect-jsonapi`). |
 | `./jsonapi/derive` | yes | The Drizzle-emitting half of `./jsonapi`. |
 
 ## Quick start
@@ -251,6 +253,75 @@ export const executeRows: <T extends Record<string, unknown>>(
 ) => Effect.Effect<readonly T[], EffectDrizzleQueryError>;
 ```
 
+## `./sort`
+
+The `?sort=` **resolution** seam: which fields a list may be sorted by, and the `ORDER BY` terms a decoded sort list becomes. The wire grammar (`?sort=-publishedAt,name`) is the request decoder's; what arrives here is a list of `SortKey`s (`{ field, direction }`).
+
+`sortableColumnsFor(view, options?)` **derives** the allow-list from the view itself, rather than a hand-kept list: every column whose Drizzle `dataType` orders usefully (string, number, bigint, boolean, timestamp) under its own key, plus the version-chain names `options` configures. Its defaults match `./versioned-chain`'s conventions: `action` and the raw `timestamp` are internal; the aliased birth-row `createdAt` is admitted by name; `timestamp` is published as `updatedAt`. A document column, an embedding, and anything not in the view are refused. The derivation is memoised per view.
+
+`resolveSortOrder({ view, sort, fallback?, tiebreak?, sortable? })` returns the caller's order when `sort` is non-empty, the resource's `fallback` otherwise, and **always closes with the view's `id`** so `LIMIT` / `OFFSET` paging is total-ordered. The tiebreak mirrors the last key's direction, and is left off when the caller already sorted by `id`. An unknown field fails the whole request with `UnsupportedSortError`, before any key is mapped. That is a `Schema.TaggedError` carrying `field`, the sorted `allowed` list (so the error document can say what the caller could have asked for) and `code: "unsupported.sort-field"`. A JSON:API boundary maps it to a 400 with `source: { parameter: "sort" }`. `chronologicalOrder({ view, sort, direction? })` is the commonest fallback spelled once: newest-first by `timestamp`, with a mirrored tiebreak.
+
+Sorting a current-version view is bounded (the page keeps its `LIMIT`) but not index-backed; a client `?sort=` changes which column is sorted, not the cost class of the query.
+
+```ts
+export interface SortKey {
+  readonly field: string;
+  readonly direction: "asc" | "desc";
+}
+export type OrderTerm = PgColumn | SQL | SQL.Aliased;
+export type SortableColumns = Readonly<Record<string, OrderTerm>>;
+export class UnsupportedSortError /* Schema.TaggedError: field, allowed; code, message */ {}
+export const sortableColumnsFor: (
+  relation: Table | View,
+  options?: SortableColumnsOptions, // { internal?, aliased?, renamed? }
+) => SortableColumns;
+export const resolveSortOrder: (
+  options: ResolveSortOrderOptions,
+) => Effect.Effect<ReadonlyArray<OrderTerm>, UnsupportedSortError>;
+export const chronologicalOrder: (
+  options: ChronologicalOrderOptions,
+) => Effect.Effect<ReadonlyArray<OrderTerm>, UnsupportedSortError>;
+```
+
+```ts
+const list = Effect.gen(function* () {
+  const order = yield* resolveSortOrder({
+    view: postView,
+    sort: query.sort,
+    fallback: [desc(postView.timestamp)],
+    tiebreak: "desc",
+  });
+  return yield* db
+    .select()
+    .from(postView)
+    .orderBy(...order)
+    .limit(limit)
+    .offset(offset);
+});
+```
+
+## `./update`
+
+The update tri-state at a single seam. An update input encodes three states across key presence and value — a value **sets**, a present `null` **clears** (a nullable column), an absent key or explicit `undefined` **carries the stored value forward**. `updateSetMap(input, writable)` builds the `UPDATE … SET` map from the input's own keys: every key in `writable` with a present value (`null` included), in the input's key order. The routing `id`, server-owned columns and unknown keys drop out, and so does an `undefined` value, so a carry-forward can never become a clear. `insertValues` is the same projection for a create: an absent optional is left to the column default.
+
+Nothing here is `Option`: the `null` / `undefined` split _is_ the tri-state, and the map is Drizzle-facing.
+
+```ts
+export type UpdateSet<I, K extends string> = {
+  readonly [P in Extract<keyof I, K>]?: Exclude<I[P], undefined>;
+};
+export const updateSetMap: <I extends Readonly<Record<string, unknown>>, K extends string>(
+  input: I,
+  writable: Iterable<K>,
+) => UpdateSet<I, K>;
+export const insertValues: typeof updateSetMap;
+```
+
+```ts
+const WRITABLE = HashSet.make("name", "summary", "birthPlaceId");
+yield * tx.update(person).set(updateSetMap(input, WRITABLE)).where(eq(person.id, input.id));
+```
+
 ## `./errors`
 
 `@effect/sql-pg` already classifies SQLSTATE into `SqlError.reason`, but keeps the violated constraint for `23505` only — every other `23xxx` becomes a bare `ConstraintError` with no constraint / table / column — and drizzle wraps the whole thing inside `EffectDrizzleQueryError.cause`, an Effect `Cause`, not the driver error. `findPgError` recovers the facts anyway: a bounded (depth 8), cycle-guarded walk of the error graph — reading `.cause` explicitly (it is non-enumerable on both `SqlError` and `EffectDrizzleQueryError`) plus enumerable values and arrays (a `Cause`'s `reasons`) — for the first node whose `code` / `sqlState` looks like a five-character SQLSTATE. It matches a bare driver error, a bare `SqlError`, or the fully drizzle-wrapped shape alike, and imports neither `drizzle-orm` nor `@effect/sql-pg` to do it (the shapes are recognised structurally).
@@ -318,6 +389,8 @@ The opt-in interpreter for "a tree of levels, each a stable + version table pair
 
 **No view built by `makeCurrentVersionView` may select from another view built by `makeCurrentVersionView`** — a library-level rule, not just an observation about the DROP-ordering hazard above.
 
+The read shapes of a chain are structural types, so a history listing and the page that renders it can share them without depending on an operations module. `VersionChainEntry<Action>` is one `{ version, action, timestamp }` row. `VersionSnapshot<Action, Extra>` is one version's reconstructed state: the entry plus `columns` (every leaf-chain domain column at that version) and whatever branch-level facts `Extra` names. `Action` defaults to `"create" | "update" | "delete"`. `versionTimestamps(row)` reads a current-version row's `createdAt` / `updatedAt` pair: `updatedAt` is the current `timestamp`, and `createdAt` comes from the birth-row merge, falling back to `updatedAt` for a view that has none.
+
 ```ts
 export const makeSubtypeTables: <TDiscriminator>(
   applyDiscriminator: (
@@ -339,6 +412,20 @@ export const makeCurrentVersionView: <
   name: string,
   config: CurrentVersionViewConfig<TColumns>,
 ) => CurrentVersionViewResult<TColumns, TMerge>;
+export type VersionAction = "create" | "update" | "delete";
+export interface VersionChainEntry<Action extends string = VersionAction> {
+  readonly version: bigint;
+  readonly action: Action;
+  readonly timestamp: Date;
+}
+export type VersionSnapshot<
+  Action extends string = VersionAction,
+  Extra extends object = {},
+> = VersionChainEntry<Action> & Extra & { readonly columns: Readonly<Record<string, unknown>> };
+export const versionTimestamps: (row: {
+  readonly timestamp: Date;
+  readonly createdAt?: Date | null | undefined;
+}) => { readonly createdAt: Date; readonly updatedAt: Date };
 ```
 
 ## `./jsonapi` and `./jsonapi/derive`
@@ -366,12 +453,31 @@ const deriveResourceColumns = makeDeriveResourceColumns(builders, {
 export const articleColumns = deriveResourceColumns(Article);
 ```
 
+`resourceAttributeProjections(resource)` reads each resource-object attribute's **projection shape** as plain data, in declaration order. That shape is what an operation factory needs to derive a row → resource mapper and a column map from the model alone:
+
+- `optional` — an `optionalKey` projection, read off the AST;
+- `nullable`, `array`, `date` — behavioural decode probes through the attribute's JSON codec, so `Schema.Date` counts as a date because an ISO string decodes to a `Date`;
+- `column` — the `dbColumn` column name, `Option.none()` when the attribute declares none.
+
+Input-only attributes (`resource: false`) are not on the resource object and are not listed.
+
 `dbTable` / `dbTableFor` / `readDbTable` are re-exported here narrowed to `R extends AnyResource` — the same functions as `.`, so a resource-facing `db-annotation.ts` imports every name it needs from one place.
 
 ```ts
 export type AnyResource = Resource.Any;
 export const resourceColumns: (resource: AnyResource) => Record<string, DbColumn>;
 export const resourceColumnBounds: (resource: AnyResource) => Record<string, ColumnBounds>;
+export interface ResourceAttributeProjection {
+  readonly key: string;
+  readonly optional: boolean;
+  readonly nullable: boolean;
+  readonly array: boolean;
+  readonly date: boolean;
+  readonly column: Option.Option<string>;
+}
+export const resourceAttributeProjections: (
+  resource: AnyResource,
+) => ReadonlyArray<ResourceAttributeProjection>;
 export const makeDeriveResourceColumns: <B extends ColumnBuilders>(
   builders: B,
   options?: DeriveOptions,
@@ -398,7 +504,7 @@ export const deriveCheckConstraints: (
 - **Owner scoping** — multi-tenant visibility predicates (`owner_id`, role ladders) are application trust policy and stay in the application.
 - **Migrations tooling** — running `drizzle-kit generate` / `migrate`, and the generated SQL files themselves, stay in the application.
 - **Provisioning** — bootstrapping a real database (fixture users, seed data, a CI Postgres service) stays in the application; `@thomasfosterau/effect-drizzle-ext-pg/testing` ships only the transaction-rollback test harness.
-- **Operation factories** — the model / route / handler layer built around a derived table (create/update/list operations, viewer-scoped queries) stays in the application.
+- **Operation factories** — the model / route / handler layer built around a derived table (create/update/list operations, viewer-scoped queries) stays in the application. The pieces of it that are generic over any table — the sort seam, the update `SET` map, the attribute projections — ship here; JSON:API link builders belong to `@thomasfosterau/effect-jsonapi`, and list visibility predicates to the authorization layer.
 
 ## Metadata
 

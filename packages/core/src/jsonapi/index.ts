@@ -28,7 +28,9 @@
 
 import { Resource } from "@thomasfosterau/effect-jsonapi";
 import * as Option from "effect/Option";
-import type * as Schema from "effect/Schema";
+import * as Predicate from "effect/Predicate";
+import * as Schema from "effect/Schema";
+import * as SchemaAST from "effect/SchemaAST";
 import {
   dbTable as coreDbTable,
   readDbTable as coreReadDbTable,
@@ -129,6 +131,82 @@ export const resourceColumnBounds = (resource: AnyResource): Record<string, Colu
     if (Option.isSome(bounds)) out[name] = { column: columns[name], ...bounds.value };
   }
   return out;
+};
+
+// ── Resource projection shapes ────────────────────────────────────────
+
+/**
+ * The resource-projection shape of one `Resource.make` attribute, as plain
+ * data — what an operation factory needs to derive a row → resource mapper
+ * and a version-table column map from the model alone:
+ *
+ * - `date` (a `createdAt` / `updatedAt` / `deletedAt`-style `Date`) → a
+ *   timestamp axis the mapper reads from the chain rather than a column,
+ * - `array` (a materialised-list attribute a flat view does not carry) → a
+ *   placeholder the mapper fills from a join,
+ * - `optional` (an `optionalKey` resource projection) → the value drops when
+ *   the column is absent rather than surfacing as a present `undefined`,
+ * - everything else (including a `NullOr` column read straight off a view) →
+ *   passthrough.
+ *
+ * `column` is the column the attribute's `dbColumn` annotation names, `none`
+ * for an attribute that declares none.
+ */
+export interface ResourceAttributeProjection {
+  readonly key: string;
+  /** The resource projection is an `optionalKey` (drops when absent). */
+  readonly optional: boolean;
+  /** The attribute schema accepts `null` (a `Schema.NullOr`). */
+  readonly nullable: boolean;
+  /** The attribute schema is an array (a materialised-list attribute). */
+  readonly array: boolean;
+  /** The attribute schema decodes an ISO string to a `Date` (a timestamp axis). */
+  readonly date: boolean;
+  /** The column the attribute backs, if it declares one. */
+  readonly column: Option.Option<string>;
+}
+
+/** An ISO timestamp a `Date`-decoding attribute schema accepts. */
+const ISO_PROBE = "2024-01-02T03:04:05.000Z";
+
+/**
+ * What a schema's **JSON codec** decodes `input` to — the wire reading, so an
+ * ISO string decodes to a `Date` for `Schema.Date` (whose own decoder accepts
+ * only a `Date` instance). A decoder is built per call: this is start-up
+ * introspection over a model, not a hot path.
+ */
+const decodesFromJson = (schema: Schema.Top, input: unknown): Option.Option<unknown> =>
+  // SAFETY: an attribute schema's decoding needs no services (a resource's
+  // attributes are plain codecs), which `Schema.Top` cannot express.
+  Schema.decodeUnknownOption(Schema.toCodecJson(schema as Schema.Codec<unknown>))(input);
+
+/**
+ * Project a `Resource.make` definition's resource-object attributes into
+ * ordered plain-data {@link ResourceAttributeProjection}s (declaration
+ * order). Optionality is read off each field's AST (`optionalKey` marks the
+ * property optional); nullability, array-ness and date-ness are recovered by
+ * behavioural decode probes through each schema's JSON codec (the wire
+ * reading), so the read stays robust across schema-AST shapes (a `NullOr` of
+ * a transformation, a branded array, …).
+ *
+ * Input-only attributes (`resource: false`) are not on the resource object,
+ * and so not here. The `column` read is {@link resourceColumns}'.
+ */
+export const resourceAttributeProjections = (
+  resource: AnyResource,
+): ReadonlyArray<ResourceAttributeProjection> => {
+  // SAFETY: `Resource.attributes` returns the resource object's
+  // `Schema.Struct.Fields`; every value is a schema.
+  const fields = Resource.attributes(resource) as Record<string, Schema.Top>;
+  const columns = resourceColumns(resource);
+  return Object.entries(fields).map(([key, schema]) => ({
+    key,
+    optional: SchemaAST.isOptional(schema.ast),
+    nullable: Option.isSome(decodesFromJson(schema, null)),
+    array: Option.isSome(decodesFromJson(schema, [])),
+    date: Option.exists(decodesFromJson(schema, ISO_PROBE), Predicate.isDate),
+    column: Option.fromNullishOr(columns[key]?.column),
+  }));
 };
 
 // ── Table-level annotation, narrowed to resources ─────────────────────

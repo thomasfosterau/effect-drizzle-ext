@@ -536,3 +536,63 @@ export const makeCurrentVersionView =
     });
     return view as unknown as CurrentVersionViewResult<TColumns, TMerge>;
   };
+
+// ── Version-chain read shapes ─────────────────────────────────────────
+
+/**
+ * The actions a version-chain row records by default: a chain appends a
+ * `(version, action, timestamp)` row per edit rather than rewriting in place,
+ * and a delete is a tombstone version.
+ */
+export type VersionAction = "create" | "update" | "delete";
+
+/**
+ * One entry in a node's append-only version chain — what a version-history
+ * listing returns per row. `Action` is the chain's own action vocabulary
+ * (default {@link VersionAction}).
+ */
+export interface VersionChainEntry<Action extends string = VersionAction> {
+  /** The version number (0 is the create). */
+  readonly version: bigint;
+  /** The edit action this version recorded. */
+  readonly action: Action;
+  /** When the version was written. */
+  readonly timestamp: Date;
+}
+
+/**
+ * One version's reconstructed state — what a browse / compare surface shows,
+ * and what a restore re-applies as a new version. Every leaf-chain domain
+ * column at `(id, version)`, keyed by column name (leaf-most level wins on a
+ * shared name), plus the root chain's `action` / `timestamp`. Generated
+ * columns (a search vector) are opaque and belong outside `columns`.
+ *
+ * `Extra` carries the branch-level facts a hierarchy adds to a snapshot (a
+ * content branch's visibility and draft flag, say); the library knows none of
+ * them.
+ */
+export type VersionSnapshot<
+  Action extends string = VersionAction,
+  Extra extends object = Record<never, never>,
+> = VersionChainEntry<Action> &
+  Extra & {
+    /** Every leaf-chain domain column at this version, keyed by column name. */
+    readonly columns: Readonly<Record<string, unknown>>;
+  };
+
+/**
+ * The `createdAt` / `updatedAt` pair of a current-version row: `updatedAt` is
+ * the current version's `timestamp`; `createdAt` is the birth row's own
+ * timestamp where the view merges one in (a function `merge` of
+ * {@link makeCurrentVersionView}), and falls back to `updatedAt` for a view
+ * that carries none (website #1223).
+ */
+/* oxlint-disable effect/prefer-option-over-null -- a Drizzle row seam: a view row's nullable column is typed `T | null` by Drizzle itself, and a view without the birth-row merge has no `createdAt` key at all */
+export const versionTimestamps = (row: {
+  readonly timestamp: Date;
+  readonly createdAt?: Date | null | undefined;
+}): { readonly createdAt: Date; readonly updatedAt: Date } => ({
+  createdAt: row.createdAt ?? row.timestamp,
+  updatedAt: row.timestamp,
+});
+/* oxlint-enable effect/prefer-option-over-null */

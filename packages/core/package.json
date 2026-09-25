@@ -38,6 +38,8 @@
     "./constraints": "./src/constraints.ts",
     "./columns": "./src/columns.ts",
     "./query": "./src/query.ts",
+    "./sort": "./src/sort.ts",
+    "./update": "./src/update.ts",
     "./errors": "./src/errors.ts",
     "./database": "./src/database.ts",
     "./versioned-chain": "./src/versioned-chain.ts",
@@ -69,6 +71,14 @@
       "./query": {
         "types": "./dist/query.d.ts",
         "default": "./dist/query.js"
+      },
+      "./sort": {
+        "types": "./dist/sort.d.ts",
+        "default": "./dist/sort.js"
+      },
+      "./update": {
+        "types": "./dist/update.d.ts",
+        "default": "./dist/update.js"
       },
       "./errors": {
         "types": "./dist/errors.d.ts",

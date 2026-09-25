@@ -60,10 +60,26 @@ import {
 } from "@thomasfosterau/effect-drizzle-ext/errors";
 import { makeDatabaseServices } from "@thomasfosterau/effect-drizzle-ext/database";
 import {
+  chronologicalOrder,
+  type OrderTerm,
+  resolveSortOrder,
+  type SortableColumns,
+  sortableColumnsFor,
+  UnsupportedSortError,
+} from "@thomasfosterau/effect-drizzle-ext/sort";
+import { insertValues, updateSetMap } from "@thomasfosterau/effect-drizzle-ext/update";
+import {
   makeCurrentVersionView,
   makeSubtypeTables,
+  type VersionChainEntry,
+  type VersionSnapshot,
+  versionTimestamps,
 } from "@thomasfosterau/effect-drizzle-ext/versioned-chain";
-import { resourceColumns, dbTable } from "@thomasfosterau/effect-drizzle-ext/jsonapi";
+import {
+  resourceAttributeProjections,
+  resourceColumns,
+  dbTable,
+} from "@thomasfosterau/effect-drizzle-ext/jsonapi";
 import { makeDeriveResourceColumns } from "@thomasfosterau/effect-drizzle-ext/jsonapi/derive";
 import * as Pg from "@thomasfosterau/effect-drizzle-ext-pg";
 import * as PgTesting from "@thomasfosterau/effect-drizzle-ext-pg/testing";
@@ -215,6 +231,32 @@ export const filmView = currentVersionView(core, "film_view", {
 });
 type FilmViewRow = typeof filmView.$inferSelect;
 
+// oxlint-disable-next-line effect/use-clock-service -- a fixed instant; never executed
+export const filmTimestamps = versionTimestamps({ timestamp: new Date(0) });
+type Snapshot = VersionSnapshot<"create", { readonly draft?: boolean }>;
+
+// ── sort ──────────────────────────────────────────────────────────────────
+
+export const filmSortable: SortableColumns = sortableColumnsFor(filmView);
+export const filmOrder = resolveSortOrder({
+  view: filmView,
+  sort: [{ field: "title", direction: "desc" }],
+});
+export const bookOrder = chronologicalOrder({ view: { ...book, timestamp: book.createdAt } });
+export const sortRejected = Effect.fail(new UnsupportedSortError({ field: "x", allowed: [] }));
+
+// ── update ────────────────────────────────────────────────────────────────
+
+/* oxlint-disable effect/prefer-option-over-null -- the update tri-state input shape */
+declare const bookUpdate: {
+  readonly id: string;
+  readonly title?: string;
+  readonly pages?: number | null | undefined;
+};
+/* oxlint-enable effect/prefer-option-over-null */
+export const bookSet = updateSetMap(bookUpdate, ["title", "pages"] as const);
+export const bookValues = insertValues(bookUpdate, ["title"] as const);
+
 // ── jsonapi ───────────────────────────────────────────────────────────────
 
 const PersonResource = dbTable(
@@ -228,6 +270,7 @@ const PersonResource = dbTable(
   { name: "person", level: "agent" },
 );
 export const personColumns = resourceColumns(PersonResource);
+export const personProjections = resourceAttributeProjections(PersonResource);
 export const personTable = table(PersonResource, { name: "person", level: "agent" });
 export const personTableMeta = readDbTable(PersonResource);
 const deriveResource = makeDeriveResourceColumns(builders);
@@ -294,4 +337,27 @@ export type Checks = [
     Equals<Effect.Services<typeof savepointed>, "AppDb/CurrentTransaction">
   >,
   /** _personName */ Assert<Equals<(typeof person.$inferSelect)["name"], string>>,
+  /** _projectionColumn */ Assert<
+    Equals<(typeof personProjections)[number]["column"], Option.Option<string>>
+  >,
+  /** _filmOrder */ Assert<
+    Equals<typeof filmOrder, Effect.Effect<ReadonlyArray<OrderTerm>, UnsupportedSortError>>
+  >,
+  /** _bookOrder */ Assert<Equals<Effect.Error<typeof bookOrder>, UnsupportedSortError>>,
+  /** _sortErrorTag */ Assert<
+    Equals<Effect.Error<typeof sortRejected>["_tag"], "UnsupportedSortError">
+  >,
+  /** _sortErrorCode */ Assert<Equals<UnsupportedSortError["code"], "unsupported.sort-field">>,
+  /* oxlint-disable effect/prefer-option-over-null -- the tri-state output (a present null clears) and an optional key's read type */
+  /** _bookSet */ Assert<
+    Equals<typeof bookSet, { readonly title?: string; readonly pages?: number | null }>
+  >,
+  /** _bookValues */ Assert<Equals<typeof bookValues, { readonly title?: string }>>,
+  /** _entryAction */ Assert<Equals<VersionChainEntry["action"], "create" | "update" | "delete">>,
+  /** _snapshotDraft */ Assert<Equals<Snapshot["draft"], boolean | undefined>>,
+  /* oxlint-enable effect/prefer-option-over-null */
+  /** _snapshotVersion */ Assert<Equals<Snapshot["version"], bigint>>,
+  /** _timestamps */ Assert<
+    Equals<typeof filmTimestamps, { readonly createdAt: Date; readonly updatedAt: Date }>
+  >,
 ];
