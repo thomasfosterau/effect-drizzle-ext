@@ -26,7 +26,7 @@ Hooks are managed by Vite+; the editable [.vite-hooks/pre-commit](.vite-hooks/pr
 1. `vp fmt` / `vp lint`
 2. `vp run check`
 3. `vp run -r test:unit`
-4. `vp run test:integration` — needs a local PostgreSQL server (`PG*` env) or a Docker daemon; or set `DATABASE_URL_TEST`.
+4. `vp run test:integration` — needs a local PostgreSQL server (`PG*` env) or a Docker daemon; or set `DATABASE_URL_TEST` (to a database that already holds the fixture chain in `packages/pg/tests/fixtures/migrations`).
 5. `vp run -r build`
 6. `fallow audit --base origin/main`
 7. A changeset (`pnpm changeset`) for every change to a published package.

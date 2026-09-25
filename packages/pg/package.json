@@ -32,7 +32,9 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./testing": "./src/testing.ts"
+    "./migrations": "./src/migrations.ts",
+    "./testing": "./src/testing.ts",
+    "./tooling": "./src/tooling/index.ts"
   },
   "publishConfig": {
     "exports": {
@@ -40,9 +42,17 @@
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
       },
+      "./migrations": {
+        "types": "./dist/migrations.d.ts",
+        "default": "./dist/migrations.js"
+      },
       "./testing": {
         "types": "./dist/testing.d.ts",
         "default": "./dist/testing.js"
+      },
+      "./tooling": {
+        "types": "./dist/tooling/index.d.ts",
+        "default": "./dist/tooling/index.js"
       }
     },
     "access": "public"
@@ -52,19 +62,29 @@
   },
   "devDependencies": {
     "@effect/language-service": "catalog:",
+    "@effect/platform-node": "catalog:",
     "@effect/sql-pg": "catalog:",
     "@testcontainers/postgresql": "catalog:",
     "@types/node": "catalog:",
-    "@types/pg": "catalog:",
     "@vitest/coverage-istanbul": "catalog:",
+    "drizzle-kit": "catalog:",
     "drizzle-orm": "catalog:",
-    "effect": "catalog:",
-    "pg": "catalog:"
+    "effect": "catalog:"
   },
   "peerDependencies": {
     "@effect/sql-pg": "catalog:peers",
+    "@testcontainers/postgresql": "catalog:peers",
+    "drizzle-kit": "catalog:peers",
     "drizzle-orm": "catalog:peers",
     "effect": "catalog:peers"
+  },
+  "peerDependenciesMeta": {
+    "@testcontainers/postgresql": {
+      "optional": true
+    },
+    "drizzle-kit": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=22"

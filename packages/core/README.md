@@ -502,8 +502,8 @@ export const deriveCheckConstraints: (
 
 - **Id brands** — a consumer's own branded id types (`ArticleId`, `PersonId`, …) stay in the application; this library is id-agnostic.
 - **Owner scoping** — multi-tenant visibility predicates (`owner_id`, role ladders) are application trust policy and stay in the application.
-- **Migrations tooling** — running `drizzle-kit generate` / `migrate`, and the generated SQL files themselves, stay in the application.
-- **Provisioning** — bootstrapping a real database (fixture users, seed data, a CI Postgres service) stays in the application; `@thomasfosterau/effect-drizzle-ext-pg/testing` ships only the transaction-rollback test harness.
+- **Migrations** — `drizzle-kit generate`, the generated SQL files and the deploy-time migrator stay in the application. The fresh-database runner, test-database provisioning and the drift / view-dependency guards are in [`@thomasfosterau/effect-drizzle-ext-pg`](../pg/README.md) (`./migrations`, `./testing`, `./tooling`).
+- **Seed data** — fixture users and application seeds stay in the application's harness.
 - **Operation factories** — the model / route / handler layer built around a derived table (create/update/list operations, viewer-scoped queries) stays in the application. The pieces of it that are generic over any table — the sort seam, the update `SET` map, the attribute projections — ship here; JSON:API link builders belong to `@thomasfosterau/effect-jsonapi`, and list visibility predicates to the authorization layer.
 
 ## Metadata

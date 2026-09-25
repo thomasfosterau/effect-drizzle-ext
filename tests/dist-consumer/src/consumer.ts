@@ -82,7 +82,15 @@ import {
 } from "@thomasfosterau/effect-drizzle-ext/jsonapi";
 import { makeDeriveResourceColumns } from "@thomasfosterau/effect-drizzle-ext/jsonapi/derive";
 import * as Pg from "@thomasfosterau/effect-drizzle-ext-pg";
+import * as PgMigrations from "@thomasfosterau/effect-drizzle-ext-pg/migrations";
 import * as PgTesting from "@thomasfosterau/effect-drizzle-ext-pg/testing";
+import * as PgTooling from "@thomasfosterau/effect-drizzle-ext-pg/tooling";
+import type * as FileSystem from "effect/FileSystem";
+import type * as Path from "effect/Path";
+import type { PlatformError } from "effect/PlatformError";
+import type * as Scope from "effect/Scope";
+import type { SqlClient } from "effect/unstable/sql/SqlClient";
+import type { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
 
 /** A compile-time assertion: `T` must be exactly `true`. */
 type Assert<T extends true> = T;
@@ -299,6 +307,29 @@ export const testLayer: Layer.Layer<"AppDb", SqlError> = PgTesting.testDatabaseL
   url: Redacted.make("postgresql://postgres@127.0.0.1:5432/test"),
 });
 
+// ── pg: migrations, provisioning, tooling ─────────────────────────────────
+
+export const migrated = PgMigrations.applyMigrations("/app/migrations");
+export const migrations = PgMigrations.readMigrations("/app/migrations");
+export const provisioned = PgTesting.provisionTestDatabase({
+  env: {},
+  migrationsDir: "/app/migrations",
+  dbNamePrefix: "app",
+  image: "postgres:17",
+});
+export const source = PgTesting.resolveDatabaseSource({
+  env: {},
+  migrationsDir: "/app/migrations",
+  dbNamePrefix: "app",
+  image: "postgres:17",
+});
+export const drift = PgTooling.checkMigrationDrift({
+  schema: {},
+  migrationsDir: "/app/migrations",
+});
+export const views = PgTooling.checkViewDependencies({ schema: {} });
+export const dagIssues: ReadonlyArray<string> = PgTooling.checkDagIntegrity([]);
+
 /**
  * Every compile-time assertion, exported so `noUnusedLocals` keeps them and a
  * failing one names itself in the error.
@@ -357,6 +388,42 @@ export type Checks = [
   /** _snapshotDraft */ Assert<Equals<Snapshot["draft"], boolean | undefined>>,
   /* oxlint-enable effect/prefer-option-over-null */
   /** _snapshotVersion */ Assert<Equals<Snapshot["version"], bigint>>,
+  /** _migrated */ Assert<
+    Equals<
+      typeof migrated,
+      Effect.Effect<
+        number,
+        PgMigrations.MigrationError | PlatformError,
+        SqlClient | FileSystem.FileSystem | Path.Path
+      >
+    >
+  >,
+  /** _migrationName */ Assert<Equals<Effect.Success<typeof migrations>[number]["name"], string>>,
+  /** _provisionedUrl */ Assert<
+    Equals<Effect.Success<typeof provisioned>["url"], Redacted.Redacted<string>>
+  >,
+  /** _provisionedScoped */ Assert<
+    Equals<Effect.Services<typeof provisioned>, FileSystem.FileSystem | Path.Path | Scope.Scope>
+  >,
+  /** _sourceTags */ Assert<
+    Equals<Effect.Success<typeof source>["_tag"], "Explicit" | "LocalServer" | "Container">
+  >,
+  /** _sourceErrors */ Assert<
+    Equals<
+      Effect.Error<typeof source>,
+      PgTesting.DatabaseUnreachable | PgTesting.InvalidDatabasePrefix
+    >
+  >,
+  /** _driftServices */ Assert<
+    Equals<Effect.Services<typeof drift>, FileSystem.FileSystem | Path.Path | ChildProcessSpawner>
+  >,
+  /** _driftErrorTag */ Assert<
+    Equals<PgTooling.MigrationDriftError["_tag"], "MigrationDriftError">
+  >,
+  /** _viewCount */ Assert<Equals<Effect.Success<typeof views>, { readonly viewCount: number }>>,
+  /** _viewError */ Assert<
+    Equals<Effect.Error<typeof views>, PgTooling.ViewDependencyError | PgTooling.SchemaDiffError>
+  >,
   /** _timestamps */ Assert<
     Equals<typeof filmTimestamps, { readonly createdAt: Date; readonly updatedAt: Date }>
   >,

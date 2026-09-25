@@ -38,6 +38,11 @@ catalog:
   # three. Pin set in step with the preferenceflow application (the freshest).
   "@effect/tsgo": 0.45.0
   "@effect/sql-pg": 4.0.0-rc.115
+  # The Node `FileSystem` / `Path` / `ChildProcessSpawner` layer the pg
+  # package's tests provide to `./migrations`, `./testing`'s provisioning and
+  # `./tooling` — a consumer provides its own (these modules only require the
+  # services).
+  "@effect/platform-node": 4.0.0-rc.115
   "@mpsuesser/oxlint-plugin-effect": ^0.5.0
   # Starts the integration suite's ephemeral `pgvector/pgvector` server when no
   # local PostgreSQL is reachable — see packages/pg/tests/integration/global-setup.ts.
@@ -45,18 +50,17 @@ catalog:
   # Optional peer of the core package: only the `./jsonapi*` subpaths import it.
   "@thomasfosterau/effect-jsonapi": ^0.14.0
   "@types/node": ^26.4.1
-  "@types/pg": ^8.20.3
   "@vitest/coverage-istanbul": 5.0.1
   # A commit-suffixed prerelease: the first drizzle line to ship the Effect
   # integration (`drizzle-orm/effect-postgres`, `effect-core`, `effect-schema`)
   # this library extends. Same pin as the three applications.
   drizzle-orm: 1.0.0-rc.5-ab785fc
+  # The optional peer `@thomasfosterau/effect-drizzle-ext-pg/tooling` diffs
+  # schemas with (`drizzle-kit/api-postgres`); always the drizzle-orm pin.
+  drizzle-kit: 1.0.0-rc.5-ab785fc
   effect: 4.0.0-rc.115
   effect-solutions: ^0.5.3
   fallow: 3.23.0
-  # Test-only since @effect/sql-pg 4.0.0-rc.115 dropped the `pg` driver: the
-  # integration suite's provisioning still talks to the server with it.
-  pg: ^8.20.0
   # TypeScript 6/7 side-by-side: TS7 (the native Go compiler) ships no JS API
   # until 7.1, so JS-API consumers (@effect/language-service) stay on TS6 while
   # native `tsc` type-checks AND emits this library's `dist/`. The alias keeps
@@ -88,8 +92,11 @@ catalogs:
     # written against it (and `pg` stopped being a peer).
     "@effect/sql-pg": ">=4.0.0-rc.115"
     "@thomasfosterau/effect-jsonapi": ">=0.14.0"
+    drizzle-kit: ">=1.0.0-rc.5"
     drizzle-orm: ">=1.0.0-rc.5"
     effect: ">=4.0.0-rc.112"
+    # Optional peer of the pg package's `./testing` Testcontainers fallback.
+    "@testcontainers/postgresql": ">=12"
 
 overrides:
   vite: "catalog:"

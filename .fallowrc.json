@@ -15,7 +15,9 @@
     "packages/core/src/jsonapi/index.ts",
     "packages/core/src/jsonapi/derive.ts",
     "packages/pg/src/index.ts",
+    "packages/pg/src/migrations.ts",
     "packages/pg/src/testing.ts",
+    "packages/pg/src/tooling/index.ts",
     "packages/*/tests/**/*.test.ts",
     "packages/pg/tests/integration/global-setup.ts",
     "packages/pg/vitest.integration.config.ts",
@@ -25,7 +27,6 @@
   "ignorePatterns": ["**/dist/**", "**/coverage/**"],
   "ignoreDependencies": [
     "@types/node",
-    "@types/pg",
     "effect-solutions",
     "@effect/tsgo",
     "@effect/language-service",
