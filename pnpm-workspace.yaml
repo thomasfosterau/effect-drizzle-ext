@@ -32,8 +32,8 @@ catalog:
   # with the `oxlint` that `vite-plus` pulls in (0.3.0 carries oxlint 1.79.0).
   # Read the `components` table in node_modules/@effect/tsgo/dist/effect-tsgo.cjs
   # before bumping any of the three.
-  "@effect/tsgo": 0.41.0
-  "@effect/sql-pg": 4.0.0-rc.112
+  "@effect/tsgo": 0.45.0
+  "@effect/sql-pg": 4.0.0-rc.117
   "@mpsuesser/oxlint-plugin-effect": ^0.4.3
   # Starts the integration suite's ephemeral `pgvector/pgvector` server when no
   # local PostgreSQL is reachable — see packages/pg/tests/integration/global-setup.ts.
@@ -47,7 +47,7 @@ catalog:
   # integration (`drizzle-orm/effect-postgres`, `effect-core`, `effect-schema`)
   # this library extends. Same pin as the three applications.
   drizzle-orm: 1.0.0-rc.5-ab785fc
-  effect: 4.0.0-rc.112
+  effect: 4.0.0-rc.117
   effect-solutions: ^0.5.3
   fallow: 3.23.0
   # Matches @effect/sql-pg's own `pg` range.
