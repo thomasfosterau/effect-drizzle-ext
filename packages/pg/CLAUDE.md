@@ -1,6 +1,6 @@
 # packages/pg — `@thomasfosterau/effect-drizzle-ext-pg`
 
-The `@effect/sql-pg` binding of the bridge. Peers: `effect`, `drizzle-orm`, `@effect/sql-pg`, `pg`. Depends on `@thomasfosterau/effect-drizzle-ext` for the driver-agnostic service factory it specialises.
+The `@effect/sql-pg` binding of the bridge. Peers: `effect`, `drizzle-orm`, `@effect/sql-pg` (`>=4.0.0-rc.115`, the release that replaced the `pg` driver with its own protocol). Depends on `@thomasfosterau/effect-drizzle-ext` for the driver-agnostic service factory it specialises.
 
 ## Terms
 
@@ -11,7 +11,7 @@ The `@effect/sql-pg` binding of the bridge. Peers: `effect`, `drizzle-orm`, `@ef
 
 ## Local invariants
 
-- `pgClientFromPool` never pings at layer build (an application that builds a runtime per request must not open a connection per request).
+- `pgClientFromPool` never pings at layer build (an application that builds a runtime per request must not open a connection per request); `pgClientFromUrl` always does. Under `@effect/sql-pg` rc.115 the pool is lazy on its own, so the ping is `pgClientFromUrl`'s explicit `SELECT 1`.
 - The test runner pins `maxConnections: 1` so an operation-opened transaction nests as a SAVEPOINT on the same connection and sees the outer transaction's uncommitted writes.
 - Provisioning under `tests/integration/` is repository test infrastructure; it is not exported and not published.
 

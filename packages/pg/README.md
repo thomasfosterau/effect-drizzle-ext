@@ -9,10 +9,10 @@ The `@effect/sql-pg` binding of the Effect ↔ Drizzle bridge: one `makePgDataba
 ## Installation
 
 ```bash
-npm install @thomasfosterau/effect-drizzle-ext-pg @thomasfosterau/effect-drizzle-ext effect drizzle-orm @effect/sql-pg pg
+npm install @thomasfosterau/effect-drizzle-ext-pg @thomasfosterau/effect-drizzle-ext effect drizzle-orm @effect/sql-pg
 ```
 
-`effect` (`>=4.0.0-rc.112`), `drizzle-orm` (`>=1.0.0-rc.5`), `@effect/sql-pg` (`>=4.0.0-rc.112`) and `pg` (`>=8`) are peer dependencies, built against `effect@4.0.0-rc.112`, `drizzle-orm@1.0.0-rc.5-ab785fc`, `@effect/sql-pg@4.0.0-rc.112` and `pg@^8.20.0`. `@thomasfosterau/effect-drizzle-ext` is a regular dependency, not a peer — it supplies the driver-agnostic `makeDatabaseServices` factory this package specialises. Node.js 22 or newer is required.
+`effect` (`>=4.0.0-rc.112`), `drizzle-orm` (`>=1.0.0-rc.5`) and `@effect/sql-pg` (`>=4.0.0-rc.115`) are peer dependencies, built against `effect@4.0.0-rc.115`, `drizzle-orm@1.0.0-rc.5-ab785fc` and `@effect/sql-pg@4.0.0-rc.115`. The `@effect/sql-pg` floor is higher than `effect`'s because 4.0.0-rc.115 replaced the `pg` driver with its own wire protocol and removed `PgClient.fromPool`; the client constructors below are written against that release, and `pg` is no longer a peer. `@thomasfosterau/effect-drizzle-ext` is a regular dependency, not a peer — it supplies the driver-agnostic `makeDatabaseServices` factory this package specialises. Node.js 22 or newer is required.
 
 ## Overview
 
@@ -36,8 +36,8 @@ export type Database = typeof database.Database.Identifier; // "Database"
 
 Both `make` and `layer` carry `PgClient` in their requirement channel and nothing else: **where the pool comes from is the consuming application's decision**, made by providing one of:
 
-- **`pgClientFromUrl`** — `@effect/sql-pg`'s own `PgClient.layer`. **Pings the database (`SELECT 1`) at layer build**, failing the build loudly with a `SqlError` if the ping doesn't answer within `connectTimeout`. Right for a long-lived process: a misconfigured URL fails once, at startup, instead of on the first query.
-- **`pgClientFromPool`** — a bare `pg.Pool` via `PgClient.fromPool`. **Never connects at layer build**; the pool is acquired and released with the layer's own scope, so a runtime built per request disposes of its pool with that request, and a connection failure surfaces on the first query instead. Use this wherever a runtime is built per request or per event — `pgClientFromUrl` there would open a connection on every build, including ones that never touch the database. A pool built this way **must never outlive the scope that created it**.
+- **`pgClientFromUrl`** — `@effect/sql-pg`'s `PgClient.make` plus one `SELECT 1`. **Pings the database at layer build**, failing the build loudly with a `SqlError` if the ping doesn't answer within `connectTimeout`. Right for a long-lived process: a misconfigured URL fails once, at startup, instead of on the first query.
+- **`pgClientFromPool`** — `@effect/sql-pg`'s own `PgClient.layer`, whose pool opens connections on first use. **Never connects at layer build**; the pool is shut down with the layer's own scope, so a runtime built per request disposes of its pool with that request, and a connection failure surfaces on the first query instead. Use this wherever a runtime is built per request or per event — `pgClientFromUrl` there would open a connection on every build, including ones that never touch the database. A pool built this way **must never outlive the scope that created it**.
 - a client layer of the caller's own (any `Layer<PgClient>`).
 
 ```ts
@@ -49,11 +49,12 @@ export const pgClientFromUrl: (config: {
 
 export const pgClientFromPool: (options: {
   readonly connectionString: Redacted.Redacted<string>;
-  readonly endTimeout?: Duration.Input | undefined;
+  readonly maxConnections?: number | undefined;
+  readonly connectTimeout?: Duration.Input | undefined;
 }) => Layer.Layer<PgClient.PgClient | SqlClient, SqlError>;
 ```
 
-Both output `PgClient | SqlClient` — that is what `@effect/sql-pg`'s own `PgClient.layer` / `PgClient.layerFrom` provide, and `Layer`'s output is covariant, so either satisfies a `PgClient`-only requirement (`testDatabaseLayer` below is built from one). `pgClientFromPool`'s `endTimeout` (default 1 second) bounds how long `pool.end()` waits on scope close — a pool that will not drain must not wedge a request's teardown.
+Both output `PgClient | SqlClient` — that is what `@effect/sql-pg`'s own `PgClient.layer` / `PgClient.layerFrom` provide, and `Layer`'s output is covariant, so either satisfies a `PgClient`-only requirement (`testDatabaseLayer` below is built from one). (Before `@effect/sql-pg` 4.0.0-rc.115, `pgClientFromPool` wrapped a bare `pg.Pool` and took an `endTimeout` for `pool.end()`; rc.115's pool owns its own shutdown, so the option is gone.)
 
 Deployment topology stays with the consuming application: resolving a connection string from a platform binding (a Cloudflare Hyperdrive binding, an environment variable), degrading a failed binding to a proxy client, and any wrapper around the concrete client are all things only the application knows about. This package has no Hyperdrive binding and no Cloudflare/Alchemy integration.
 

@@ -6,7 +6,6 @@
     "drizzle",
     "drizzle-orm",
     "effect",
-    "pg",
     "postgres",
     "typescript"
   ],
@@ -65,8 +64,7 @@
   "peerDependencies": {
     "@effect/sql-pg": "catalog:peers",
     "drizzle-orm": "catalog:peers",
-    "effect": "catalog:peers",
-    "pg": "catalog:peers"
+    "effect": "catalog:peers"
   },
   "engines": {
     "node": ">=22"
