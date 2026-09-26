@@ -95,6 +95,26 @@ export default defineConfig({
       "effect/avoid-option-getorthrow": "warn",
       "effect/no-barrel-imports": "warn",
       "effect/throw-in-effect-gen": "warn",
+      // Added to `effect.configs.recommended` (at `error`) by
+      // @mpsuesser/oxlint-plugin-effect 0.5; staged the same way, as
+      // effect-jsonapi staged them. Counted at the bump (`vp lint`,
+      // 2026-09-25): 69 `require-safety-comment-for-type-assertion`, 20
+      // `no-unknown-parameters`, 12 `no-unsafe-dictionary-type`, 12
+      // `no-known-value-widening`, 10 `no-unknown-returns`, 9
+      // `no-runtime-typeof`, 9 `no-chained-type-assertions`, 3
+      // `no-shape-in-symbol-names`, 2 `no-conditional-empty-object-spread`,
+      // 1 `no-object-parameters`. Flip each back to `error` (and delete its
+      // line) when its count reaches zero.
+      "effect/require-safety-comment-for-type-assertion": "warn",
+      "effect/no-unknown-parameters": "warn",
+      "effect/no-unsafe-dictionary-type": "warn",
+      "effect/no-known-value-widening": "warn",
+      "effect/no-unknown-returns": "warn",
+      "effect/no-runtime-typeof": "warn",
+      "effect/no-chained-type-assertions": "warn",
+      "effect/no-conditional-empty-object-spread": "warn",
+      "effect/no-object-parameters": "warn",
+      "effect/no-shape-in-symbol-names": "warn",
       "typescript/no-explicit-any": "off",
       "typescript/no-empty-object-type": "off",
       "typescript/ban-ts-comment": "off",

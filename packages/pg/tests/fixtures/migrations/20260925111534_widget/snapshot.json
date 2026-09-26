@@ -1,0 +1,154 @@
+{
+  "version": "8",
+  "dialect": "postgres",
+  "id": "0146b7f6-2933-4d88-b8d7-75d7217534ab",
+  "prevIds": [
+    "00000000-0000-0000-0000-000000000000"
+  ],
+  "ddl": [
+    {
+      "name": "fixture",
+      "entityType": "schemas"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "widget",
+      "entityType": "tables",
+      "schema": "fixture"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "widget_version",
+      "entityType": "tables",
+      "schema": "fixture"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "gen_random_uuid()",
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "fixture",
+      "table": "widget"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "slug",
+      "entityType": "columns",
+      "schema": "fixture",
+      "table": "widget"
+    },
+    {
+      "type": "uuid",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "fixture",
+      "table": "widget_version"
+    },
+    {
+      "type": "bigint",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "version",
+      "entityType": "columns",
+      "schema": "fixture",
+      "table": "widget_version"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "fixture",
+      "table": "widget_version"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "timestamp",
+      "entityType": "columns",
+      "schema": "fixture",
+      "table": "widget_version"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "id"
+      ],
+      "schemaTo": "fixture",
+      "tableTo": "widget",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "widget_version_id_widget_id_fkey",
+      "entityType": "fks",
+      "schema": "fixture",
+      "table": "widget_version"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "widget_pkey",
+      "schema": "fixture",
+      "table": "widget",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "slug"
+      ],
+      "nullsNotDistinct": false,
+      "name": "widget_slug_key",
+      "schema": "fixture",
+      "table": "widget",
+      "entityType": "uniques"
+    },
+    {
+      "definition": "select \"fixture\".\"widget\".\"id\", \"fixture\".\"widget\".\"slug\", \"fixture\".\"widget_version\".\"name\", \"fixture\".\"widget_version\".\"timestamp\" from \"fixture\".\"widget\" inner join \"fixture\".\"widget_version\" on \"fixture\".\"widget\".\"id\" = \"fixture\".\"widget_version\".\"id\"",
+      "with": null,
+      "withNoData": null,
+      "using": null,
+      "tablespace": null,
+      "materialized": false,
+      "name": "widget_view",
+      "entityType": "views",
+      "schema": "fixture"
+    }
+  ],
+  "renames": []
+}

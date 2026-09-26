@@ -37,14 +37,12 @@ import type {
   EffectPgTransaction,
 } from "drizzle-orm/effect-postgres";
 import type { AnyRelations } from "drizzle-orm/relations";
-import * as Duration from "effect/Duration";
+import type * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as Redacted from "effect/Redacted";
-import type * as Scope from "effect/Scope";
+import type * as Redacted from "effect/Redacted";
 import type { SqlClient } from "effect/unstable/sql/SqlClient";
 import type { SqlError } from "effect/unstable/sql/SqlError";
-import * as Pg from "pg";
 
 /**
  * The Effect-native Drizzle client an application's `Database` service holds,
@@ -143,79 +141,59 @@ export const makePgDatabase = <Relations extends AnyRelations, const Key extends
 };
 
 /**
- * How long {@link pgClientFromPool} waits for `pool.end()` before letting the
- * scope close anyway. A pool that will not drain must not wedge a request's
- * teardown.
- */
-const DEFAULT_POOL_END_TIMEOUT = Duration.millis(1000);
-
-/**
- * A `PgClient` layer over a connection URL, built by `@effect/sql-pg`'s own
- * `PgClient.layer`.
+ * A `PgClient` layer over a connection URL that **pings the database
+ * (`SELECT 1`) at layer BUILD**, failing the build with a `SqlError` if the
+ * ping does not answer within `connectTimeout`.
  *
- * **This pings the database (`SELECT 1`) at layer BUILD**, and fails the
- * build with a `SqlError` if the ping does not answer within
- * `connectTimeout`. That is the right trade for a long-lived process — a
- * misconfigured URL fails once, loudly, at startup rather than on the first
- * query — and the wrong one for a runtime that is built per request, where it
- * opens a connection even for requests that never touch the database. Use
+ * That is the right trade for a long-lived process — a misconfigured URL
+ * fails once, loudly, at startup rather than on the first query — and the
+ * wrong one for a runtime that is built per request, where it opens a
+ * connection even for requests that never touch the database. Use
  * {@link pgClientFromPool} there.
  *
+ * `@effect/sql-pg` 4.0.0-rc.115 replaced the `pg` driver with its own wire
+ * protocol, and its `PgClient.layer` no longer pings on its own: the pool
+ * opens connections on first use. The ping is therefore this function's, run
+ * once over the freshly built client.
+ *
  * The output includes `SqlClient` as well as `PgClient` because that is what
- * `PgClient.layer` provides; a consumer that only needs `PgClient` can ignore
- * the extra service.
+ * `PgClient.layerFrom` provides; a consumer that only needs `PgClient` can
+ * ignore the extra service.
  */
 /* oxlint-disable effect/prefer-option-over-null -- `config` is handed STRAIGHT to `@effect/sql-pg`'s `PgPoolConfig`, whose optional members are `?: T | undefined`: the driver reads `undefined` as "not supplied" and would treat an `Option` object as a value. Same boundary rule as the Drizzle-facing config in packages/core/src/derive.ts. */
 export const pgClientFromUrl = (config: {
   readonly url: Redacted.Redacted<string>;
   readonly maxConnections?: number | undefined;
   readonly connectTimeout?: Duration.Input | undefined;
-}): Layer.Layer<PgClient.PgClient | SqlClient, SqlError> => PgClient.layer(config);
-/* oxlint-enable effect/prefer-option-over-null */
+}): Layer.Layer<PgClient.PgClient | SqlClient, SqlError> =>
+  PgClient.layerFrom(Effect.tap(PgClient.make(config), (client) => client`SELECT 1`));
 
 /**
- * Scoped acquisition of the underlying `pg` pool.
- *
- * Deliberately a bare `Pg.Pool` via `PgClient.fromPool` rather than
- * `PgClient.layer`: `layer`'s make pings the database (`SELECT 1`) at build
- * time, which would open a connection on every runtime build — including ones
- * that never touch the database. A bare pool connects on the first query,
- * preserving lazy semantics. `pool.end()` runs when the owning scope closes
- * (the request/event runtime), which is what platforms that pin I/O to the
- * event that created it require — a pool must never outlive that event
- * (website #455).
- */
-const acquirePool = (
-  connectionString: Redacted.Redacted<string>,
-  endTimeout: Duration.Input,
-): Effect.Effect<Pg.Pool, never, Scope.Scope> =>
-  Effect.acquireRelease(
-    Effect.sync(() => new Pg.Pool({ connectionString: Redacted.value(connectionString) })),
-    // oxlint-disable-next-line effect/effect-promise-vs-trypromise -- an `acquireRelease` finalizer must have `never` in its error channel, so a rejection here has to be a defect; `tryPromise` would put it in the typed error channel and not typecheck as a release.
-    (pool) => Effect.promise(() => pool.end()).pipe(Effect.timeoutOption(endTimeout)),
-  );
-
-/**
- * A `PgClient` layer over a bare `pg` pool that **does not connect at layer
+ * A `PgClient` layer over a connection URL that **does not connect at layer
  * build** — the lazy counterpart to {@link pgClientFromUrl}.
  *
- * The pool is acquired and released with the layer's scope, so a runtime
- * built per request disposes of its pool with that request. Connection
- * failures surface on the first query as a `SqlError`, not at build; the
- * `SqlError` in the error channel is the driver's, since nothing this layer
- * does can fail.
+ * The pool is `@effect/sql-pg`'s own: it opens connections on first use (up
+ * to `maxConnections`) and is shut down, every session released, when the
+ * layer's scope closes. A runtime built per request therefore disposes of its
+ * pool with that request, and a connection failure surfaces on the first
+ * query as a `SqlError` instead of at build. Platforms that pin I/O to the
+ * event that created it require exactly this — a pool must never outlive
+ * that event (website #455).
+ *
+ * Until `@effect/sql-pg` 4.0.0-rc.115 this wrapped a bare `pg.Pool` via
+ * `PgClient.fromPool`, because `PgClient.layer` pinged at build; rc.115
+ * dropped both the `pg` driver and `fromPool`, and its pool is lazy by
+ * construction. The name is kept for the contract, not the mechanism.
  */
-/* oxlint-disable effect/prefer-option-over-null -- driver-facing config: `endTimeout` is a `Duration.Input` the release path forwards to `Effect.timeoutOption`, and this options record mirrors `pgClientFromUrl`'s shape. See that function's block. */
+/* oxlint-disable effect/prefer-option-over-null -- driver-facing config: every optional member is forwarded to `@effect/sql-pg`'s `PgPoolConfig`, which reads `undefined` as "not supplied". See `pgClientFromUrl`'s block. */
 export const pgClientFromPool = (options: {
   readonly connectionString: Redacted.Redacted<string>;
-  readonly endTimeout?: Duration.Input | undefined;
+  readonly maxConnections?: number | undefined;
+  readonly connectTimeout?: Duration.Input | undefined;
 }): Layer.Layer<PgClient.PgClient | SqlClient, SqlError> =>
-  PgClient.layerFrom(
-    PgClient.fromPool({
-      acquire: acquirePool(
-        options.connectionString,
-        options.endTimeout ?? DEFAULT_POOL_END_TIMEOUT,
-      ),
-    }),
-  );
+  PgClient.layer({
+    url: options.connectionString,
+    maxConnections: options.maxConnections,
+    connectTimeout: options.connectTimeout,
+  });
 /* oxlint-enable effect/prefer-option-over-null */

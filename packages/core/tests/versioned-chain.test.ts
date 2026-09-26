@@ -22,6 +22,9 @@ import {
   type DiscriminatorColumns,
   makeCurrentVersionView,
   makeSubtypeTables,
+  type VersionChainEntry,
+  type VersionSnapshot,
+  versionTimestamps,
 } from "../src/versioned-chain.ts";
 
 const app = pgSchema("app");
@@ -302,5 +305,43 @@ describe("dist-consumer-style type checks", () => {
     // the injected `merge` column (`slug`, nullable on `node`) rides along too.
     /* oxlint-disable-next-line effect/prefer-option-over-null -- exact-identity assertion against Drizzle's own inferred row type */
     expectTypeOf<(typeof view.$inferSelect)["slug"]>().toEqualTypeOf<string | null>();
+  });
+});
+
+describe("version-chain read shapes", () => {
+  it("types an entry over the default action vocabulary", () => {
+    expectTypeOf<VersionChainEntry["action"]>().toEqualTypeOf<"create" | "update" | "delete">();
+    expectTypeOf<VersionChainEntry<"publish">["action"]>().toEqualTypeOf<"publish">();
+  });
+
+  it("carries a hierarchy's extra snapshot facts without knowing them", () => {
+    type Snapshot = VersionSnapshot<"create" | "update", { readonly draft?: boolean }>;
+    // oxlint-disable-next-line effect/prefer-option-over-null -- asserts the optional key's read type
+    expectTypeOf<Snapshot["draft"]>().toEqualTypeOf<boolean | undefined>();
+    expectTypeOf<Snapshot["columns"]>().toEqualTypeOf<Readonly<Record<string, unknown>>>();
+    expectTypeOf<Snapshot["version"]>().toEqualTypeOf<bigint>();
+  });
+});
+
+describe("versionTimestamps", () => {
+  // oxlint-disable-next-line effect/use-clock-service -- fixed fixture instants, parsed from literals
+  const born = new Date("2024-01-01T00:00:00.000Z");
+  // oxlint-disable-next-line effect/use-clock-service -- as above
+  const edited = new Date("2024-06-01T00:00:00.000Z");
+
+  it("reads createdAt off the birth row and updatedAt off the current version", () => {
+    expect(versionTimestamps({ timestamp: edited, createdAt: born })).toEqual({
+      createdAt: born,
+      updatedAt: edited,
+    });
+  });
+
+  it("falls back to the current timestamp for a view with no birth-row merge", () => {
+    expect(versionTimestamps({ timestamp: edited })).toEqual({
+      createdAt: edited,
+      updatedAt: edited,
+    });
+    // oxlint-disable-next-line effect/prefer-option-over-null -- Drizzle's nullable row shape
+    expect(versionTimestamps({ timestamp: edited, createdAt: null }).createdAt).toBe(edited);
   });
 });

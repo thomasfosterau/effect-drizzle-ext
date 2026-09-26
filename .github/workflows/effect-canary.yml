@@ -1,0 +1,170 @@
+name: Effect Canary
+
+# Runs the gate against the newest Effect *prerelease* (the "rc" npm dist-tag)
+# instead of the version pinned in the catalog / pnpm-lock.yaml, so upstream
+# breakage surfaces here on a schedule rather than in a consumer's build.
+#
+# Scheduled + manual only — this never runs on push or pull_request, so a red
+# run can never block a PR merge. The job still finishes red in the Actions
+# tab (see the final step) and files/refreshes a GitHub issue, because nobody
+# watches the Actions tab for a weekly cron.
+#
+# Copied from effect-jsonapi. This repository has no docgen; in its place the
+# canary runs the integration suite, because the pg package binds
+# `@effect/sql-pg` — which floats with `effect` (they release in lockstep) —
+# and its behaviour against a live server is the part a type check cannot see.
+on:
+  schedule:
+    # Mondays at 06:00 UTC.
+    - cron: "0 6 * * 1"
+  workflow_dispatch: {}
+
+concurrency:
+  group: effect-canary-${{ github.ref }}
+  cancel-in-progress: true
+
+# No permissions by default; the single job grants only what it needs.
+permissions: {}
+
+jobs:
+  canary:
+    name: Typecheck, unit & integration tests against effect@rc
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # The integration suite's database; see ci.yml, whose service this copies.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    permissions:
+      contents: read
+      issues: write # to file/refresh the failure-notification issue
+    env:
+      PGPASSWORD: postgres
+      NODE_OPTIONS: --max-old-space-size=2048
+      VITEST_MAX_WORKERS: 2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Baseline install against the committed lockfile (see the action).
+      - name: Setup toolchain
+        uses: ./.github/actions/setup
+
+      # Float the whole workspace onto the newest Effect prerelease. Every
+      # package references `effect` and `@effect/sql-pg` through the strict
+      # catalog (a version literal anywhere else is rejected at install), so
+      # the float is one edit per catalog entry followed by a non-frozen
+      # install — not a `pnpm add` per package. `@effect/sql-pg` floats with
+      # `effect` because each release peers on the matching `effect`. The peer
+      # ranges under `catalogs.peers` are left alone: they are what consumers
+      # see, not what this run tests. The "rc"
+      # dist-tag is the pre-4.0 release-candidate line this repo currently
+      # tracks (see the `effect` catalog entry) — switch this to "beta" or
+      # "next" if the project moves to tracking a different prerelease line.
+      # `minimumReleaseAge` is lifted for the run: the point of a canary is to
+      # see the newest publish, not the one-day-old one.
+      - name: Install latest Effect prerelease
+        run: |
+          set -euo pipefail
+          latest="$(pnpm view effect@rc version)"
+          sql_pg="$(pnpm view @effect/sql-pg@rc version)"
+          echo "floating effect to ${latest}, @effect/sql-pg to ${sql_pg}"
+          # First match only: the `overrides` block also has an `  effect:`
+          # line (`"catalog:"`), which must stay a catalog reference.
+          sed -i -E "0,/^  effect: /s/^(  effect: ).*$/\1${latest}/" pnpm-workspace.yaml
+          sed -i -E "s/^(  \"@effect\/sql-pg\": ).*$/\1${sql_pg}/" pnpm-workspace.yaml
+          grep -E "^  effect: ${latest}$" pnpm-workspace.yaml
+          grep -E "^  \"@effect/sql-pg\": ${sql_pg}$" pnpm-workspace.yaml
+          pnpm install --no-frozen-lockfile --config.minimumReleaseAge=0
+
+      # The three checks most likely to catch an Effect API/behavior break.
+      # Lint and formatting are deliberately skipped: they have nothing to do
+      # with the Effect version and would only add unrelated noise to a
+      # canary result. Each step runs even if an earlier one fails, so a
+      # single run reports typecheck/test/integration status independently.
+      - name: Type gates (packages + emitted declarations)
+        id: typecheck
+        continue-on-error: true
+        run: vp run --concurrency-limit 2 check
+
+      - name: Test
+        id: test
+        continue-on-error: true
+        run: vp run -r test:unit
+
+      # The pg binding against a live server (the service container above).
+      - name: Integration tests
+        id: integration
+        continue-on-error: true
+        run: vp run test:integration
+
+      - name: Open or refresh an issue if the canary is red
+        if: |
+          steps.typecheck.outcome == 'failure' ||
+          steps.test.outcome == 'failure' ||
+          steps.integration.outcome == 'failure'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TYPECHECK_OUTCOME: ${{ steps.typecheck.outcome }}
+          TEST_OUTCOME: ${{ steps.test.outcome }}
+          INTEGRATION_OUTCOME: ${{ steps.integration.outcome }}
+        run: |
+          set -euo pipefail
+
+          title="Effect canary is red against effect@rc"
+
+          body=$(jq -n \
+            --arg run "$RUN_URL" \
+            --arg typecheck "$TYPECHECK_OUTCOME" \
+            --arg test "$TEST_OUTCOME" \
+            --arg integration "$INTEGRATION_OUTCOME" \
+            '"The scheduled Effect canary failed against the latest `effect` prerelease (the `rc` npm dist-tag), with `@effect/sql-pg` floated alongside.\n\n" +
+             "- typecheck: " + $typecheck + "\n" +
+             "- test: " + $test + "\n" +
+             "- integration: " + $integration + "\n\n" +
+             "Run: " + $run + "\n\n" +
+             "This does not block any PR by itself — it means the next Effect prerelease is likely to break this library once it stabilizes. Investigate the run, then either fix the break ahead of time or close this out if it turns out to be a fluke in that prerelease."')
+
+          existing=$(curl -sS -G \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            --data-urlencode "q=repo:$REPO type:issue state:open in:title \"$title\"" \
+            "https://api.github.com/search/issues" | jq -r '.items[0].number // empty')
+
+          if [ -n "$existing" ]; then
+            curl -sS -X POST \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$REPO/issues/$existing/comments" \
+              -d "{\"body\": $body}"
+          else
+            payload=$(jq -n --arg title "$title" --argjson body "$body" '{title: $title, body: $body}')
+            curl -sS -X POST \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$REPO/issues" \
+              -d "$payload"
+          fi
+
+      # continue-on-error above keeps the job running through all three
+      # checks so the issue body above has full information; this step turns
+      # that into a real (visible, red) job failure once we're done.
+      - name: Fail the job if any check failed
+        if: |
+          steps.typecheck.outcome == 'failure' ||
+          steps.test.outcome == 'failure' ||
+          steps.integration.outcome == 'failure'
+        run: exit 1

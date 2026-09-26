@@ -25,6 +25,7 @@ import {
   dbTable,
   dbTableFor,
   readDbTable,
+  resourceAttributeProjections,
   resourceColumnBounds,
   resourceColumns,
   type ResourceColumnsMetaOf,
@@ -324,5 +325,74 @@ describe("type-level precision", () => {
     const derived = makeDeriveResourceColumns(builders)(Descriptored);
     const _notNull: (typeof derived)["slug"]["_"]["notNull"] = true;
     expect([_slug, _size, _absent, _notNull]).toEqual(["text", "integer", true, true]);
+  });
+});
+
+describe("resourceAttributeProjections", () => {
+  // Ported from the website application's
+  // `packages/models/tests/resource-projections.test.ts`, with a Person-shaped
+  // fixture in place of the application's model: a leaf column, the timestamp
+  // axes, an optional tombstone, and materialised-list arrays.
+  const PersonResource = Resource.make("people", {
+    attributes: {
+      createdAt: Resource.readOnlyAttribute(Schema.Date),
+      updatedAt: Resource.readOnlyAttribute(Schema.Date),
+      deletedAt: Resource.attribute(Schema.Date, { resource: "optional", create: false }),
+      summary: Resource.attribute(
+        dbColumn(Schema.NullOr(Schema.String), { column: "summary", pg: "text", notNull: false }),
+      ),
+      externalIdentifiers: Resource.readOnlyAttribute(Schema.Array(Schema.String)),
+      mappings: Resource.readOnlyAttribute(Schema.Array(Schema.Struct({ uri: Schema.String }))),
+      secret: Resource.attribute(Schema.String, { resource: false }),
+      name: dbColumn(Schema.String, { column: "name", pg: "text", notNull: true }),
+    },
+  });
+  const projections = resourceAttributeProjections(PersonResource);
+  const byKey = Object.fromEntries(projections.map((p) => [p.key, p]));
+
+  it("recovers the leaf column from the dbColumn annotation", () => {
+    expect(byKey.name).toEqual({
+      key: "name",
+      column: Option.some("name"),
+      optional: false,
+      nullable: false,
+      array: false,
+      date: false,
+    });
+  });
+
+  it("flags the timestamp axes as dates with no column", () => {
+    expect(byKey.createdAt).toMatchObject({ date: true, optional: false });
+    expect(byKey.updatedAt).toMatchObject({ date: true, optional: false });
+    expect(Option.isNone(byKey.createdAt.column)).toBe(true);
+  });
+
+  it("flags the optional deletedAt tombstone", () => {
+    expect(byKey.deletedAt).toMatchObject({ optional: true, date: true });
+  });
+
+  it("flags a NullOr column as nullable", () => {
+    expect(byKey.summary).toMatchObject({
+      nullable: true,
+      optional: false,
+      column: Option.some("summary"),
+    });
+  });
+
+  it("flags the materialised-list attributes as arrays with no column", () => {
+    for (const key of ["externalIdentifiers", "mappings"] as const) {
+      expect(byKey[key]).toMatchObject({ array: true, date: false });
+      expect(Option.isNone(byKey[key].column)).toBe(true);
+    }
+  });
+
+  it("leaves out an input-only attribute, which is not on the resource object", () => {
+    expect(byKey).not.toHaveProperty("secret");
+  });
+
+  it("preserves declaration order", () => {
+    const keys = projections.map((p) => p.key);
+    expect(keys[0]).toBe("createdAt");
+    expect(keys.at(-1)).toBe("name");
   });
 });

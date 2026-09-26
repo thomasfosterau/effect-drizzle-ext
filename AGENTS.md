@@ -10,7 +10,7 @@ Project conventions live here; personal style preferences live in user memory. `
 - **This package emits declarations; the applications never did.** Any exported generic whose inferred type mentions `PgBuildColumns` / `PgTableWithColumns` / `PgViewWithSelection` needs an explicit, self-contained return annotation, or the declaration printer emits an unbound `TTableName` that `skipLibCheck` hides. `tests/dist-consumer` type-checks a consumer fixture against the emitted `dist/` declarations with `Equals<…>` assertions on every derived type (an unbound name degrades to `any`, and an assertion against `any` is false); `vp run check` includes it.
 - **The derivation decides column _types_, never column _order_ or _names_.** Both are what a consumer's `db:generate` emits into a migration; a reorder here rewrites their schema.
 - **`transact` is always-open, never join-if-present** (website #1883). A nested call opens a SAVEPOINT. Do not "improve" it.
-- **No application vocabulary.** No `owner_id`, role ladders, `node` / `node_version`, id brands, Hyperdrive, KV caches, migrations tooling. Those stay in the apps.
+- **No application vocabulary.** No `owner_id`, role ladders, `node` / `node_version`, id brands, Hyperdrive, KV caches, fixture users or seed data. Those stay in the apps. The generic migration tooling (the fresh-database runner, test-database provisioning, the drift and view-dependency guards) moved here by owner decision (#9); anything that knows an application's schema does not.
 
 Everything else that must be visible when touching a package is in that package's `CLAUDE.md` (`packages/core`, `packages/pg`), which carries its terms, invariants and import boundary.
 
@@ -26,7 +26,7 @@ Everything else that must be visible when touching a package is in that package'
 - `vp check` — the built-in format + lint pass (`vp fmt --check` + `vp lint`).
 - `vp run check` — the type gate: both packages' `check` plus the dist-consumer declaration check (which builds `dist/` and asserts the emitted types). Distinct from `vp check`.
 - `vp run -r test:unit` — unit tests (pure code; no database).
-- `vp run test:integration` — one root task over `packages/pg`'s vitest project; provisions a fresh database per run on a reachable local PostgreSQL (`PG*` env) or a `pgvector/pgvector:pg17` container via Testcontainers (needs a Docker daemon). An explicit `DATABASE_URL_TEST` / `DATABASE_URL` wins and is used as-is. Filter with `--project pg-integration`.
+- `vp run test:integration` — one root task over `packages/pg`'s vitest project; provisions a fresh database per run through the pg package's own `provisionTestDatabase` — on a reachable local PostgreSQL (`PG*` env) or a `pgvector/pgvector:pg17` container via Testcontainers (needs a Docker daemon) — migrated with the committed fixture chain in `packages/pg/tests/fixtures/`. An explicit `DATABASE_URL_TEST` / `DATABASE_URL` wins and is used as-is. Filter with `--project pg-integration`.
 - `vp run -r build` — emit `dist/` for both packages.
 - `pnpm changeset` — add a changeset; every change to a published package needs one. Releases are cut by the `Release` workflow (changesets/action) on `main`.
 

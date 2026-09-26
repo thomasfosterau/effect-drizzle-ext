@@ -2,9 +2,10 @@
  * Unit coverage for `@thomasfosterau/effect-drizzle-ext-pg` (`src/index.ts`).
  *
  * Nothing here touches a database: the service keys, the shape of `make` /
- * `layer`, and the one behaviour of {@link pgClientFromPool} that is
- * observable without a server — that it acquires a bare `pg.Pool`, never
- * connects at layer build, and ends the pool when the scope closes.
+ * `layer`, and the one difference between the two client constructors that
+ * is observable without a server — {@link pgClientFromPool} never connects at
+ * layer build, {@link pgClientFromUrl} pings and so fails its build against
+ * an address with nothing listening.
  *
  * The live-database half is `tests/integration/database.test.ts`.
  *
@@ -16,8 +17,7 @@ import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
-import * as Pg from "pg";
-import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 import {
   makePgDatabase,
   type PgDatabaseClient,
@@ -35,10 +35,6 @@ type TestRelations = typeof relations;
  * PostgreSQL server.
  */
 const UNREACHABLE = Redacted.make("postgresql://postgres@127.0.0.1:1/nothing");
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 describe("makePgDatabase", () => {
   it("derives both service keys from the key it is given", () => {
@@ -83,57 +79,44 @@ describe("makePgDatabase", () => {
 });
 
 describe("pgClientFromUrl", () => {
-  it("is a layer over PgClient (which pings at build — see the doc comment)", () => {
-    const layer = pgClientFromUrl({ url: UNREACHABLE, maxConnections: 1 });
-    expect(Layer.isLayer(layer)).toBe(true);
+  it("pings at build, so an unreachable server fails the build", async () => {
+    const exit = await Effect.runPromiseExit(
+      Effect.scoped(
+        Effect.asVoid(
+          Layer.build(
+            pgClientFromUrl({ url: UNREACHABLE, maxConnections: 1, connectTimeout: "2 seconds" }),
+          ),
+        ),
+      ),
+    );
+    expect(exit._tag).toBe("Failure");
   });
 });
 
 describe("pgClientFromPool", () => {
-  it("builds without connecting, and ends the pool when the scope closes", async () => {
-    // `end` is inherited from `pg`'s base `Pool`; spying defines an own
-    // property on the bound subclass's prototype, which instances find first.
-    const end = vi
-      .spyOn(Pg.Pool.prototype, "end")
-      .mockImplementation(() => Promise.resolve(undefined));
-    const connect = vi.spyOn(Pg.Pool.prototype, "connect");
-    const query = vi.spyOn(Pg.Pool.prototype, "query");
-
-    await Effect.runPromise(
+  it("builds without connecting, and closes cleanly with its scope", async () => {
+    const exit = await Effect.runPromiseExit(
       Effect.gen(function* () {
         const context = yield* Layer.build(pgClientFromPool({ connectionString: UNREACHABLE }));
-        // The pool exists and the client is in the context …
+        // The client is in the context and nothing has talked to a server:
+        // port 1 refuses every connection, so a ping would have failed the
+        // build already.
         expect(Context.get(context, PgClient.PgClient)).toBeDefined();
-        // … and nothing has talked to a server (this is the whole point:
-        // `PgClient.layer` would have run a `SELECT 1` by now).
-        expect(connect).not.toHaveBeenCalled();
-        expect(query).not.toHaveBeenCalled();
-        expect(end).not.toHaveBeenCalled();
       }).pipe(Effect.scoped),
     );
-
-    expect(end).toHaveBeenCalledTimes(1);
+    expect(exit._tag).toBe("Success");
   });
 
-  it("honours an explicit end timeout without failing the release", async () => {
-    // A pool that never drains must not wedge teardown: the release is
-    // `timeoutOption`-bounded, so the scope closes either way.
-    const end = vi.spyOn(Pg.Pool.prototype, "end").mockImplementation(
-      () =>
-        new Promise<undefined>(() => {
-          /* never settles */
-        }),
-    );
-
+  it("surfaces the connection failure on the first query instead", async () => {
     const exit = await Effect.runPromiseExit(
-      Effect.scoped(
-        Effect.asVoid(
-          Layer.build(pgClientFromPool({ connectionString: UNREACHABLE, endTimeout: "10 millis" })),
-        ),
-      ),
+      Effect.gen(function* () {
+        const context = yield* Layer.build(
+          pgClientFromPool({ connectionString: UNREACHABLE, connectTimeout: "2 seconds" }),
+        );
+        const client = Context.get(context, PgClient.PgClient);
+        return yield* client`SELECT 1`;
+      }).pipe(Effect.scoped),
     );
-
-    expect(exit._tag).toBe("Success");
-    expect(end).toHaveBeenCalledTimes(1);
+    expect(exit._tag).toBe("Failure");
   });
 });

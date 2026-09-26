@@ -32,6 +32,11 @@
  * needs inside that transaction: DDL is transactional in PostgreSQL, so the
  * always-rollback disposes of them with everything else.
  *
+ * The database the runner connects to is provisioned by
+ * {@link provisionTestDatabase} (defined in `./provisioning.ts`, re-exported
+ * here): an explicit URL, else a fresh migrated database on a reachable
+ * local server, else a Testcontainers container.
+ *
  * @module testing
  */
 
@@ -46,6 +51,25 @@ import type * as Redacted from "effect/Redacted";
 import * as Schedule from "effect/Schedule";
 import { isSqlError, type SqlError } from "effect/unstable/sql/SqlError";
 import { type PgDatabase, pgClientFromUrl } from "./index.ts";
+
+export {
+  connectionUrl,
+  ContainerStartFailed,
+  type DatabaseSource,
+  type DatabaseSourceOptions,
+  DatabaseUnreachable,
+  InvalidDatabasePrefix,
+  type MigrationRunner,
+  probeServer,
+  type ProvisionedDatabase,
+  type ProvisionOptions,
+  provisionTestDatabase,
+  type ResolutionEnvironment,
+  resolveDatabaseSource,
+  type ServerProbe,
+  ServerUnreachable,
+  testDatabaseName,
+} from "./provisioning.ts";
 
 // ── Connect-seam retry classification ─────────────────────────────────
 //

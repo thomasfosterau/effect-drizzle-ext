@@ -18,6 +18,9 @@
       "@thomasfosterau/effect-drizzle-ext/jsonapi": ["../../packages/core/dist/jsonapi/index.d.ts"],
       "@thomasfosterau/effect-drizzle-ext/*": ["../../packages/core/dist/*.d.ts"],
       "@thomasfosterau/effect-drizzle-ext-pg": ["../../packages/pg/dist/index.d.ts"],
+      "@thomasfosterau/effect-drizzle-ext-pg/tooling": [
+        "../../packages/pg/dist/tooling/index.d.ts"
+      ],
       "@thomasfosterau/effect-drizzle-ext-pg/*": ["../../packages/pg/dist/*.d.ts"]
     }
   },

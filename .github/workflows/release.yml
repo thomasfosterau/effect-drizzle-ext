@@ -5,40 +5,72 @@ name: Release
 # or, when that PR has merged and no changesets remain, publishes both
 # packages to npm and tags the release.
 #
-# Requires the `NPM_TOKEN` repository secret (an npm automation token with
-# publish rights on the @thomasfosterau scope). Owner-filled; until it exists
-# the publish step fails by design.
+# Publishing is npm OIDC trusted publishing — there is NO `NPM_TOKEN`. The
+# workflow proves its identity to npm with a short-lived, job-scoped OIDC
+# token, and each package's trusted-publisher binding on npmjs.com names this
+# repository, this workflow file and the `release` environment. Provenance is
+# attached automatically. The owner's one-time setup (the protected `release`
+# environment, the two trusted-publisher bindings, the Actions permission to
+# open PRs) is in CONTRIBUTING.md; the shape is copied from effect-jsonapi.
 
 on:
   push:
     branches: [main]
 
-concurrency: release-${{ github.ref }}
+concurrency:
+  group: release-${{ github.ref }}
 
-permissions:
-  contents: write
-  pull-requests: write
-  id-token: write
+# No permissions by default; the release job opts into exactly what it needs.
+permissions: {}
 
 jobs:
   release:
+    name: Version or publish
+    # Never run on forks (they have neither the environment nor the trusted
+    # publisher binding, so a fork cannot publish on your behalf).
+    if: github.repository == 'thomasfosterau/effect-drizzle-ext'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # A protected GitHub Environment: required reviewers and a `main`-only
+    # deployment rule pause every run for manual approval, and the npm
+    # trusted-publisher bindings accept only tokens minted inside it.
+    environment: release
+    permissions:
+      contents: write # push the version commit/tag and the "Version Packages" PR branch
+      pull-requests: write # open/update the "Version Packages" PR
+      id-token: write # OIDC: prove this workflow's identity to npm (no token needed)
     steps:
-      - uses: actions/checkout@v7.0.1
+      - name: Checkout
+        # The Changesets action pushes the version branch, so it needs the
+        # checkout's git credentials (the ephemeral, job-scoped GITHUB_TOKEN).
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: ./.github/actions/setup
+
+      - name: Setup toolchain
+        uses: ./.github/actions/setup
+
       - name: Build
         run: vp run -r build
-      - name: Version or publish
-        uses: changesets/action@v2
+
+      # When changesets are pending, this opens/updates a "Version Packages" PR
+      # (via `pnpm run version`). Once that PR is merged (no changesets remain),
+      # it runs `pnpm run release` — scripts/release.sh: `pnpm pack` per package
+      # (which resolves the `catalog:` / `workspace:` specifiers) then
+      # `npm publish <tarball>` per package under OIDC, then `changeset tag`.
+      # The action parses the "New tag:" output, pushes the tags and creates
+      # the GitHub releases.
+      #
+      # v2 of the action pairs with Changesets CLI v3 (`@changesets/cli` in
+      # the catalog) and renamed v1's `version` / `publish` / `commit` /
+      # `title` inputs. SHA-pinned: this step runs with `id-token: write`.
+      - name: Create release PR or publish to npm
+        uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
-          version: pnpm run version
-          publish: pnpm run release
-          title: "chore: version packages"
-          commit: "chore: version packages"
+          version-script: pnpm run version
+          publish-script: pnpm run release
+          commit-message: "chore: version packages"
+          pr-title: "chore: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
