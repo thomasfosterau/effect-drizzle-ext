@@ -36,13 +36,13 @@ catalog:
   # `pnpm install` itself. Read the `components` table in
   # node_modules/@effect/tsgo/dist/effect-tsgo.cjs before bumping any of the
   # three. Pin set in step with the preferenceflow application (the freshest).
-  "@effect/tsgo": 0.45.0
-  "@effect/sql-pg": 4.0.0-rc.115
+  "@effect/tsgo": 0.46.0
+  "@effect/sql-pg": 4.0.0-rc.117
   # The Node `FileSystem` / `Path` / `ChildProcessSpawner` layer the pg
   # package's tests provide to `./migrations`, `./testing`'s provisioning and
   # `./tooling` — a consumer provides its own (these modules only require the
   # services).
-  "@effect/platform-node": 4.0.0-rc.115
+  "@effect/platform-node": 4.0.0-rc.117
   "@mpsuesser/oxlint-plugin-effect": ^0.5.0
   # Starts the integration suite's ephemeral `pgvector/pgvector` server when no
   # local PostgreSQL is reachable — see packages/pg/tests/integration/global-setup.ts.
@@ -58,7 +58,7 @@ catalog:
   # The optional peer `@thomasfosterau/effect-drizzle-ext-pg/tooling` diffs
   # schemas with (`drizzle-kit/api-postgres`); always the drizzle-orm pin.
   drizzle-kit: 1.0.0-rc.5-ab785fc
-  effect: 4.0.0-rc.115
+  effect: 4.0.0-rc.117
   effect-solutions: ^0.5.3
   fallow: 3.28.0
   # TypeScript 6/7 side-by-side: TS7 (the native Go compiler) ships no JS API
