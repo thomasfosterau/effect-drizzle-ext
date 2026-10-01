@@ -10,7 +10,7 @@ Hooks are managed by Vite+; the editable [.vite-hooks/pre-commit](.vite-hooks/pr
 
 ## CI expectations
 
-[ci.yml](.github/workflows/ci.yml) runs one job: `vp check` (format + lint), `vp run check` (both packages' type gates plus the dist-consumer declaration check, which builds `dist/`), `vp run -r test:unit`, `vp run test:integration` against the job's `pgvector/pgvector` service container, `vp run -r build`, `pnpm audit --audit-level high`. [release.yml](.github/workflows/release.yml) runs changesets/action (v2.1.2, SHA-pinned) on `main` inside the protected `release` environment: it opens the "Version Packages" PR while unreleased changesets exist (`pnpm run version`: `changeset version` with its auto-formatter disabled — `"format": false` in `.changeset/config.json`, because the `oxfmt` bin Vite+ installs is an IDE-only wrapper that exits 1 on `--write` — then `vp fmt` on the generated changelogs) and, once that PR merges, runs [`scripts/release.sh`](scripts/release.sh) — `pnpm pack` then `npm publish <tarball>` per package under npm OIDC trusted publishing (no `NPM_TOKEN`; provenance left to npm, never forced), then `changeset tag`. `RELEASE_DRY_RUN=1 pnpm run release` exercises the pack and publish steps locally without writing to the registry. [effect-canary.yml](.github/workflows/effect-canary.yml) runs weekly (and on demand) against the newest `effect` / `@effect/sql-pg` prerelease — type gates, unit and integration tests — and files or refreshes an issue when it goes red; it never gates a PR.
+[ci.yml](.github/workflows/ci.yml) runs one job: the gates listed in [AGENTS.md → Verification](AGENTS.md#verification), in that order, with `vp run test:integration` against the job's `pgvector/pgvector` service container. [release.yml](.github/workflows/release.yml) runs changesets/action (v2.1.2, SHA-pinned) on `main` inside the protected `release` environment: it opens the "Version Packages" PR while unreleased changesets exist (`pnpm run version`: `changeset version` with its auto-formatter disabled — `"format": false` in `.changeset/config.json`, because the `oxfmt` bin Vite+ installs is an IDE-only wrapper that exits 1 on `--write` — then `vp fmt` on the generated changelogs) and, once that PR merges, runs [`scripts/release.sh`](scripts/release.sh) — `pnpm pack` then `npm publish <tarball>` per package under npm OIDC trusted publishing (no `NPM_TOKEN`; provenance left to npm, never forced), then `changeset tag`. `RELEASE_DRY_RUN=1 pnpm run release` exercises the pack and publish steps locally without writing to the registry. [effect-canary.yml](.github/workflows/effect-canary.yml) runs weekly (and on demand) against the newest `effect` / `@effect/sql-pg` prerelease — type gates, unit and integration tests — and files or refreshes an issue when it goes red; it never gates a PR.
 
 ## Release setup (owner, one-time)
 
@@ -21,10 +21,8 @@ Hooks are managed by Vite+; the editable [.vite-hooks/pre-commit](.vite-hooks/pr
 
 ## Pre-PR checklist
 
-1. The gates in [AGENTS.md → Verification](AGENTS.md#verification), in order, from a clean install.
-2. A changeset (`pnpm changeset`) for every change to a published package's behaviour.
-3. `git fetch origin main && git rebase origin/main`.
-4. Docs: the package `README.md` for any exported change; the package `CLAUDE.md` for a new term or invariant.
+1. The gates in [AGENTS.md → Verification](AGENTS.md#verification), in order, and the changeset and rebase rules in [AGENTS.md → Branches and pull requests](AGENTS.md#branches-and-pull-requests).
+2. Docs: the package `README.md` for any exported change; the package `CLAUDE.md` for a new term or invariant.
 
 ## Running individual checks
 

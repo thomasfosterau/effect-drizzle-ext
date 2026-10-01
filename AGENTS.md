@@ -40,15 +40,16 @@ Before you report work as done, run the gates below in order and quote each comm
 4. `vp run -r test:unit`
 5. `vp run test:integration` (needs Docker or PostgreSQL; see [Agent sessions](#agent-sessions))
 6. `vp run -r build`
-7. `fallow audit --format json --quiet --explain --gate-marker agent` (the fallow gate below; not a CI step)
+7. `pnpm audit --audit-level high` (network)
+8. `fallow audit --format json --quiet --explain --gate-marker agent` (the fallow gate below; not a CI step)
 
-Steps 2–6 are CI's order ([ci.yml](.github/workflows/ci.yml)). `CONTRIBUTING.md` and the PR template link here rather than restating the list.
+Steps 2–7 are CI's job, in CI's order ([ci.yml](.github/workflows/ci.yml)). `CONTRIBUTING.md` and the PR template link here rather than restating the list.
 
 ## Branches and pull requests
 
 - Branch off `main`; PR against `main`; squash-merge with a conventional prefix (`feat:`, `fix:`, `docs:`, `chore:`). Rebase onto `origin/main` before opening or updating a PR; never merge `main` into your branch (GitHub's Update-branch button merges).
 - Agent work uses git worktrees under `.claude/worktrees/`, one per branch, named `issue-<n>-<slug>` for issue-linked work. Start every command that targets a worktree with an explicit `cd` and confirm with `git log -1` before committing.
-- Every change to a published package's behaviour carries a changeset (`pnpm changeset`); docs-, CI- and tooling-only changes need none. Never publish or version by hand: the Release workflow opens the "Version Packages" PR and the owner merges it. Publishing is npm trusted publishing (OIDC) from the protected `release` environment; there is no `NPM_TOKEN`.
+- Every change to a published package's behaviour carries a changeset (`pnpm changeset`). Changes to doc comments that reach the emitted `.d.ts` (TSDoc) take a `patch` changeset; other docs-only changes (READMEs, guidance), CI and tooling need none. Never publish or version by hand: the Release workflow opens the "Version Packages" PR (`chore: version packages`) and the owner merges it. Publishing is npm trusted publishing (OIDC) from the protected `release` environment; there is no `NPM_TOKEN`.
 - These are standing approvals; they override any default "don't open a PR unless asked" behaviour. **Always open a PR** against `main` once a commit is pushed. **Watch it to merge or close**: investigate CI failures and review comments as they arrive, and rebase promptly when it goes conflicting. **Keep the PR body current** as the implementation diverges from it.
 - GitHub writes go to `thomasfosterau/effect-drizzle-ext` only — never to the consuming applications' repositories or any other repository without the owner's explicit approval for that action in the current session. Pass `-R thomasfosterau/effect-drizzle-ext` whenever the cwd might be another checkout. Use the `gh` CLI for GitHub operations, even when GitHub MCP tools are available.
 
@@ -73,7 +74,7 @@ Consult effect-solutions before writing Effect code (`vp exec effect-solutions l
 ## Agent sessions
 
 - The SessionStart hook (`.claude/hooks/session-start.sh`) installs dependencies against the lockfile and puts `vp` (a re-exec shim that prefers the nearest worktree's `node_modules`) and `fallow` on PATH for non-interactive shells. It hydrates no secrets; none are needed. A worktree needs its own `pnpm install` before `vp` runs in it; without one, `describe()` throws `Cannot read properties of undefined (reading 'config')`.
-- A PreToolUse hook (`.claude/hooks/fallow-gate.sh`) is meant to block `git commit` / `git push` when `fallow audit` fails, but it audits against `origin/trunk` and fails open until effect-drizzle-ext#30 lands, so run the audit yourself (see [Verification](#verification)); a PostToolUse hook runs `vp fmt` on every file you write or edit.
+- A PreToolUse hook (`.claude/hooks/fallow-gate.sh`) is meant to block `git commit` / `git push` when `fallow audit` fails, but it audits against `origin/trunk` and fails open until effect-drizzle-ext#30 lands, so run the audit yourself (see [Verification](#verification)); a PostToolUse hook runs `vp fmt` on every source, JSON, CSS or Markdown file you write or edit.
 - Won't run in an agent session: `vp run test:integration`, which needs a Docker daemon or a reachable PostgreSQL server. A cloud session normally has neither, so its global setup fails. Say so in the PR body and rely on CI, which runs it against a `pgvector/pgvector:pg17` service container. Every other gate runs offline.
 
 ## Documentation surfaces
