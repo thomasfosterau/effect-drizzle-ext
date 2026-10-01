@@ -14,9 +14,11 @@
  * it is handed.
  *
  * This module recovers them: {@link findPgError} walks the error graph for the
- * `pg` driver error object itself and reads its `code` / `constraint` /
- * `table` / `column` / `detail` / `schema`, and {@link classifyError} turns
- * those facts into one of seven tagged errors a consumer can `catchTag`.
+ * driver's Postgres error (the node carrying a SQLSTATE `code`; under
+ * `@effect/sql-pg` an `Error` carrying the server's ErrorResponse fields) and
+ * reads its `code` / `constraint` / `table` / `column` / `detail` / `schema`,
+ * and {@link classifyError} turns those facts into one of seven tagged errors
+ * a consumer can `catchTag`.
  *
  * Nothing here is thrown: these are runtime query failures and they travel in
  * the Effect error channel. (Construction-time failures are the thrown
@@ -24,7 +26,7 @@
  *
  * The module imports neither `drizzle-orm` nor `@effect/sql-pg`, at runtime or
  * as types: it recognises those shapes structurally, so it works the same on a
- * bare `SqlError`, a bare `pg` driver error and the drizzle-wrapped shape, and
+ * bare `SqlError`, a bare Postgres error and the drizzle-wrapped shape, and
  * a consumer holding any of them classifies it without pulling a driver into
  * the bundle.
  *
@@ -62,7 +64,7 @@ const SERIALIZATION_FAILURE = "40001";
 const DEADLOCK_DETECTED = "40P01";
 
 /**
- * The stable `pg` message fragment for a unique violation, kept as a
+ * The stable Postgres message fragment for a unique violation, kept as a
  * belt-and-suspenders fallback for {@link isUniqueViolation} (see its note).
  */
 const PG_UNIQUE_VIOLATION_MESSAGE = "duplicate key value violates unique constraint";
@@ -87,11 +89,11 @@ const MAX_ERROR_DEPTH = 8;
  */
 type ErrorNode = Record.ReadonlyRecord<string, unknown>;
 
-// ── The facts a `pg` driver error carries ──────────────────────────
+// ── The facts a Postgres error carries ─────────────────────────────
 
 /**
- * The fields of a `pg` `DatabaseError` this library reads, as recovered from
- * wherever the driver error sits in an error graph. `code` is the SQLSTATE and
+ * The fields of a Postgres error response this library reads, as recovered from
+ * wherever the driver's error sits in an error graph. `code` is the SQLSTATE and
  * is always present (finding it is what identifies the node); every other
  * fact is `Option` because Postgres populates it per error class — a `23502`
  * carries `column` and `table` but no `constraint`, a `23503` carries
@@ -166,7 +168,7 @@ const childErrorNodes = (node: ErrorNode): unknown[] => [
  *
  * A failed write reaches a caller deeply wrapped, and NOT on a simple `.cause`
  * chain: drizzle's `EffectDrizzleQueryError` holds an Effect `Cause` under a
- * (non-enumerable) `.cause`, and the `pg` driver error carrying the SQLSTATE
+ * (non-enumerable) `.cause`, and the driver's Postgres error carrying the SQLSTATE
  * sits inside that Cause's `reasons`. Hence a search over the whole reachable
  * graph — reading `.cause` explicitly (for the non-enumerable wrappers) and
  * sweeping enumerable values / arrays (for the Cause `reasons`) — rather than
@@ -189,8 +191,8 @@ const searchErrorGraph = <A>(
 };
 
 /**
- * The `pg` driver error's facts, recovered from anywhere in `error`'s graph:
- * a bare driver error, a bare `SqlError` (whose `reason` holds the driver
+ * The driver's Postgres error facts, recovered from anywhere in `error`'s graph:
+ * a bare Postgres error, a bare `SqlError` (whose `reason` holds the driver
  * error as its `cause`), or drizzle's `EffectDrizzleQueryError` wrapping an
  * Effect `Cause` that holds the `SqlError`. `Option.none()` when the graph
  * holds no node declaring a SQLSTATE, including for a non-object input.
@@ -348,7 +350,7 @@ const makeTransactionFailure = (
 
 /**
  * Classifies any value into one of the seven tagged errors, by finding the
- * `pg` driver error in its graph ({@link findPgError}) and dispatching on the
+ * driver's Postgres error in its graph ({@link findPgError}) and dispatching on the
  * SQLSTATE. `Option.none()` when the graph holds no driver error, or holds one
  * whose SQLSTATE is outside the classified families (a syntax error, a
  * connection failure — `SqlError.reason` already covers those well).
@@ -373,7 +375,7 @@ const constraintViolationOf = (error: unknown): Option.Option<ConstraintViolatio
 
 // ── Predicates ─────────────────────────────────────────────────────
 
-/** True when a node declares `23505` by SQLSTATE, or by the stable pg message fragment. */
+/** True when a node declares `23505` by SQLSTATE, or by the stable Postgres message fragment. */
 const uniqueViolationNode = (node: ErrorNode): Option.Option<true> => {
   const code = Option.orElse(readString(node, "code"), () => readString(node, "sqlState"));
   if (Option.contains(code, UNIQUE_VIOLATION)) return Option.some(true);
@@ -392,7 +394,7 @@ const uniqueViolationNode = (node: ErrorNode): Option.Option<true> => {
  * Kept as its own predicate, with its own walk, for adoption parity: this is
  * the name and the semantics the consuming applications already call, and the
  * semantics include a fallback the typed classification deliberately does not
- * have — matching the stable `pg` message fragment when no `code` survived the
+ * have — matching the stable Postgres message fragment when no `code` survived the
  * wrapping. It also matches a `23505` declared under a `code` that is not
  * SQLSTATE-shaped, which {@link classifyError} skips.
  */

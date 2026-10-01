@@ -2,9 +2,7 @@
 
 Maintained by Thomas Foster, with a workflow meant to be approachable for both humans and coding agents. Conventions are in [AGENTS.md](AGENTS.md).
 
-## Branch model
-
-`main` plus short-lived feature branches, PR against `main`, squash-merge with a conventional prefix (`feat:`, `fix:`, `docs:`, `chore:`). Rebase onto `origin/main` before opening a PR; never merge `main` into a feature branch (GitHub's "Update branch" button does a merge — avoid it).
+Branch model, changesets and PR rules: [AGENTS.md → Branches and pull requests](AGENTS.md#branches-and-pull-requests).
 
 ## Git hooks
 
@@ -12,7 +10,7 @@ Hooks are managed by Vite+; the editable [.vite-hooks/pre-commit](.vite-hooks/pr
 
 ## CI expectations
 
-[ci.yml](.github/workflows/ci.yml) runs one job: `vp check` (format + lint), `vp run check` (both packages' type gates plus the dist-consumer declaration check, which builds `dist/`), `vp run -r test:unit`, `vp run test:integration` against the job's `pgvector/pgvector` service container, `vp run -r build`, `pnpm audit --audit-level high`. [release.yml](.github/workflows/release.yml) runs changesets/action (v2.1.2, SHA-pinned) on `main` inside the protected `release` environment: it opens the "Version Packages" PR while unreleased changesets exist (`pnpm run version`: `changeset version` with its auto-formatter disabled — `"format": false` in `.changeset/config.json`, because the `oxfmt` bin Vite+ installs is an IDE-only wrapper that exits 1 on `--write` — then `vp fmt` on the generated changelogs) and, once that PR merges, runs [`scripts/release.sh`](scripts/release.sh) — `pnpm pack` then `npm publish <tarball>` per package under npm OIDC trusted publishing (no `NPM_TOKEN`; provenance left to npm, never forced), then `changeset tag`. `RELEASE_DRY_RUN=1 pnpm run release` exercises the pack and publish steps locally without writing to the registry. [effect-canary.yml](.github/workflows/effect-canary.yml) runs weekly (and on demand) against the newest `effect` / `@effect/sql-pg` prerelease — type gates, unit and integration tests — and files or refreshes an issue when it goes red; it never gates a PR.
+[ci.yml](.github/workflows/ci.yml) runs one job: the gates listed in [AGENTS.md → Verification](AGENTS.md#verification), in that order, with `vp run test:integration` against the job's `pgvector/pgvector` service container. [release.yml](.github/workflows/release.yml) runs changesets/action (v2.1.2, SHA-pinned) on `main` inside the protected `release` environment: it opens the "Version Packages" PR while unreleased changesets exist (`pnpm run version`: `changeset version` with its auto-formatter disabled — `"format": false` in `.changeset/config.json`, because the `oxfmt` bin Vite+ installs is an IDE-only wrapper that exits 1 on `--write` — then `vp fmt` on the generated changelogs) and, once that PR merges, runs [`scripts/release.sh`](scripts/release.sh) — `pnpm pack` then `npm publish <tarball>` per package under npm OIDC trusted publishing (no `NPM_TOKEN`; provenance left to npm, never forced), then `changeset tag`. `RELEASE_DRY_RUN=1 pnpm run release` exercises the pack and publish steps locally without writing to the registry. [effect-canary.yml](.github/workflows/effect-canary.yml) runs weekly (and on demand) against the newest `effect` / `@effect/sql-pg` prerelease — type gates, unit and integration tests — and files or refreshes an issue when it goes red; it never gates a PR.
 
 ## Release setup (owner, one-time)
 
@@ -23,21 +21,15 @@ Hooks are managed by Vite+; the editable [.vite-hooks/pre-commit](.vite-hooks/pr
 
 ## Pre-PR checklist
 
-1. `vp fmt` / `vp lint`
-2. `vp run check`
-3. `vp run -r test:unit`
-4. `vp run test:integration` — needs a local PostgreSQL server (`PG*` env) or a Docker daemon; or set `DATABASE_URL_TEST` (to a database that already holds the fixture chain in `packages/pg/tests/fixtures/migrations`).
-5. `vp run -r build`
-6. `fallow audit --base origin/main`
-7. A changeset (`pnpm changeset`) for every change to a published package.
-8. `git fetch origin main && git rebase origin/main`
-9. Docs: the package `README.md` for any exported change; the package `CLAUDE.md` for a new term or invariant.
+1. The gates in [AGENTS.md → Verification](AGENTS.md#verification), in order, and the changeset and rebase rules in [AGENTS.md → Branches and pull requests](AGENTS.md#branches-and-pull-requests).
+2. Docs: the package `README.md` for any exported change; the package `CLAUDE.md` for a new term or invariant.
 
 ## Running individual checks
 
 ```sh
-vp lint                                  # oxlint
-vp fmt                                   # oxlint --fix && oxfmt
+vp check                                 # format + lint (oxfmt + oxlint); --fix to autofix
+vp lint                                  # oxlint only
+vp fmt                                   # oxfmt (format only)
 vp run check                             # the whole type gate (includes building dist/)
 vp run --filter ./packages/core check    # one package's type check
 vp run -r test:unit                      # unit tests

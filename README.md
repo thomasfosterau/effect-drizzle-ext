@@ -14,17 +14,24 @@ Both extend drizzle-orm's own Effect integration (`drizzle-orm/effect-postgres`,
 ## Quick start
 
 ```ts
-// db-annotation.ts — pin a column-kind union once, annotate a model field with its column.
+import { dbColumnFor } from "@thomasfosterau/effect-drizzle-ext";
+import { makeDeriveColumns } from "@thomasfosterau/effect-drizzle-ext/derive";
+import { makePgDatabase } from "@thomasfosterau/effect-drizzle-ext-pg";
+import { integer, pgTable, text } from "drizzle-orm/pg-core";
+import * as Schema from "effect/Schema";
+import { relations } from "./relations.ts"; // your application's drizzle relations graph
+
+// Pin a column-kind union once, and annotate a model field with its column.
 export const dbColumn = dbColumnFor<"text" | "integer">();
 const Article = Schema.Struct({
   title: dbColumn(Schema.NonEmptyString, { column: "title", pg: "text", notNull: true }),
 });
 
-// derive.ts — a builder registry turns the annotations into Drizzle columns.
+// A builder registry turns the annotations into Drizzle columns.
 const { fromFields } = makeDeriveColumns({ text, integer });
 export const articleTable = pgTable("article", fromFields(Article.fields));
 
-// database.ts — one `@effect/sql-pg` binding call gives the app its services.
+// One `@effect/sql-pg` binding call gives the app its services.
 const database = makePgDatabase({ relations, key: "Database" });
 export const { Database, CurrentTransaction, transact, readHandle } = database;
 ```
@@ -33,6 +40,12 @@ export const { Database, CurrentTransaction, transact, readHandle } = database;
 
 ## Documentation
 
-[`packages/core/README.md`](packages/core/README.md) and [`packages/pg/README.md`](packages/pg/README.md) are the two packages' API references; [AGENTS.md](AGENTS.md) carries repository conventions.
+[`packages/core/README.md`](packages/core/README.md) and [`packages/pg/README.md`](packages/pg/README.md) are the two packages' API references. Extracted from the `thomasfosterau/website`, `thomasfosterau/gardeneria` and `thomasfosterau/preferenceflow` applications.
 
-Extracted from the `thomasfosterau/website`, `thomasfosterau/gardeneria` and `thomasfosterau/preferenceflow` applications. Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
+## Development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md); agent conventions are in [AGENTS.md](AGENTS.md).
+
+## License
+
+MIT © Thomas Foster. See [LICENSE](LICENSE).

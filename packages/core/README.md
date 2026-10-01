@@ -2,11 +2,11 @@
 
 The Effect ↔ Drizzle bridge: Effect Schema → Drizzle column derivation with an extensible column-kind system, a versioned-chain interpreter, typed Postgres error classification, pagination and transaction combinators.
 
-[![CI](https://github.com/thomasfosterau/effect-drizzle-ext/actions/workflows/ci.yml/badge.svg)](https://github.com/thomasfosterau/effect-drizzle-ext/actions/workflows/ci.yml) [![npm version](https://img.shields.io/npm/v/@thomasfosterau/effect-drizzle-ext.svg)](https://www.npmjs.com/package/@thomasfosterau/effect-drizzle-ext) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![npm version](https://img.shields.io/npm/v/@thomasfosterau/effect-drizzle-ext.svg)](https://www.npmjs.com/package/@thomasfosterau/effect-drizzle-ext)
 
 **Disclaimer:** This repository and package have been created using Claude Code. The package's API and functionality is in flux, so expect churn and breaking changes.
 
-## Installation
+## Install
 
 ```bash
 npm install @thomasfosterau/effect-drizzle-ext effect drizzle-orm
@@ -57,7 +57,7 @@ import * as Schema from "effect/Schema";
 import { dbColumn } from "./db-annotation.ts";
 
 export const Article = Schema.Struct({
-  id: dbColumn(Schema.UUID, { column: "id", pg: "text", notNull: true }),
+  id: dbColumn(Schema.String.check(Schema.isUUID()), { column: "id", pg: "text", notNull: true }),
   title: dbColumn(Schema.NonEmptyString, { column: "title", pg: "text", notNull: true }),
   views: dbColumn(Schema.Finite, { column: "views", pg: "integer", notNull: true, default: 0 }),
 });
@@ -71,7 +71,7 @@ import { makeDeriveColumns, type ColumnBuilders } from "@thomasfosterau/effect-d
 import { makeReferenceRegistry } from "@thomasfosterau/effect-drizzle-ext/references";
 import type { PgKind } from "./db-annotation.ts";
 
-const references = makeReferenceRegistry();
+export const references = makeReferenceRegistry();
 const builders: ColumnBuilders<PgKind> = { text, integer, boolean, timestamp };
 export const { fromFields } = makeDeriveColumns(builders, { resolveReference: references.resolve });
 ```
@@ -338,7 +338,7 @@ yield * tx.update(person).set(updateSetMap(input, WRITABLE)).where(eq(person.id,
 | `40001`  | `SerializationFailure` | —                               | yes       |
 | `40P01`  | `DeadlockDetected`     | —                               | yes       |
 
-Every class carries `cause` (the value classification started from, so the wrapping graph — drizzle's query text and params, the `SqlError` — survives). `classifyError` is `Option.none()` outside these seven (a syntax error, a connection failure — `SqlError.reason` already covers those well). `catchConstraintViolation` / `catchUniqueViolation` are data-last Effect combinators that recover the matching class and re-fail everything else, including other constraint classes, unchanged. `isUniqueViolation` is kept for adoption parity with the consuming applications' pre-existing predicate: same name, same semantics, including a fallback to the stable `pg` message fragment when no `code` survived the wrapping.
+Every class carries `cause` (the value classification started from, so the wrapping graph — drizzle's query text and params, the `SqlError` — survives). `classifyError` is `Option.none()` outside these seven (a syntax error, a connection failure — `SqlError.reason` already covers those well). `catchConstraintViolation` / `catchUniqueViolation` are data-last Effect combinators that recover the matching class and re-fail everything else, including other constraint classes, unchanged. `isUniqueViolation` is kept for adoption parity with the consuming applications' pre-existing predicate: same name, same semantics, including a fallback to the stable Postgres message fragment when no `code` survived the wrapping.
 
 ```ts
 export const findPgError: (error: unknown) => Option.Option<PgErrorFacts>;
@@ -494,8 +494,6 @@ export const deriveCheckConstraints: (
 
 **The derivation decides column _types_, never column _order_ or _names_.** Both are what a consumer's `db:generate` emits into a migration, so reordering or renaming fields in a schema declaration is a migration to write by hand, not something this library infers.
 
-**Explicit return annotations on the chain tables.** `SubtypeTables` and `CurrentVersionViewResult` are written out, not inferred, because the declaration printer cannot reduce `PgBuildColumns` / `PgViewWithSelection` while their column map is still generic — an inferred form would emit an unbound `TTableName` reference that only shows up as `any` downstream, past `skipLibCheck`.
-
 **No view selects from another view built by `makeCurrentVersionView`.** drizzle-kit does not topologically order view-on-view DROPs, so layering one generated current-version view on top of another breaks migration generation; a hierarchy's own hand-written views may join a generated one, never the reverse.
 
 ## Limitations / non-goals
@@ -506,6 +504,6 @@ export const deriveCheckConstraints: (
 - **Seed data** — fixture users and application seeds stay in the application's harness.
 - **Operation factories** — the model / route / handler layer built around a derived table (create/update/list operations, viewer-scoped queries) stays in the application. The pieces of it that are generic over any table — the sort seam, the update `SET` map, the attribute projections — ship here; JSON:API link builders belong to `@thomasfosterau/effect-jsonapi`, and list visibility predicates to the authorization layer.
 
-## Metadata
+## License
 
 MIT © Thomas Foster. Repository: [github.com/thomasfosterau/effect-drizzle-ext](https://github.com/thomasfosterau/effect-drizzle-ext). Extracted from the `thomasfosterau/website`, `thomasfosterau/gardeneria` and `thomasfosterau/preferenceflow` applications.
