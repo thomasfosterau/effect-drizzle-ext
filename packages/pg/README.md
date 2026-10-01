@@ -14,7 +14,7 @@ npm install @thomasfosterau/effect-drizzle-ext-pg @thomasfosterau/effect-drizzle
 npm install --save-dev drizzle-kit @testcontainers/postgresql
 ```
 
-`effect` (`>=4.0.0-rc.112`), `drizzle-orm` (`>=1.0.0-rc.5`) and `@effect/sql-pg` (`>=4.0.0-rc.115`) are peer dependencies, built against `effect@4.0.0-rc.115`, `drizzle-orm@1.0.0-rc.5-ab785fc` and `@effect/sql-pg@4.0.0-rc.115`. The `@effect/sql-pg` floor is higher than `effect`'s because 4.0.0-rc.115 replaced the `pg` driver with its own wire protocol and removed `PgClient.fromPool`; the client constructors below are written against that release, and `pg` is no longer a peer. `drizzle-kit` (`>=1.0.0-rc.5`, for `./tooling`) and `@testcontainers/postgresql` (`>=12`, for `./testing`'s container fallback) are **optional** peers. `@thomasfosterau/effect-drizzle-ext` is a regular dependency, not a peer — it supplies the driver-agnostic `makeDatabaseServices` factory this package specialises. Node.js 22 or newer is required.
+`effect` (`>=4.0.0-rc.118`), `drizzle-orm` (`>=1.0.0-rc.5`) and `@effect/sql-pg` (`>=4.0.0-rc.118`) are peer dependencies, built against `effect@4.0.0-rc.118`, `drizzle-orm@1.0.0-rc.5-ab785fc` and `@effect/sql-pg@4.0.0-rc.118`. Both floors are rc.118 because that release moved `effect/unstable/*` to `effect/*`; the client constructors below are written against `@effect/sql-pg`'s own wire protocol, and `pg` is no longer a peer. `drizzle-kit` (`>=1.0.0-rc.5`, for `./tooling`) and `@testcontainers/postgresql` (`>=12`, for `./testing`'s container fallback) are **optional** peers. `@thomasfosterau/effect-drizzle-ext` is a regular dependency, not a peer — it supplies the driver-agnostic `makeDatabaseServices` factory this package specialises. Node.js 22 or newer is required.
 
 ## Overview
 
@@ -47,16 +47,37 @@ export const pgClientFromUrl: (config: {
   readonly url: Redacted.Redacted<string>;
   readonly maxConnections?: number | undefined;
   readonly connectTimeout?: Duration.Input | undefined;
+  readonly types?: PgTypes.Registry | undefined;
+  readonly prepare?: boolean | undefined;
 }) => Layer.Layer<PgClient.PgClient | SqlClient, SqlError>;
 
 export const pgClientFromPool: (options: {
   readonly connectionString: Redacted.Redacted<string>;
   readonly maxConnections?: number | undefined;
   readonly connectTimeout?: Duration.Input | undefined;
+  readonly types?: PgTypes.Registry | undefined;
+  readonly prepare?: boolean | undefined;
 }) => Layer.Layer<PgClient.PgClient | SqlClient, SqlError>;
 ```
 
-Both output `PgClient | SqlClient` — that is what `@effect/sql-pg`'s own `PgClient.layer` / `PgClient.layerFrom` provide, and `Layer`'s output is covariant, so either satisfies a `PgClient`-only requirement (`testDatabaseLayer` below is built from one). (Before `@effect/sql-pg` 4.0.0-rc.115, `pgClientFromPool` wrapped a bare `pg.Pool` and took an `endTimeout` for `pool.end()`; rc.115's pool owns its own shutdown, so the option is gone.)
+Both output `PgClient | SqlClient` — that is what `@effect/sql-pg`'s own `PgClient.layer` / `PgClient.layerFrom` provide, and `Layer`'s output is covariant, so either satisfies a `PgClient`-only requirement (`testDatabaseLayer` below is built from one).
+
+### Binary codecs and Drizzle (read this before upgrading the driver)
+
+`@effect/sql-pg` rc.113 and later talks to PostgreSQL in the **binary** protocol only, and decodes each column by OID. Drizzle's `effect-postgres` driver was written for the text protocol, so under it some column types break or are silently corrupted: user enums and enum arrays, `vector`, `interval`, `tsvector`, `time`, `macaddr`, and `bigint({ mode: "string" })` (the driver hands back a JS `bigint` where Drizzle's type says `string`). `timestamptz` and the other columns Drizzle casts to text itself are fine. The measured table and a tested codec shim are in [website#2027](https://github.com/thomasfosterau/website/issues/2027).
+
+The fix is a per-client codec registry. Both helpers forward two optional `@effect/sql-pg` options for it:
+
+- `types` — a `PgTypes.Registry` (`PgTypes.makeRegistry()` plus `register(oid, codec, { arrayOid })` calls), for example an `int8` codec that returns a decimal string.
+- `prepare` — `false` to use unnamed statements. Set it behind a pooler that cannot keep named prepared statements across queries, such as Cloudflare Hyperdrive.
+
+```ts
+const types = PgTypes.makeRegistry();
+types.register(20, int8StringCodec, { arrayOid: 1016 });
+const client = pgClientFromUrl({ url, types, prepare: false });
+```
+
+`tests/integration/round-trip.test.ts` pins an enum, a string-mode `bigint` and a `timestamptz` through Drizzle against a live server, with and without the registry. This package ships no codecs of its own: which types need one depends on the application's schema.
 
 Deployment topology stays with the consuming application: resolving a connection string from a platform binding (a Cloudflare Hyperdrive binding, an environment variable), degrading a failed binding to a proxy client, and any wrapper around the concrete client are all things only the application knows about. This package has no Hyperdrive binding and no Cloudflare/Alchemy integration.
 

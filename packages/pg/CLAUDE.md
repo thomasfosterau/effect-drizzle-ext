@@ -1,6 +1,6 @@
 # packages/pg — `@thomasfosterau/effect-drizzle-ext-pg`
 
-The `@effect/sql-pg` binding of the bridge. Peers: `effect`, `drizzle-orm`, `@effect/sql-pg` (`>=4.0.0-rc.115`, the release that replaced the `pg` driver with its own protocol); optional `drizzle-kit` (only `./tooling` imports it) and `@testcontainers/postgresql` (only `./testing`'s container fallback, dynamically). Depends on `@thomasfosterau/effect-drizzle-ext` for the driver-agnostic service factory it specialises.
+The `@effect/sql-pg` binding of the bridge. Peers: `effect`, `drizzle-orm`, `@effect/sql-pg` (`>=4.0.0-rc.118`; rc.115 replaced the `pg` driver with its own protocol); optional `drizzle-kit` (only `./tooling` imports it) and `@testcontainers/postgresql` (only `./testing`'s container fallback, dynamically). Depends on `@thomasfosterau/effect-drizzle-ext` for the driver-agnostic service factory it specialises.
 
 ## Terms
 

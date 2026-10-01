@@ -12,7 +12,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
-import { SqlError, UniqueViolation as SqlUniqueViolation } from "effect/unstable/sql/SqlError";
+import { SqlError, UniqueViolation as SqlUniqueViolation } from "effect/sql/SqlError";
 import {
   catchConstraintViolation,
   catchUniqueViolation,

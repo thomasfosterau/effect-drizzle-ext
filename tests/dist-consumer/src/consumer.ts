@@ -13,7 +13,7 @@ import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as PgClient from "@effect/sql-pg/PgClient";
-import type { SqlError } from "effect/unstable/sql/SqlError";
+import type { SqlError } from "effect/sql/SqlError";
 import { Resource } from "@thomasfosterau/effect-jsonapi";
 import { sql, type SQL } from "drizzle-orm";
 import { boolean, integer, pgSchema, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
@@ -89,8 +89,8 @@ import type * as FileSystem from "effect/FileSystem";
 import type * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
 import type * as Scope from "effect/Scope";
-import type { SqlClient } from "effect/unstable/sql/SqlClient";
-import type { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
+import type { SqlClient } from "effect/sql/SqlClient";
+import type { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
 
 /** A compile-time assertion: `T` must be exactly `true`. */
 type Assert<T extends true> = T;

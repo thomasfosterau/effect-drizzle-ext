@@ -47,7 +47,7 @@ import * as Order from "effect/Order";
 import * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
 import * as Schema from "effect/Schema";
-import { SqlClient } from "effect/unstable/sql/SqlClient";
+import { SqlClient } from "effect/sql/SqlClient";
 
 /** drizzle-kit's statement separator inside a `migration.sql`. */
 export const STATEMENT_BREAKPOINT = "--> statement-breakpoint";

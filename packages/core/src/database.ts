@@ -34,7 +34,7 @@ import type { PgTransactionConfig } from "drizzle-orm/pg-core";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
-import type { SqlError } from "effect/unstable/sql/SqlError";
+import type { SqlError } from "effect/sql/SqlError";
 
 /**
  * The five read-side members {@link ReadHandle} narrows a handle to, as a

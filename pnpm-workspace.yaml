@@ -37,18 +37,18 @@ catalog:
   # node_modules/@effect/tsgo/dist/effect-tsgo.cjs before bumping any of the
   # three. Pin set in step with the preferenceflow application (the freshest).
   "@effect/tsgo": 0.46.1
-  "@effect/sql-pg": 4.0.0-rc.117
+  "@effect/sql-pg": 4.0.0-rc.118
   # The Node `FileSystem` / `Path` / `ChildProcessSpawner` layer the pg
   # package's tests provide to `./migrations`, `./testing`'s provisioning and
   # `./tooling` — a consumer provides its own (these modules only require the
   # services).
-  "@effect/platform-node": 4.0.0-rc.117
+  "@effect/platform-node": 4.0.0-rc.118
   "@mpsuesser/oxlint-plugin-effect": ^0.5.0
   # Starts the integration suite's ephemeral `pgvector/pgvector` server when no
   # local PostgreSQL is reachable — see packages/pg/tests/integration/global-setup.ts.
   "@testcontainers/postgresql": ^12.1.0
   # Optional peer of the core package: only the `./jsonapi*` subpaths import it.
-  "@thomasfosterau/effect-jsonapi": ^0.15.2
+  "@thomasfosterau/effect-jsonapi": ^0.16.0
   "@types/node": ^26.6.2
   "@vitest/coverage-istanbul": 5.0.2
   # A commit-suffixed prerelease: the first drizzle line to ship the Effect
@@ -58,7 +58,7 @@ catalog:
   # The optional peer `@thomasfosterau/effect-drizzle-ext-pg/tooling` diffs
   # schemas with (`drizzle-kit/api-postgres`); always the drizzle-orm pin.
   drizzle-kit: 1.0.0-rc.5-5935859
-  effect: 4.0.0-rc.117
+  effect: 4.0.0-rc.118
   effect-solutions: ^0.5.3
   fallow: 3.28.0
   # TypeScript 6/7 side-by-side: TS7 (the native Go compiler) ships no JS API
@@ -82,19 +82,20 @@ catalog:
 
 # Peer ranges the PUBLISHED packages declare. Kept as a named catalog so the
 # strict catalog mode still governs them while they stay ranges (an exact
-# `4.0.0-rc.115` peer would reject a consumer still on rc.112, the `effect`
-# floor). `pnpm pack` replaces `catalog:peers` with these ranges in the
+# `4.0.0-rc.118` peer would reject a consumer on a later prerelease, so the
+# floor is a range). `pnpm pack` replaces `catalog:peers` with these ranges in the
 # published manifest (see scripts/release.sh).
 catalogs:
   peers:
     # rc.115 replaced the `pg` driver with @effect/sql-pg's own protocol and
     # removed `PgClient.fromPool`; the pg package's client constructors are
-    # written against it (and `pg` stopped being a peer).
-    "@effect/sql-pg": ">=4.0.0-rc.115"
-    "@thomasfosterau/effect-jsonapi": ">=0.14.0"
+    # written against it (and `pg` stopped being a peer). rc.118 is the floor
+    # because its `effect/sql/*` entry points replaced `effect/unstable/sql/*`.
+    "@effect/sql-pg": ">=4.0.0-rc.118"
+    "@thomasfosterau/effect-jsonapi": ">=0.16.0"
     drizzle-kit: ">=1.0.0-rc.5"
     drizzle-orm: ">=1.0.0-rc.5"
-    effect: ">=4.0.0-rc.112"
+    effect: ">=4.0.0-rc.118"
     # Optional peer of the pg package's `./testing` Testcontainers fallback.
     "@testcontainers/postgresql": ">=12"
 
@@ -104,6 +105,14 @@ overrides:
   # `effect` MUST be a singleton (see the header): force every resolution to
   # the catalog version so a hoisting reshuffle cannot introduce a second copy.
   effect: "catalog:"
+  # `@mpsuesser/oxlint-plugin-effect` 0.5.0 is built on effect 4.0.0-beta.100
+  # and calls `Schema.isIncludes` (renamed `isIncluding` in rc.118), so the
+  # catalog `effect` override above makes `vite.config.ts` fail to load. Keep
+  # the plugin on its own private beta.100 copy. Remove this once the plugin
+  # ships an rc.118 build (website#2015).
+  "@mpsuesser/oxlint-plugin-effect>effect": "4.0.0-beta.100"
+  # GHSA-m9gg-hp2v-232j: @grpc/grpc-js <1.14.5 (via @testcontainers) fails `pnpm audit`.
+  "@grpc/grpc-js@>=1.14.0 <1.14.5": ^1.14.5
 nodeLinker: hoisted
 allowBuilds:
   # cpu-features / ssh2 / protobufjs arrive via @testcontainers/postgresql;
