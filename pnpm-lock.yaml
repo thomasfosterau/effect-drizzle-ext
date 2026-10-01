@@ -40,8 +40,8 @@ catalogs:
       specifier: npm:typescript@7.0.2
       version: 7.0.2
     '@vitest/coverage-istanbul':
-      specifier: 5.0.1
-      version: 5.0.1
+      specifier: 5.0.2
+      version: 5.0.2
     drizzle-kit:
       specifier: 1.0.0-rc.5-5935859
       version: 1.0.0-rc.5-5935859
@@ -135,7 +135,7 @@ importers:
         version: 26.6.2
       '@vitest/coverage-istanbul':
         specifier: 'catalog:'
-        version: 5.0.1(vitest@4.1.11)
+        version: 5.0.2(vitest@4.1.11)
       drizzle-orm:
         specifier: 'catalog:'
         version: 1.0.0-rc.5-ab785fc(@effect/sql-pg@4.0.0-rc.117(effect@4.0.0-rc.117))(@types/pg@8.23.1)(effect@4.0.0-rc.117)(pg@8.23.0)
@@ -166,7 +166,7 @@ importers:
         version: 26.6.2
       '@vitest/coverage-istanbul':
         specifier: 'catalog:'
-        version: 5.0.1(vitest@4.1.11)
+        version: 5.0.2(vitest@4.1.11)
       drizzle-kit:
         specifier: 'catalog:'
         version: 1.0.0-rc.5-5935859
@@ -1318,8 +1318,8 @@ packages:
     peerDependencies:
       vitest: 4.1.11
 
-  '@vitest/coverage-istanbul@5.0.1':
-    resolution: {integrity: sha512-JROeZ7Yy4xOMXQALW6CHT3O165LlUCB55F0aQ1LBRuFOCPCnSM1vDx8YxZTs8uPIBW9lcEftfNfOvIj4IJ1i9g==}
+  '@vitest/coverage-istanbul@5.0.2':
+    resolution: {integrity: sha512-YHA67+r9tAUDwVUcIJgc5u2sLwO8hHbC1Lcv5XmgMFjNk0HNl/0sJmADY474c7zP9r1bQDacQgN9Ix7MlBb4dA==}
     peerDependencies:
       vitest: 4.1.11
 
@@ -3814,7 +3814,7 @@ snapshots:
       '@testing-library/dom': 10.4.2
       '@testing-library/user-event': 14.6.7(@testing-library/dom@10.4.2)
       '@vitest/browser': 4.1.11(@voidzero-dev/vite-plus-core@0.3.2(@types/node@26.6.2)(@typescript/typescript6@6.0.2)(jiti@2.7.0)(yaml@2.9.1))(vitest@4.1.11)
-      vitest: 4.1.11(@types/node@26.6.2)(@vitest/browser-preview@4.1.11)(@vitest/coverage-istanbul@5.0.1)(@voidzero-dev/vite-plus-core@0.3.2(@types/node@26.6.2)(@typescript/typescript6@6.0.2)(jiti@2.7.0)(yaml@2.9.1))
+      vitest: 4.1.11(@types/node@26.6.2)(@vitest/browser-preview@4.1.11)(@vitest/coverage-istanbul@5.0.2)(@voidzero-dev/vite-plus-core@0.3.2(@types/node@26.6.2)(@typescript/typescript6@6.0.2)(jiti@2.7.0)(yaml@2.9.1))
     transitivePeerDependencies:
       - bufferutil
       - msw
@@ -3855,7 +3855,7 @@ snapshots:
       - supports-color
     optional: true
 
-  '@vitest/coverage-istanbul@5.0.1(vitest@4.1.11)':
+  '@vitest/coverage-istanbul@5.0.2(vitest@4.1.11)':
     dependencies:
       '@jridgewell/gen-mapping': 0.3.13
       '@jridgewell/trace-mapping': 0.3.31
@@ -3866,7 +3866,7 @@ snapshots:
       magicast: 0.5.5
       obug: 2.2.1
       tinyrainbow: 3.1.1
-      vitest: 4.1.11(@types/node@26.6.2)(@vitest/browser-preview@4.1.11)(@vitest/coverage-istanbul@5.0.1)(@voidzero-dev/vite-plus-core@0.3.2(@types/node@26.6.2)(@typescript/typescript6@6.0.2)(jiti@2.7.0)(yaml@2.9.1))
+      vitest: 4.1.11(@types/node@26.6.2)(@vitest/browser-preview@4.1.11)(@vitest/coverage-istanbul@5.0.2)(@voidzero-dev/vite-plus-core@0.3.2(@types/node@26.6.2)(@typescript/typescript6@6.0.2)(jiti@2.7.0)(yaml@2.9.1))
 
   '@vitest/expect@4.1.11':
     dependencies:
@@ -5197,7 +5197,7 @@ snapshots:
     transitivePeerDependencies:
       - msw
 
-  vitest@4.1.11(@types/node@26.6.2)(@vitest/browser-preview@4.1.11)(@vitest/coverage-istanbul@5.0.1)(@voidzero-dev/vite-plus-core@0.3.2(@types/node@26.6.2)(@typescript/typescript6@6.0.2)(jiti@2.7.0)(yaml@2.9.1)):
+  vitest@4.1.11(@types/node@26.6.2)(@vitest/browser-preview@4.1.11)(@vitest/coverage-istanbul@5.0.2)(@voidzero-dev/vite-plus-core@0.3.2(@types/node@26.6.2)(@typescript/typescript6@6.0.2)(jiti@2.7.0)(yaml@2.9.1)):
     dependencies:
       '@vitest/expect': 4.1.11
       '@vitest/mocker': 4.1.11(@voidzero-dev/vite-plus-core@0.3.2(@types/node@26.6.2)(@typescript/typescript6@6.0.2)(jiti@2.7.0)(yaml@2.9.1))
@@ -5222,7 +5222,7 @@ snapshots:
     optionalDependencies:
       '@types/node': 26.6.2
       '@vitest/browser-preview': 4.1.11(@voidzero-dev/vite-plus-core@0.3.2(@types/node@26.6.2)(@typescript/typescript6@6.0.2)(jiti@2.7.0)(yaml@2.9.1))(vitest@4.1.11)
-      '@vitest/coverage-istanbul': 5.0.1(vitest@4.1.11)
+      '@vitest/coverage-istanbul': 5.0.2(vitest@4.1.11)
     transitivePeerDependencies:
       - msw
 
