@@ -1,7 +1,7 @@
 {
   "name": "@thomasfosterau/effect-drizzle-ext-pg",
   "version": "0.0.0",
-  "description": "The @effect/sql-pg binding for @thomasfosterau/effect-drizzle-ext: the Database / CurrentTransaction services over drizzle-orm/effect-postgres, PgClient layer helpers, and the sentinel-rollback test transaction runner.",
+  "description": "The @effect/sql-pg binding for @thomasfosterau/effect-drizzle-ext: Database / CurrentTransaction services over drizzle-orm/effect-postgres, PgClient layers, a sentinel-rollback test runner with test-database provisioning, a fresh-database migration runner, and migration-drift / view-dependency guards.",
   "keywords": [
     "drizzle",
     "drizzle-orm",

@@ -1,12 +1,12 @@
 # `@thomasfosterau/effect-drizzle-ext-pg`
 
-The `@effect/sql-pg` binding of the Effect ↔ Drizzle bridge: one `makePgDatabase` call gives an application its `Database` / `CurrentTransaction` services, the `transact` write boundary and the `readHandle` resolver, all wired to `drizzle-orm/effect-postgres` over a real Postgres connection — plus the `PgClient` layer choice and a sentinel-rollback test transaction runner.
+The `@effect/sql-pg` binding for `@thomasfosterau/effect-drizzle-ext`: `Database` / `CurrentTransaction` services over `drizzle-orm/effect-postgres`, `PgClient` layers, a sentinel-rollback test runner with test-database provisioning, a fresh-database migration runner, and migration-drift / view-dependency guards.
 
-[![CI](https://github.com/thomasfosterau/effect-drizzle-ext/actions/workflows/ci.yml/badge.svg)](https://github.com/thomasfosterau/effect-drizzle-ext/actions/workflows/ci.yml) [![npm version](https://img.shields.io/npm/v/@thomasfosterau/effect-drizzle-ext-pg.svg)](https://www.npmjs.com/package/@thomasfosterau/effect-drizzle-ext-pg) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![npm version](https://img.shields.io/npm/v/@thomasfosterau/effect-drizzle-ext-pg.svg)](https://www.npmjs.com/package/@thomasfosterau/effect-drizzle-ext-pg)
 
 **Disclaimer:** This repository and package have been created using Claude Code. The package's API and functionality is in flux, so expect churn and breaking changes.
 
-## Installation
+## Install
 
 ```bash
 npm install @thomasfosterau/effect-drizzle-ext-pg @thomasfosterau/effect-drizzle-ext effect drizzle-orm @effect/sql-pg
@@ -114,10 +114,10 @@ const createWidget = (name: string) =>
 A read prefers whichever transaction is already open, so a helper called from inside a handler's `transact` sees its uncommitted writes without being told about the transaction at all:
 
 ```ts
-const findWidget = (id: string) =>
+const findWidget = (name: string) =>
   Effect.gen(function* () {
     const handle = yield* readHandle;
-    return yield* handle.select().from(widgets).where(eq(widgets.id, id));
+    return yield* handle.select().from(widgets).where(eq(widgets.name, name));
   });
 ```
 
@@ -438,6 +438,6 @@ This repository proves both guards against a committed fixture chain, `packages/
 - **No migrator for a live database.** `./migrations` applies everything to a database that is always brand new; it keeps no ledger, so it is not a deploy-time migrator.
 - **Single driver.** This package binds `@effect/sql-pg` only; a different Postgres driver, or a different database entirely, needs its own binding package built the same way against the core package's `makeDatabaseServices`.
 
-## Metadata
+## License
 
 MIT © Thomas Foster. Repository: [github.com/thomasfosterau/effect-drizzle-ext](https://github.com/thomasfosterau/effect-drizzle-ext), package directory `packages/pg`. Extracted from the `thomasfosterau/website`, `thomasfosterau/gardeneria` and `thomasfosterau/preferenceflow` applications. See [`@thomasfosterau/effect-drizzle-ext`](../core/README.md) for the driver-agnostic half.
