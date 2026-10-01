@@ -26,6 +26,7 @@
  */
 
 import * as PgClient from "@effect/sql-pg/PgClient";
+import type * as PgTypes from "@effect/sql-pg/PgTypes";
 import {
   type DatabaseServices,
   makeDatabaseServices,
@@ -165,6 +166,18 @@ export const pgClientFromUrl = (config: {
   readonly url: Redacted.Redacted<string>;
   readonly maxConnections?: number | undefined;
   readonly connectTimeout?: Duration.Input | undefined;
+  /**
+   * A per-client codec registry (`PgTypes.makeRegistry()` plus your
+   * `register` calls), forwarded to `@effect/sql-pg`. See the README's
+   * "Binary codecs" section for why Drizzle needs one.
+   */
+  readonly types?: PgTypes.Registry | undefined;
+  /**
+   * Named prepared statements (`@effect/sql-pg` defaults this to `true`).
+   * Set `false` behind a pooler that cannot keep them across queries, such
+   * as Cloudflare Hyperdrive.
+   */
+  readonly prepare?: boolean | undefined;
 }): Layer.Layer<PgClient.PgClient | SqlClient, SqlError> =>
   PgClient.layerFrom(Effect.tap(PgClient.make(config), (client) => client`SELECT 1`));
 
@@ -190,10 +203,24 @@ export const pgClientFromPool = (options: {
   readonly connectionString: Redacted.Redacted<string>;
   readonly maxConnections?: number | undefined;
   readonly connectTimeout?: Duration.Input | undefined;
+  /**
+   * A per-client codec registry (`PgTypes.makeRegistry()` plus your
+   * `register` calls), forwarded to `@effect/sql-pg`. See the README's
+   * "Binary codecs" section for why Drizzle needs one.
+   */
+  readonly types?: PgTypes.Registry | undefined;
+  /**
+   * Named prepared statements (`@effect/sql-pg` defaults this to `true`).
+   * Set `false` behind a pooler that cannot keep them across queries, such
+   * as Cloudflare Hyperdrive.
+   */
+  readonly prepare?: boolean | undefined;
 }): Layer.Layer<PgClient.PgClient | SqlClient, SqlError> =>
   PgClient.layer({
     url: options.connectionString,
     maxConnections: options.maxConnections,
     connectTimeout: options.connectTimeout,
+    types: options.types,
+    prepare: options.prepare,
   });
 /* oxlint-enable effect/prefer-option-over-null */
