@@ -43,8 +43,8 @@ catalogs:
       specifier: 5.0.1
       version: 5.0.1
     drizzle-kit:
-      specifier: 1.0.0-rc.5-ab785fc
-      version: 1.0.0-rc.5-ab785fc
+      specifier: 1.0.0-rc.5-5935859
+      version: 1.0.0-rc.5-5935859
     drizzle-orm:
       specifier: 1.0.0-rc.5-ab785fc
       version: 1.0.0-rc.5-ab785fc
@@ -169,7 +169,7 @@ importers:
         version: 5.0.1(vitest@4.1.11)
       drizzle-kit:
         specifier: 'catalog:'
-        version: 1.0.0-rc.5-ab785fc
+        version: 1.0.0-rc.5-5935859
       drizzle-orm:
         specifier: 'catalog:'
         version: 1.0.0-rc.5-ab785fc(@effect/sql-pg@4.0.0-rc.117(effect@4.0.0-rc.117))(@types/pg@8.23.1)(effect@4.0.0-rc.117)(pg@8.23.0)
@@ -187,7 +187,7 @@ importers:
         version: 0.14.0(effect@4.0.0-rc.117)
       drizzle-kit:
         specifier: 'catalog:'
-        version: 1.0.0-rc.5-ab785fc
+        version: 1.0.0-rc.5-5935859
       drizzle-orm:
         specifier: 'catalog:'
         version: 1.0.0-rc.5-ab785fc(@effect/sql-pg@4.0.0-rc.117(effect@4.0.0-rc.117))(@types/pg@8.23.1)(effect@4.0.0-rc.117)(pg@8.23.0)
@@ -1842,8 +1842,8 @@ packages:
   dom-accessibility-api@0.5.16:
     resolution: {integrity: sha512-X7BJ2yElsnOJ30pZF4uIIDfBEVgF4XEBxL9Bxhy6dnrm5hkzqmsWHGTiHqRiITNhMyFLyAiWndIJP7Z1NTteDg==}
 
-  drizzle-kit@1.0.0-rc.5-ab785fc:
-    resolution: {integrity: sha512-TSg7sK1finOxdo48O9mDfyMY3lhi/aHCVIil5TFhthyq/H/89H/3nwX5V9Gdp7HYMUGFHyWJD5iowSn98l0elw==}
+  drizzle-kit@1.0.0-rc.5-5935859:
+    resolution: {integrity: sha512-p//MvJbSeDFxa3pODv0ebNVJmk/5aAHHaCyQTtDGFlCYX4e7eY9rrSX/liBJ7098Ei9WUi9VT65JQkSFDuG1ng==}
     hasBin: true
 
   drizzle-orm@1.0.0-rc.5-ab785fc:
@@ -4275,7 +4275,7 @@ snapshots:
 
   dom-accessibility-api@0.5.16: {}
 
-  drizzle-kit@1.0.0-rc.5-ab785fc:
+  drizzle-kit@1.0.0-rc.5-5935859:
     dependencies:
       '@drizzle-team/brocli': 0.12.1
       '@js-temporal/polyfill': 0.5.1

@@ -57,7 +57,7 @@ catalog:
   drizzle-orm: 1.0.0-rc.5-ab785fc
   # The optional peer `@thomasfosterau/effect-drizzle-ext-pg/tooling` diffs
   # schemas with (`drizzle-kit/api-postgres`); always the drizzle-orm pin.
-  drizzle-kit: 1.0.0-rc.5-ab785fc
+  drizzle-kit: 1.0.0-rc.5-5935859
   effect: 4.0.0-rc.117
   effect-solutions: ^0.5.3
   fallow: 3.28.0
