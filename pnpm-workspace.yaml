@@ -111,6 +111,8 @@ overrides:
   # the plugin on its own private beta.100 copy. Remove this once the plugin
   # ships an rc.118 build (website#2015).
   "@mpsuesser/oxlint-plugin-effect>effect": "4.0.0-beta.100"
+  # GHSA-m9gg-hp2v-232j: @grpc/grpc-js <1.14.5 (via @testcontainers) fails `pnpm audit`.
+  "@grpc/grpc-js@>=1.14.0 <1.14.5": ^1.14.5
 nodeLinker: hoisted
 allowBuilds:
   # cpu-features / ssh2 / protobufjs arrive via @testcontainers/postgresql;
