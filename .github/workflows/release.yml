@@ -9,7 +9,8 @@ name: Release
 # workflow proves its identity to npm with a short-lived, job-scoped OIDC
 # token, and each package's trusted-publisher binding on npmjs.com names this
 # repository, this workflow file and the `release` environment. Provenance is
-# attached automatically. The owner's one-time setup (the protected `release`
+# left to npm (attached automatically where supported; never forced, which fails
+# from a private repository). The owner's one-time setup (the protected `release`
 # environment, the two trusted-publisher bindings, the Actions permission to
 # open PRs) is in CONTRIBUTING.md; the shape is copied from effect-jsonapi.
 
@@ -73,4 +74,3 @@ jobs:
           pr-title: "chore: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_CONFIG_PROVENANCE: "true"
