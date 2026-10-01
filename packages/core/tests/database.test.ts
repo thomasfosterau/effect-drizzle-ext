@@ -25,7 +25,7 @@ import { beforeEach, describe, expect, it } from "vite-plus/test";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
-import type { SqlError } from "effect/unstable/sql/SqlError";
+import type { SqlError } from "effect/sql/SqlError";
 import {
   makeDatabaseServices,
   type ReadSurface,

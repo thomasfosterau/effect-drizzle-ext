@@ -49,7 +49,7 @@ import * as Layer from "effect/Layer";
 import type * as ManagedRuntime from "effect/ManagedRuntime";
 import type * as Redacted from "effect/Redacted";
 import * as Schedule from "effect/Schedule";
-import { isSqlError, type SqlError } from "effect/unstable/sql/SqlError";
+import { isSqlError, type SqlError } from "effect/sql/SqlError";
 import { type PgDatabase, pgClientFromUrl } from "./index.ts";
 
 export {

@@ -37,7 +37,7 @@ import {
   SqlError,
   UniqueViolation,
   UnknownError,
-} from "effect/unstable/sql/SqlError";
+} from "effect/sql/SqlError";
 import { makeDatabaseServices } from "@thomasfosterau/effect-drizzle-ext/database";
 import { describe, expect, it } from "vite-plus/test";
 import type { PgDatabase } from "../src/index.ts";
