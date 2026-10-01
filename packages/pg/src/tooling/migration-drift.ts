@@ -304,18 +304,18 @@ export const checkBaseAncestry = (
   ];
 };
 
-/**
- * The base ref for the ancestry check, when one is knowable: an explicit
- * `MIGRATION_BASE_REF` wins (local use: `MIGRATION_BASE_REF=origin/main`),
- * else `origin/$GITHUB_BASE_REF` — which GitHub Actions sets only on
- * `pull_request` events, so pushes and local runs skip the check.
- */
 /** The environment {@link resolveBaseRef} reads — the shape of `process.env`. */
 export interface BaseRefEnvironment {
   // oxlint-disable-next-line effect/prefer-option-over-null -- `process.env`'s shape (unset variables are missing keys), passed straight in
   readonly [name: string]: string | undefined;
 }
 
+/**
+ * The base ref for the ancestry check, when one is knowable: an explicit
+ * `MIGRATION_BASE_REF` wins (local use: `MIGRATION_BASE_REF=origin/main`),
+ * else `origin/$GITHUB_BASE_REF` — which GitHub Actions sets only on
+ * `pull_request` events, so pushes and local runs skip the check.
+ */
 export const resolveBaseRef = (env: BaseRefEnvironment): Option.Option<string> => {
   const explicit = env.MIGRATION_BASE_REF ?? "";
   if (explicit !== "") return Option.some(explicit);
