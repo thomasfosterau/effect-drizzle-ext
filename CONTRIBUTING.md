@@ -2,9 +2,7 @@
 
 Maintained by Thomas Foster, with a workflow meant to be approachable for both humans and coding agents. Conventions are in [AGENTS.md](AGENTS.md).
 
-## Branch model
-
-`main` plus short-lived feature branches, PR against `main`, squash-merge with a conventional prefix (`feat:`, `fix:`, `docs:`, `chore:`). Rebase onto `origin/main` before opening a PR; never merge `main` into a feature branch (GitHub's "Update branch" button does a merge — avoid it).
+Branch model, changesets and PR rules: [AGENTS.md → Branches and pull requests](AGENTS.md#branches-and-pull-requests).
 
 ## Git hooks
 
@@ -23,21 +21,17 @@ Hooks are managed by Vite+; the editable [.vite-hooks/pre-commit](.vite-hooks/pr
 
 ## Pre-PR checklist
 
-1. `vp fmt` / `vp lint`
-2. `vp run check`
-3. `vp run -r test:unit`
-4. `vp run test:integration` — needs a local PostgreSQL server (`PG*` env) or a Docker daemon; or set `DATABASE_URL_TEST` (to a database that already holds the fixture chain in `packages/pg/tests/fixtures/migrations`).
-5. `vp run -r build`
-6. `fallow audit --base origin/main`
-7. A changeset (`pnpm changeset`) for every change to a published package.
-8. `git fetch origin main && git rebase origin/main`
-9. Docs: the package `README.md` for any exported change; the package `CLAUDE.md` for a new term or invariant.
+1. The gates in [AGENTS.md → Verification](AGENTS.md#verification), in order, from a clean install.
+2. A changeset (`pnpm changeset`) for every change to a published package's behaviour.
+3. `git fetch origin main && git rebase origin/main`.
+4. Docs: the package `README.md` for any exported change; the package `CLAUDE.md` for a new term or invariant.
 
 ## Running individual checks
 
 ```sh
-vp lint                                  # oxlint
-vp fmt                                   # oxlint --fix && oxfmt
+vp check                                 # format + lint (oxfmt + oxlint); --fix to autofix
+vp lint                                  # oxlint only
+vp fmt                                   # oxfmt (format only)
 vp run check                             # the whole type gate (includes building dist/)
 vp run --filter ./packages/core check    # one package's type check
 vp run -r test:unit                      # unit tests
