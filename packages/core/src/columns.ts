@@ -98,10 +98,9 @@ export const tsvector = (
  *
  * Typed `Uint8Array` rather than `Buffer` — see {@link byteaToHex} for why
  * the Node global is off-limits here. Both directions are honest about the
- * runtime: node-pg returns a `Buffer` for `bytea` (a `Uint8Array` subclass,
- * so reads widen safely), and on the write side `pg`'s `prepareValue`
- * converts any `ArrayBuffer` view to a `Buffer` before binding the
- * parameter, so a plain `Uint8Array` binds identically to one.
+ * runtime: `@effect/sql-pg`'s binary `bytea` codec decodes to a `Uint8Array`
+ * and encodes any `Uint8Array` (a Node `Buffer` included, as a subclass) as
+ * raw bytes, so a plain `Uint8Array` binds identically to a `Buffer`.
  */
 export const bytea = (
   name: string,

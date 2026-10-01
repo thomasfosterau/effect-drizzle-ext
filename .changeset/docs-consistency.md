@@ -3,4 +3,4 @@
 "@thomasfosterau/effect-drizzle-ext-pg": patch
 ---
 
-Documentation: `resolveBaseRef` (`./tooling`) now carries its own hover documentation; the `./errors` docs describe the driver's Postgres error rather than the `pg` driver's `DatabaseError`; the READMEs drop the private-repository CI badge, and their quick-start samples compile.
+Documentation: every `./tooling` export, `resolveBaseRef` included, carries hover documentation; the `./errors` and `./columns` docs describe `@effect/sql-pg`'s Postgres error and `bytea` codec; the README quick-start samples compile.
