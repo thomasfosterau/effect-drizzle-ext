@@ -6,6 +6,7 @@
   "linked": [["@thomasfosterau/effect-drizzle-ext", "@thomasfosterau/effect-drizzle-ext-pg"]],
   "access": "public",
   "baseBranch": "main",
+  "format": false,
   "updateInternalDependencies": "patch",
   "ignore": ["@effect-drizzle-ext/dist-consumer"]
 }

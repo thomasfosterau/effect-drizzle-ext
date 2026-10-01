@@ -10,7 +10,9 @@
 # short-lived publish token scoped to ONE package, and the trusted-publisher
 # binding is configured per package on npmjs.com. `npm publish` (npm >= 11.5.1)
 # is the client npm documents for that exchange: it mints the token for the
-# package it is publishing and attaches the provenance statement itself. The
+# package it is publishing and attaches a provenance statement itself where the repository
+# supports one (it is never forced with `--provenance`, which fails from a
+# private repository). The
 # 2026-09-18 tooling survey (issue #10) found the old recursive
 # `pnpm -r publish` could not take this path, so each package is published by
 # its own `npm publish` call.
@@ -61,7 +63,7 @@ for dir in "${PACKAGES[@]}"; do
   ')"
 
   echo "publishing ${name}@${version} from ${tarball}"
-  npm publish "$tarball" --access public --provenance ${RELEASE_DRY_RUN:+--dry-run}
+  npm publish "$tarball" --access public ${RELEASE_DRY_RUN:+--dry-run}
 done
 
 # `RELEASE_DRY_RUN=1 pnpm run release` exercises everything above locally
