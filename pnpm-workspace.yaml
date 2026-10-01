@@ -36,7 +36,7 @@ catalog:
   # `pnpm install` itself. Read the `components` table in
   # node_modules/@effect/tsgo/dist/effect-tsgo.cjs before bumping any of the
   # three. Pin set in step with the preferenceflow application (the freshest).
-  "@effect/tsgo": 0.46.0
+  "@effect/tsgo": 0.46.1
   "@effect/sql-pg": 4.0.0-rc.117
   # The Node `FileSystem` / `Path` / `ChildProcessSpawner` layer the pg
   # package's tests provide to `./migrations`, `./testing`'s provisioning and
