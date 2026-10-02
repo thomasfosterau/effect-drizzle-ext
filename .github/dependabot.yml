@@ -5,6 +5,15 @@
 # line is a lockstep-versioned singleton set; the vitest toolchain is pinned to
 # vite-plus's exact versions.
 #
+# `@effect/tsgo`, `typescript` (the TS 6 alias) and `@typescript/native` (TS 7)
+# are one set: `effect-tsgo patch` matches the native `tsc` and `oxlint` by
+# gitHead / version and hard-errors on any pairing it has no artifact for, so
+# a PR that moves one of them alone goes red. They move by hand, together with
+# `vite-plus`, after checking the `components` table in
+# `node_modules/@effect/tsgo/dist/effect-tsgo.cjs`. Their *version* updates are
+# ignored below (SECURITY updates stay enabled, as for drizzle-orm), and
+# `@effect/tsgo` is excluded from the `effect` group's `@effect/*` pattern.
+#
 # drizzle-orm is on a commit-suffixed prerelease with no meaningful semver bump
 # to compute, so its *version* updates are ignored while SECURITY updates stay
 # enabled (the ignore is scoped to the `version-update:semver-*` update types;
@@ -33,6 +42,8 @@ updates:
         patterns:
           - "effect"
           - "@effect/*"
+        exclude-patterns:
+          - "@effect/tsgo"
       vitest-toolchain:
         patterns:
           - "vitest"
@@ -40,6 +51,27 @@ updates:
           - "vite-plus"
     ignore:
       - dependency-name: "drizzle-orm"
+        update-types:
+          [
+            "version-update:semver-major",
+            "version-update:semver-minor",
+            "version-update:semver-patch",
+          ]
+      - dependency-name: "@effect/tsgo"
+        update-types:
+          [
+            "version-update:semver-major",
+            "version-update:semver-minor",
+            "version-update:semver-patch",
+          ]
+      - dependency-name: "typescript"
+        update-types:
+          [
+            "version-update:semver-major",
+            "version-update:semver-minor",
+            "version-update:semver-patch",
+          ]
+      - dependency-name: "@typescript/native"
         update-types:
           [
             "version-update:semver-major",
