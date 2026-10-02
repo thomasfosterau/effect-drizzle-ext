@@ -50,7 +50,7 @@ catalog:
   # Optional peer of the core package: only the `./jsonapi*` subpaths import it.
   "@thomasfosterau/effect-jsonapi": ^0.16.0
   "@types/node": ^26.6.3
-  "@vitest/coverage-istanbul": 5.0.2
+  "@vitest/coverage-istanbul": 5.0.3
   # A commit-suffixed prerelease: the first drizzle line to ship the Effect
   # integration (`drizzle-orm/effect-postgres`, `effect-core`, `effect-schema`)
   # this library extends. Same pin as the three applications.
