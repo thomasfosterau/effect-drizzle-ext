@@ -48,7 +48,7 @@ catalog:
   # local PostgreSQL is reachable — see packages/pg/tests/integration/global-setup.ts.
   "@testcontainers/postgresql": ^12.1.0
   # Optional peer of the core package: only the `./jsonapi*` subpaths import it.
-  "@thomasfosterau/effect-jsonapi": ^0.16.0
+  "@thomasfosterau/effect-jsonapi": ^0.16.3
   "@types/node": ^26.6.3
   "@vitest/coverage-istanbul": 5.0.2
   # A commit-suffixed prerelease: the first drizzle line to ship the Effect
