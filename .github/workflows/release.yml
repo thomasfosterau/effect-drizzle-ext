@@ -1,6 +1,6 @@
 name: Release
 
-# Changesets release flow: on every push to `main`, changesets/action either
+# Changesets release flow: on every push to `trunk`, changesets/action either
 # opens/updates the "Version Packages" PR (when unreleased changesets exist)
 # or, when that PR has merged and no changesets remain, publishes both
 # packages to npm and tags the release.
@@ -16,7 +16,7 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    branches: [trunk]
 
 concurrency:
   group: release-${{ github.ref }}
@@ -32,7 +32,7 @@ jobs:
     if: github.repository == 'thomasfosterau/effect-drizzle-ext'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # A protected GitHub Environment: required reviewers and a `main`-only
+    # A protected GitHub Environment: required reviewers and a `trunk`-only
     # deployment rule pause every run for manual approval, and the npm
     # trusted-publisher bindings accept only tokens minted inside it.
     environment: release
