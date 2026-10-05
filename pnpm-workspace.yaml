@@ -43,7 +43,7 @@ catalog:
   # `./tooling` — a consumer provides its own (these modules only require the
   # services).
   "@effect/platform-node": 4.0.0
-  "@mpsuesser/oxlint-plugin-effect": ^0.5.0
+  "@mpsuesser/oxlint-plugin-effect": ^0.6.0
   # Starts the integration suite's ephemeral `pgvector/pgvector` server when no
   # local PostgreSQL is reachable — see packages/pg/tests/integration/global-setup.ts.
   "@testcontainers/postgresql": ^12.2.0
