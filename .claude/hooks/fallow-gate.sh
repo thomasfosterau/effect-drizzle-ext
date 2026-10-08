@@ -18,11 +18,13 @@ set -euo pipefail
 # diverge on prereleases (BSD sorts `2.48.0-alpha.1` ABOVE `2.48.0`, GNU below).
 # If you set a prerelease floor explicitly, verify the behavior on the target OS.
 #
-# Local edit (effect-drizzle-ext#30, effect-drizzle-ext#55): this paragraph,
-# the block between the "local edit" markers below and `--base "$BASE"` on the
-# audit call are not generated, because the installer passes no --base. After
+# Local edits (effect-drizzle-ext#30, #55, #58): this paragraph, the two blocks
+# between "local edit" markers below (the #58 block directly before the #30
+# one) and `--base "$BASE"` on the audit call are not generated. The installer
+# passes no --base, and it audits the hook's own directory rather than the
+# checkout a `cd <dir> &&` or `git -C <dir>` in the command targets. After
 # regenerating with `fallow hooks install --target agent --agent claude --force`,
-# re-apply exactly those three pieces; the rest of the file is the installer's.
+# re-apply exactly those four pieces; the rest of the file is the installer's.
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "fallow-gate: jq not on PATH, skipping audit." >&2
@@ -138,6 +140,102 @@ cleanup() {
   rm -f "$TMP_JSON" "$TMP_ERR"
 }
 trap cleanup EXIT
+
+# --- local edit begin (effect-drizzle-ext#58) ---
+# Audit the checkout the command targets, not the hook's own directory. A
+# PreToolUse hook runs before the command, so a `cd <dir> &&` or a
+# `git -C <dir>` inside it has not moved the hook yet. Split the command into
+# segments exactly as is_git_write_command does; apply, in order, each segment
+# that starts with `cd` before the first git commit/push (each relative to the
+# previous, as the shell would), then that git's -C options (likewise, as git
+# does); and move to the top level of the result, so the base resolution below
+# and the audit both run in the target checkout. A target that is not a
+# directory inside a git checkout, or a `cd` this cannot follow (`cd -`, a
+# `$VAR`), keeps the hook's own directory, with a notice. --git-dir and
+# --work-tree are not followed: fallow runs its own git in the audit
+# directory, which would not see a separate --git-dir. pushd and subshell
+# scoping are not modelled, and only the first git commit/push counts.
+join_dir() {
+  local word="$2"
+  case "$word" in
+    \~) word="$HOME" ;;
+    \~/*) word="$HOME/${word#\~/}" ;;
+    \"*\" | \'*\') word="${word:1:${#word}-2}" ;;
+  esac
+  case "$word" in
+    "") printf '%s\n' "$1" ;;
+    -* | *'$'* | *'`'*) printf '\n' ;;
+    /*) printf '%s\n' "$word" ;;
+    *) if [ -n "$1" ]; then printf '%s\n' "$1/$word"; else printf '\n'; fi ;;
+  esac
+}
+# Same segmentation as is_git_write_command, deliberately.
+# shellcheck disable=SC2020
+git_write_target() {
+  local cmd="$1" segment dir="." git_dir
+  while IFS= read -r segment; do
+    # Intentional word splitting; globbing is disabled by the caller.
+    # shellcheck disable=SC2086
+    set -- $segment
+    if [ "${1:-}" = "cd" ]; then
+      shift
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          --) shift && break ;;
+          -?*) shift ;;
+          *) break ;;
+        esac
+      done
+      dir="$(join_dir "$dir" "${1:-~}")"
+      continue
+    fi
+    while [ "$#" -gt 0 ]; do
+      if [ "$1" != "git" ]; then
+        shift
+        continue
+      fi
+      shift
+      git_dir="$dir"
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          commit | push)
+            printf '%s\n' "$git_dir"
+            return 0
+            ;;
+          -C)
+            git_dir="$(join_dir "$git_dir" "${2:-}")"
+            shift
+            [ "$#" -gt 0 ] && shift
+            ;;
+          -c | --git-dir | --work-tree | --namespace | --config-env | --super-prefix | --exec-path | --list-cmds | --attr-source)
+            shift
+            [ "$#" -gt 0 ] && shift
+            ;;
+          -*) shift ;;
+          *) break ;;
+        esac
+      done
+    done
+  done < <(printf '%s\n' "$cmd" | tr ';|&()' '\n\n\n\n\n')
+  return 1
+}
+set -f
+TARGET="$(git_write_target "$CMD")" || TARGET="."
+set +f
+if [ -z "$TARGET" ]; then
+  echo "fallow-gate: could not follow the command's cd or -C target; auditing $PWD instead." >&2
+elif [ "$TARGET" != "." ]; then
+  if TOP="$(cd "$TARGET" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null)" && [ -n "$TOP" ]; then
+    # Keep a relative runner pointing at the install found above.
+    case "${RUNNER[0]}" in
+      ./*) RUNNER[0]="$PWD/${RUNNER[0]#./}" ;;
+    esac
+    cd "$TOP"
+  else
+    echo "fallow-gate: command targets $TARGET, which is not inside a git checkout; auditing $PWD instead." >&2
+  fi
+fi
+# --- local edit end ---
 
 # --- local edit begin (effect-drizzle-ext#30) ---
 # Audit against the remote default branch. Without --base, fallow diffs against
