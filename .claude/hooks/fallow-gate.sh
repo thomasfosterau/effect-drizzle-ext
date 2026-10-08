@@ -18,13 +18,63 @@ set -euo pipefail
 # diverge on prereleases (BSD sorts `2.48.0-alpha.1` ABOVE `2.48.0`, GNU below).
 # If you set a prerelease floor explicitly, verify the behavior on the target OS.
 #
-# Local edits (effect-drizzle-ext#30, #55, #58): this paragraph, the two blocks
-# between "local edit" markers below (the #58 block directly before the #30
-# one) and `--base "$BASE"` on the audit call are not generated. The installer
-# passes no --base, and it audits the hook's own directory rather than the
-# checkout a `cd <dir> &&` or `git -C <dir>` in the command targets. After
-# regenerating with `fallow hooks install --target agent --agent claude --force`,
-# re-apply exactly those four pieces; the rest of the file is the installer's.
+# Local edits (effect-drizzle-ext#30, #55, #58, #61): this paragraph, the four
+# blocks between "local edit" markers below (a #61 block directly before the
+# jq check, a second #61 block directly after `trap cleanup EXIT`, then the
+# #58 block directly before the #30 one) and `--base "$BASE"` on the audit
+# call are not generated. The installer passes no --base, audits the hook's
+# own directory rather than the checkout a `cd <dir> &&` or `git -C <dir>` in
+# the command targets, and writes its fail-open notices to stderr only, which
+# Claude Code keeps in its debug log when the hook exits 0. After regenerating
+# with `fallow hooks install --target agent --agent claude --force`, re-apply
+# exactly those six pieces; the rest of the file is the installer's.
+
+# --- local edit begin (effect-drizzle-ext#61) ---
+# Surface every fail-open notice. Claude Code reads a hook's stderr only when
+# it exits 2, so from here on stderr goes to a temp file and gate_finish, run
+# on exit, replays it to the real stderr (the debug log, or the block reason
+# on exit 2). When the hook exits 0 on a git commit or push without a passing
+# audit (every fail-open path), or after a #58 notice that sets GATE_NOTICE,
+# it also prints one JSON object on stdout whose systemMessage (shown to the
+# user) and hookSpecificOutput.additionalContext (shown to the agent) carry
+# the notice text. A passing audit and a command that is not a git commit or
+# push print nothing. Without jq the command cannot be classified, so the JSON
+# is a fixed literal, printed only when the input mentions commit or push.
+# The second #61 block re-arms this trap after `trap cleanup EXIT` replaces it.
+GATE_NOTICE=0
+GATE_LOG="$(mktemp 2>/dev/null || true)"
+if [ -n "$GATE_LOG" ]; then
+  exec 9>&2 2>"$GATE_LOG"
+fi
+# Called from the EXIT trap as `gate_finish <exit status> || true`, so errexit
+# is off inside.
+# shellcheck disable=SC2329
+gate_finish() {
+  local status="$1" text=""
+  if [ -n "$GATE_LOG" ]; then
+    exec 2>&9 9>&-
+    [ ! -s "$GATE_LOG" ] || text="$(cat "$GATE_LOG" 2>/dev/null)"
+    rm -f "$GATE_LOG"
+    [ -z "$text" ] || printf '%s\n' "$text" >&2
+  fi
+  [ "$status" -eq 0 ] && [ "${GIT_WRITE-1}" != 0 ] || return 0
+  if [ "$GATE_NOTICE" -eq 0 ] && [ "${STATUS-}" = 0 ] && [ "${IS_ERROR-}" != true ] && [ -n "${VERDICT-}" ]; then
+    return 0
+  fi
+  if ! command -v jq >/dev/null 2>&1; then
+    # The generated jq check exits before reading stdin.
+    case "${INPUT-$(cat 2>/dev/null)}" in
+      *commit* | *push*) ;;
+      *) return 0 ;;
+    esac
+    printf '%s\n' '{"systemMessage":"fallow-gate: jq not on PATH, skipping audit.","hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"fallow-gate: jq not on PATH, skipping audit."}}'
+    return 0
+  fi
+  [ -n "$text" ] || text="fallow-gate: no passing fallow audit ran for this git commit or push."
+  jq -cn --arg m "$text" '{systemMessage: $m, hookSpecificOutput: {hookEventName: "PreToolUse", additionalContext: $m}}'
+}
+trap 'GATE_STATUS=$?; gate_finish "$GATE_STATUS" || true; exit "$GATE_STATUS"' EXIT
+# --- local edit end ---
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "fallow-gate: jq not on PATH, skipping audit." >&2
@@ -140,6 +190,11 @@ cleanup() {
   rm -f "$TMP_JSON" "$TMP_ERR"
 }
 trap cleanup EXIT
+
+# --- local edit begin (effect-drizzle-ext#61) ---
+# `trap cleanup EXIT` above replaced the first #61 block's trap; run both.
+trap 'GATE_STATUS=$?; cleanup; gate_finish "$GATE_STATUS" || true; exit "$GATE_STATUS"' EXIT
+# --- local edit end ---
 
 # --- local edit begin (effect-drizzle-ext#58) ---
 # Audit the checkout the command targets. A PreToolUse hook runs before the
@@ -332,6 +387,7 @@ git_write_target "$CMD"
 set +f
 if [ "$T_FOLLOW" -eq 0 ]; then
   echo "fallow-gate: could not follow the command's cd or -C target; auditing $PWD instead." >&2
+  GATE_NOTICE=1
 elif [ "${#T_OPS[@]}" -gt 0 ]; then
   if TOP="$(
     exec 2>/dev/null
@@ -348,18 +404,23 @@ elif [ "${#T_OPS[@]}" -gt 0 ]; then
     if [ "$TOP" != "$HERE_TOP" ]; then
       if [ -n "$HERE_TOP" ] && { [ "$T_LOOSE" -eq 1 ] || [ -n "${GIT_DIR:-}${GIT_WORK_TREE:-}" ] || command_unmodelled "$CMD"; }; then
         echo "fallow-gate: the command has shell syntax this hook does not model; auditing both $PWD and $TOP." >&2
+        # The child's notices reach this hook's stderr; its stdout is JSON
+        # only when it failed open (#61), which this hook's own JSON reports.
         if [ -f "$SELF" ] && [ -r "$SELF" ]; then
-          if printf '%s\n' '{"tool_input":{"command":"git commit"}}' | "$BASH" "$SELF" >&2; then
+          if HERE_JSON="$(printf '%s\n' '{"tool_input":{"command":"git commit"}}' | "$BASH" "$SELF")"; then
             HERE_STATUS=0
           else
             HERE_STATUS=$?
           fi
         else
+          HERE_JSON=""
           HERE_STATUS=127
         fi
         [ "$HERE_STATUS" -ne 2 ] || exit 2
+        [ -z "$HERE_JSON" ] || GATE_NOTICE=1
         if [ "$HERE_STATUS" -ne 0 ]; then
           echo "fallow-gate: could not audit $PWD separately (exit $HERE_STATUS); auditing $PWD only." >&2
+          GATE_NOTICE=1
           TOP=""
         fi
       fi
@@ -373,6 +434,7 @@ elif [ "${#T_OPS[@]}" -gt 0 ]; then
     fi
   else
     echo "fallow-gate: the command's cd or -C target is not a directory inside a git checkout; auditing $PWD instead." >&2
+    GATE_NOTICE=1
   fi
 fi
 # --- local edit end ---
@@ -384,7 +446,9 @@ fi
 # FALLOW_AUDIT_BASE if set, else origin/HEAD when it resolves, else origin/trunk
 # (the default branch). A dangling origin/HEAD (a clone from before the
 # main -> trunk rename, pruned) falls through to origin/trunk rather than
-# skipping the audit. Local git only: this runs before every commit and push.
+# skipping the audit. A base that still does not resolve blocks (exit 2) with
+# the fetch that restores it (effect-drizzle-ext#61); outside a git checkout
+# the audit is skipped. Local git only: this runs before every commit and push.
 if ! git rev-parse --git-dir >/dev/null 2>&1; then
   echo "fallow-gate: not inside a git checkout, skipping audit." >&2
   exit 0
@@ -407,10 +471,17 @@ if ! resolves "$BASE"; then
     *) FIX="fetch it" ;;
   esac
   {
-    echo "fallow-gate: audit base $BASE does not resolve in this checkout, skipping audit."
-    echo "fallow-gate: $FIX, or set FALLOW_AUDIT_BASE to a ref that exists, then retry."
+    echo "fallow-gate: blocked: audit base $BASE does not resolve in this checkout, so fallow audit cannot run."
+    if [ -n "${FALLOW_AUDIT_BASE:-}" ]; then
+      echo "fallow-gate: FALLOW_AUDIT_BASE names it; $FIX, or set FALLOW_AUDIT_BASE to a ref that exists (unset, the base is origin/HEAD or origin/trunk), then retry."
+    else
+      echo "fallow-gate: $FIX, or set FALLOW_AUDIT_BASE to a ref that exists, then retry."
+      if [ -n "${HEAD_REF:-}" ]; then
+        echo "fallow-gate: origin/HEAD points at $HEAD_REF, which does not resolve; repoint it with 'git remote set-head origin --auto'."
+      fi
+    fi
   } >&2
-  exit 0
+  exit 2
 fi
 # --- local edit end ---
 
