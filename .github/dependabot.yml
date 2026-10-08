@@ -20,6 +20,11 @@
 # a bare `dependency-name` ignore would block security updates too).
 #
 # `cooldown` mirrors pnpm-workspace.yaml's `minimumReleaseAge`.
+#
+# `docker-compose` watches the dev container's images (.devcontainer/compose.yaml).
+# The workspace image's Node major tracks CI's `latest` and pgvector's `pg17`
+# tracks CI's service container, so a PR that moves either major lands only
+# together with the matching CI change.
 version: 2
 updates:
   - package-ecosystem: "npm"
@@ -110,3 +115,15 @@ updates:
     commit-message:
       prefix: "ci"
       include: "scope"
+  - package-ecosystem: "docker-compose"
+    directory: "/.devcontainer"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore"
+    cooldown:
+      default-days: 1
