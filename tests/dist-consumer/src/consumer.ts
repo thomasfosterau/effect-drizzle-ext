@@ -332,13 +332,15 @@ export const drift = PgTooling.checkMigrationDrift({
 /**
  * A caller forwarding its own optionals under `exactOptionalPropertyTypes`:
  * `forwardOptionals` compiles only while each options member is spelled
- * `?: T | undefined` (effect-drizzle-ext#29), since a bare `?: T` rejects an
- * `undefined` value.
+ * `?: T | undefined` (effect-drizzle-ext#29, #57), since a bare `?: T` rejects
+ * an `undefined` value.
  */
 export interface ForwardedOptionals {
   readonly probe?: PgTesting.ServerProbe | undefined;
   readonly applyMigrations?: PgTesting.MigrationRunner<never, never> | undefined;
   readonly base?: Option.Option<PgTooling.GitBase> | undefined;
+  readonly pk?: string | undefined;
+  readonly parentFk?: string | undefined;
 }
 /* oxlint-enable effect/prefer-option-over-null */
 export const forwardOptionals = (forwarded: ForwardedOptionals) =>
@@ -361,6 +363,13 @@ export const forwardOptionals = (forwarded: ForwardedOptionals) =>
       schema: {},
       migrationsDir: "/app/migrations",
       base: forwarded.base,
+    }),
+    defineSubtypeTables(core, {
+      name: "short",
+      parentId: node.id,
+      parentVersion: nodeVersion,
+      columns: {},
+      constraintNames: { pk: forwarded.pk, parentFk: forwarded.parentFk },
     }),
   ] as const;
 

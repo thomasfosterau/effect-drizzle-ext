@@ -124,9 +124,10 @@ export interface SubtypeTablesConfig<
   /**
    * Constraint-name overrides for the version table's primary key and its
    * `(id, version)` → parent-version foreign key. Each defaults to the canonical
-   * `${name}_version_pkey` / `${name}_version_${parentVersion}_fk`.
+   * `${name}_version_pkey` / `${name}_version_${parentVersion}_fk` when absent
+   * or `undefined`.
    */
-  constraintNames?: { pk?: string; parentFk?: string } | undefined;
+  constraintNames?: { pk?: string | undefined; parentFk?: string | undefined } | undefined;
   /**
    * Physical name for the version table's id column, when a historical table
    * diverges from the canonical `id` (e.g. `organisation_version.organisation_id`).
