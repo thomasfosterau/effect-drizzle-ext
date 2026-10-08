@@ -155,9 +155,9 @@ trap cleanup EXIT
 # the write may still run in the hook's own directory, so that directory is
 # audited too, by re-running this script there on a plain `git commit`, and a
 # fail in either blocks. A target this cannot follow (`cd -`, a `$VAR`,
-# `~user`, `~` with HOME unset, a cd option other than -L/-P) or that is not
-# a directory inside a git checkout keeps the hook's own directory, with a
-# notice.
+# `~user`, `~` with HOME unset, a cd option other than -L/-P, an -L after a
+# -P) or that is not a directory inside a git checkout keeps the hook's own
+# directory, with a notice.
 target_operand() {
   OPERAND="$1"
   case "$OPERAND" in
@@ -205,6 +205,10 @@ git_write_target() {
           -*[!LP]*) T_FOLLOW=0 && shift ;;
           -?*)
             opts="${1//[!LP]/}"
+            # bash takes the last of -L/-P; zsh resolves physically whenever
+            # -P is given. They disagree only when an L follows a P, so that
+            # falls back.
+            case "$mode$opts" in *P*L*) T_FOLLOW=0 ;; esac
             [ -z "$opts" ] || mode="${opts: -1}"
             shift
             ;;
