@@ -197,7 +197,7 @@ export interface DatabaseSourceOptions {
   readonly dbNamePrefix: string;
   /** The container image the Testcontainers fallback starts (`pgvector/pgvector:pg17`, `postgres:17`, …). */
   readonly image: string;
-  /** The server probe; {@link probeServer} when absent or `undefined` (a test substitutes one). */
+  /** The server probe: {@link probeServer} when absent or `undefined`. A test substitutes its own. */
   // oxlint-disable-next-line effect/prefer-option-over-null -- the `?: T | undefined` spelling (AGENTS.md → Conventions) lets a caller under `exactOptionalPropertyTypes` forward its own optional; read through `??`, so `undefined` means absent
   readonly probe?: ServerProbe | undefined;
 }
