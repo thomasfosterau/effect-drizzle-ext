@@ -74,7 +74,7 @@ Consult effect-solutions before writing Effect code (`vp exec effect-solutions l
 ## Agent sessions
 
 - The SessionStart hook (`.claude/hooks/session-start.sh`) installs dependencies against the lockfile and puts `vp` (a re-exec shim that prefers the nearest worktree's `node_modules`) and `fallow` on PATH for non-interactive shells. It hydrates no secrets; none are needed. A worktree needs its own `pnpm install` before `vp` runs in it; without one, `describe()` throws `Cannot read properties of undefined (reading 'config')`.
-- A PreToolUse hook (`.claude/hooks/fallow-gate.sh`) blocks `git commit` / `git push` when `fallow audit --base origin/trunk` returns `fail` and fails open on a runtime error, so still run the audit yourself (see [Verification](#verification)); a PostToolUse hook runs `vp fmt` on every source, JSON, CSS or Markdown file you write or edit.
+- A PreToolUse hook (`.claude/hooks/fallow-gate.sh`) blocks `git commit` / `git push` when `fallow audit` against the default branch (`origin/HEAD`, else `origin/trunk`) returns `fail`. It fails open, with a stderr notice, on a runtime error or when that base ref is missing locally (fetch it with `git fetch origin trunk:refs/remotes/origin/trunk`), so still run the audit yourself (see [Verification](#verification)); a PostToolUse hook runs `vp fmt` on every source, JSON, CSS or Markdown file you write or edit.
 - Won't run in an agent session: `vp run test:integration`, which needs a Docker daemon or a reachable PostgreSQL server. A cloud session normally has neither, so its global setup fails. Say so in the PR body and rely on CI, which runs it against a `pgvector/pgvector:pg17` service container. Every other gate runs offline.
 
 ## Documentation surfaces
