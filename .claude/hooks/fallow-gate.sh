@@ -15,6 +15,9 @@ set -euo pipefail
 # Floor comparison uses `sort -V`; GNU and BSD agree on plain semver but
 # diverge on prereleases (BSD sorts `2.48.0-alpha.1` ABOVE `2.48.0`, GNU below).
 # If you set a prerelease floor explicitly, verify the behavior on the target OS.
+#
+# Local edit (effect-drizzle-ext#30); re-apply it after regenerating: the
+# audit base is pinned below, because the installer passes no --base.
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "fallow-gate: jq not on PATH, skipping audit." >&2
@@ -65,7 +68,42 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if "${RUNNER[@]}" audit --format json --quiet --explain --gate-marker agent --base origin/trunk >"$TMP_JSON" 2>"$TMP_ERR"; then
+# Audit against the remote default branch. Without --base, fallow diffs against
+# the branch's upstream, which on a pushed branch is that branch itself, and
+# otherwise needs origin/HEAD, which a session checkout leaves unset. So take
+# FALLOW_AUDIT_BASE if set, else origin/HEAD when it resolves, else origin/trunk
+# (the default branch). A dangling origin/HEAD (a clone from before the
+# main -> trunk rename, pruned) falls through to origin/trunk rather than
+# skipping the audit. Local git only: this runs before every commit and push.
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+  echo "fallow-gate: not inside a git checkout, skipping audit." >&2
+  exit 0
+fi
+resolves() {
+  git rev-parse --verify -q "${1}^{commit}" >/dev/null 2>&1
+}
+BASE="${FALLOW_AUDIT_BASE:-}"
+if [ -z "$BASE" ]; then
+  HEAD_REF="$(git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null || true)"
+  if [ -n "$HEAD_REF" ] && resolves "$HEAD_REF"; then
+    BASE="$HEAD_REF"
+  else
+    BASE="origin/trunk"
+  fi
+fi
+if ! resolves "$BASE"; then
+  case "$BASE" in
+    origin/*) FIX="fetch it with 'git fetch origin ${BASE#origin/}:refs/remotes/$BASE'" ;;
+    *) FIX="fetch it" ;;
+  esac
+  {
+    echo "fallow-gate: audit base $BASE does not resolve in this checkout, skipping audit."
+    echo "fallow-gate: $FIX, or set FALLOW_AUDIT_BASE to a ref that exists, then retry."
+  } >&2
+  exit 0
+fi
+
+if "${RUNNER[@]}" audit --format json --quiet --explain --gate-marker agent --base "$BASE" >"$TMP_JSON" 2>"$TMP_ERR"; then
   STATUS=0
 else
   STATUS=$?
