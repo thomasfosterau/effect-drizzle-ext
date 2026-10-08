@@ -133,6 +133,21 @@ describe("makeSubtypeTables", () => {
     ).toBe(true);
   });
 
+  it("treats explicit `undefined` constraint-name overrides as absent", () => {
+    const { version } = defineSubtypeTables(app, {
+      name: "gizmo",
+      parentId: entity.id,
+      parentVersion: entityVersion,
+      constraintNames: { pk: undefined, parentFk: undefined },
+      columns: { label: text("label") },
+    });
+    const versionCfg = getTableConfig(version);
+    expect(versionCfg.primaryKeys[0]?.getName()).toBe("gizmo_version_pkey");
+    expect(
+      versionCfg.foreignKeys.some((fk) => fk.getName() === "gizmo_version_entity_version_fk"),
+    ).toBe(true);
+  });
+
   // `SubtypeTables` exists so declaration emit can *name* what this builder
   // returns (website #1579); the hazard is that a future edit keeps it nameable while
   // quietly widening it, which no runtime assertion would catch and which
