@@ -529,11 +529,12 @@ export interface MigrationDriftOptions {
   /** The committed drizzle-kit migrations directory. */
   readonly migrationsDir: string;
   /**
-   * The base branch to check ancestry against — `Option.none()` (or absent)
-   * on pushes and local runs, which is what mapping {@link resolveBaseRef}
-   * gives outside a pull request.
+   * The base branch to check ancestry against — `Option.none()` (or absent,
+   * or `undefined`) on pushes and local runs, which is what mapping
+   * {@link resolveBaseRef} gives outside a pull request.
    */
-  readonly base?: Option.Option<GitBase>;
+  // oxlint-disable-next-line effect/prefer-option-over-null -- the `?: T | undefined` spelling (AGENTS.md → Conventions) lets a caller under `exactOptionalPropertyTypes` forward its own optional; read through `??`, so `undefined` means absent
+  readonly base?: Option.Option<GitBase> | undefined;
 }
 
 /** What a passing run checked. */

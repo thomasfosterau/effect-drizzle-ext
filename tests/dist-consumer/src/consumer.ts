@@ -327,6 +327,43 @@ export const drift = PgTooling.checkMigrationDrift({
   schema: {},
   migrationsDir: "/app/migrations",
 });
+
+/* oxlint-disable effect/prefer-option-over-null -- the caller-side optional shape under test */
+/**
+ * A caller forwarding its own optionals under `exactOptionalPropertyTypes`:
+ * `forwardOptionals` compiles only while each options member is spelled
+ * `?: T | undefined` (effect-drizzle-ext#29), since a bare `?: T` rejects an
+ * `undefined` value.
+ */
+export interface ForwardedOptionals {
+  readonly probe?: PgTesting.ServerProbe | undefined;
+  readonly applyMigrations?: PgTesting.MigrationRunner<never, never> | undefined;
+  readonly base?: Option.Option<PgTooling.GitBase> | undefined;
+}
+/* oxlint-enable effect/prefer-option-over-null */
+export const forwardOptionals = (forwarded: ForwardedOptionals) =>
+  [
+    PgTesting.resolveDatabaseSource({
+      env: {},
+      migrationsDir: "/app/migrations",
+      dbNamePrefix: "app",
+      image: "postgres:17",
+      probe: forwarded.probe,
+    }),
+    PgTesting.provisionTestDatabase({
+      env: {},
+      migrationsDir: "/app/migrations",
+      dbNamePrefix: "app",
+      image: "postgres:17",
+      applyMigrations: forwarded.applyMigrations,
+    }),
+    PgTooling.checkMigrationDrift({
+      schema: {},
+      migrationsDir: "/app/migrations",
+      base: forwarded.base,
+    }),
+  ] as const;
+
 export const views = PgTooling.checkViewDependencies({ schema: {} });
 export const dagIssues: ReadonlyArray<string> = PgTooling.checkDagIntegrity([]);
 

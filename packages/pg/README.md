@@ -391,7 +391,7 @@ Two schema guards for a drizzle-kit `migrations/` directory. Neither needs a dat
 export const checkMigrationDrift: (options: {
   readonly schema: Record<string, unknown>;
   readonly migrationsDir: string;
-  readonly base?: Option.Option<GitBase>; // { ref, migrationsPath, cwd }
+  readonly base?: Option.Option<GitBase> | undefined; // { ref, migrationsPath, cwd }
 }) => Effect.Effect<
   MigrationDriftReport, // { snapshots, baseRef }
   MigrationDriftError | MalformedSnapshot | SchemaDiffError | PlatformError,
