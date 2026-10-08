@@ -155,13 +155,14 @@ trap cleanup EXIT
 # the write may still run in the hook's own directory, so that directory is
 # audited too, by re-running this script there on a plain `git commit`, and a
 # fail in either blocks. A target this cannot follow (`cd -`, a `$VAR`,
-# `~user`) or that is not a directory inside a git checkout keeps the hook's
-# own directory, with a notice.
+# `~user`, `~` with HOME unset, a cd option other than -L/-P) or that is not
+# a directory inside a git checkout keeps the hook's own directory, with a
+# notice.
 target_operand() {
   OPERAND="$1"
   case "$OPERAND" in
-    \~) OPERAND="$HOME" ;;
-    \~/*) OPERAND="$HOME/${OPERAND#\~/}" ;;
+    \~) [ -n "${HOME-}" ] || return 1; OPERAND="$HOME" ;;
+    \~/*) [ -n "${HOME-}" ] || return 1; OPERAND="$HOME/${OPERAND#\~/}" ;;
     \~*) return 1 ;;
     \"*\" | \'*\') OPERAND="${OPERAND:1:${#OPERAND}-2}" ;;
   esac
@@ -201,7 +202,7 @@ git_write_target() {
         case "$1" in
           --) shift && break ;;
           -) break ;;
-          -*[!LPe@]*) T_FOLLOW=0 && shift ;;
+          -*[!LP]*) T_FOLLOW=0 && shift ;;
           -?*)
             opts="${1//[!LP]/}"
             [ -z "$opts" ] || mode="${opts: -1}"
@@ -288,10 +289,10 @@ git_write_target() {
 # subshells, ||, pipes, a lone &, heredocs, $ expansions, backticks,
 # backslashes, braces, a comment, a separator or newline inside quotes, an
 # unbalanced quote, pushd/popd, GIT_* variables, --git-dir or --work-tree. A
-# command over 8 KiB counts as unmodelled rather than being scanned.
+# command over 8192 bytes counts as unmodelled rather than being scanned.
 command_unmodelled() {
   local rest="$1" pre q inner
-  [ "${#rest}" -le 8192 ] || return 0
+  [ "$(LC_ALL=C; printf %s "${#rest}")" -le 8192 ] || return 0
   case "$rest" in
     *[\(\)\|\`\$\\\{\}]* | *'<<'* | *pushd* | *popd* | *GIT_* | *--git-dir* | *--work-tree*) return 0 ;;
   esac
