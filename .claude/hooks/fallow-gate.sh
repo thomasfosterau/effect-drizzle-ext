@@ -71,14 +71,27 @@ trap cleanup EXIT
 # Audit against the remote default branch. Without --base, fallow diffs against
 # the branch's upstream, which on a pushed branch is that branch itself, and
 # otherwise needs origin/HEAD, which a session checkout leaves unset. So take
-# FALLOW_AUDIT_BASE if set, else origin/HEAD, else origin/trunk (the default
-# branch). Local git only: this runs before every commit and push.
+# FALLOW_AUDIT_BASE if set, else origin/HEAD when it resolves, else origin/trunk
+# (the default branch). A dangling origin/HEAD (a clone from before the
+# main -> trunk rename, pruned) falls through to origin/trunk rather than
+# skipping the audit. Local git only: this runs before every commit and push.
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+  echo "fallow-gate: not inside a git checkout, skipping audit." >&2
+  exit 0
+fi
+resolves() {
+  git rev-parse --verify -q "${1}^{commit}" >/dev/null 2>&1
+}
 BASE="${FALLOW_AUDIT_BASE:-}"
 if [ -z "$BASE" ]; then
-  BASE="$(git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null || true)"
+  HEAD_REF="$(git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null || true)"
+  if [ -n "$HEAD_REF" ] && resolves "$HEAD_REF"; then
+    BASE="$HEAD_REF"
+  else
+    BASE="origin/trunk"
+  fi
 fi
-BASE="${BASE:-origin/trunk}"
-if ! git rev-parse --verify -q "${BASE}^{commit}" >/dev/null 2>&1; then
+if ! resolves "$BASE"; then
   case "$BASE" in
     origin/*) FIX="fetch it with 'git fetch origin ${BASE#origin/}:refs/remotes/$BASE'" ;;
     *) FIX="fetch it" ;;
