@@ -142,97 +142,232 @@ cleanup() {
 trap cleanup EXIT
 
 # --- local edit begin (effect-drizzle-ext#58) ---
-# Audit the checkout the command targets, not the hook's own directory. A
-# PreToolUse hook runs before the command, so a `cd <dir> &&` or a
-# `git -C <dir>` inside it has not moved the hook yet. Split the command into
-# segments exactly as is_git_write_command does; apply, in order, each segment
-# that starts with `cd` before the first git commit/push (each relative to the
-# previous, as the shell would), then that git's -C options (likewise, as git
-# does); and move to the top level of the result, so the base resolution below
-# and the audit both run in the target checkout. A target that is not a
-# directory inside a git checkout, or a `cd` this cannot follow (`cd -`, a
-# `$VAR`), keeps the hook's own directory, with a notice. --git-dir and
-# --work-tree are not followed: fallow runs its own git in the audit
-# directory, which would not see a separate --git-dir. pushd and subshell
-# scoping are not modelled, and only the first git commit/push counts.
-join_dir() {
-  local word="$2"
-  case "$word" in
-    \~) word="$HOME" ;;
-    \~/*) word="$HOME/${word#\~/}" ;;
-    \"*\" | \'*\') word="${word:1:${#word}-2}" ;;
+# Audit the checkout the command targets. A PreToolUse hook runs before the
+# command, so a `cd <dir> &&` or a `git -C <dir>` inside it has not moved the
+# hook yet. git_write_target splits the command into segments exactly as
+# is_git_write_command does and models one shape: leading `cd <dir>` segments,
+# then plain git segments, then the git commit/push and its -C options, joined
+# by `&&`, `;` or newlines. The cd steps are replayed in a subshell as the
+# shell would (logical unless -P) and the -C steps as git does (physical), and
+# the audit moves to the top level of the result. When that top level is not
+# the hook's own and the command has anything else (see command_unmodelled and
+# T_LOOSE below, or GIT_DIR / GIT_WORK_TREE set in the hook's environment),
+# the write may still run in the hook's own directory, so that directory is
+# audited too, by re-running this script there on a plain `git commit`, and a
+# fail in either blocks. A target this cannot follow (`cd -`, a `$VAR`,
+# `~user`) or that is not a directory inside a git checkout keeps the hook's
+# own directory, with a notice.
+target_operand() {
+  OPERAND="$1"
+  case "$OPERAND" in
+    \~) OPERAND="$HOME" ;;
+    \~/*) OPERAND="$HOME/${OPERAND#\~/}" ;;
+    \~*) return 1 ;;
+    \"*\" | \'*\') OPERAND="${OPERAND:1:${#OPERAND}-2}" ;;
   esac
-  case "$word" in
-    "") printf '%s\n' "$1" ;;
-    -* | *'$'* | *'`'*) printf '\n' ;;
-    /*) printf '%s\n' "$word" ;;
-    *) if [ -n "$1" ]; then printf '%s\n' "$1/$word"; else printf '\n'; fi ;;
+  case "$OPERAND" in
+    - | *'$'* | *'`'*) return 1 ;;
   esac
 }
+# Sets T_OPS (the cd and -C steps before the first git commit/push: L or P
+# then a path), T_FOLLOW=0 when a step cannot be followed, and T_LOOSE=1 when
+# a segment is outside the modelled shape: a cd after another command or after
+# the write, a cd with several operands, another command before the write, a
+# `git` word that does not start its segment, -c or --config-env on the write,
+# or a later write with different -C options or after another command (or no
+# write found where is_git_write_command found one).
 # Same segmentation as is_git_write_command, deliberately.
 # shellcheck disable=SC2020
 git_write_target() {
-  local cmd="$1" segment dir="." git_dir
+  local cmd="$1" segment first mode opts gits write c_follow c_cfg key
+  local lead=1 found=0 other_after=0 first_key="" c_ops=()
+  T_OPS=()
+  T_FOLLOW=1
+  T_LOOSE=0
   while IFS= read -r segment; do
     # Intentional word splitting; globbing is disabled by the caller.
     # shellcheck disable=SC2086
     set -- $segment
-    if [ "${1:-}" = "cd" ]; then
+    [ "$#" -gt 0 ] || continue
+    first="$1"
+    if [ "$first" = "cd" ]; then
+      if [ "$lead" -eq 0 ]; then
+        T_LOOSE=1
+        continue
+      fi
       shift
+      mode=L
       while [ "$#" -gt 0 ]; do
         case "$1" in
           --) shift && break ;;
-          -?*) shift ;;
+          -) break ;;
+          -*[!LPe@]*) T_FOLLOW=0 && shift ;;
+          -?*)
+            opts="${1//[!LP]/}"
+            [ -z "$opts" ] || mode="${opts: -1}"
+            shift
+            ;;
           *) break ;;
         esac
       done
-      dir="$(join_dir "$dir" "${1:-~}")"
+      [ "$#" -le 1 ] || T_LOOSE=1
+      if ! target_operand "${1-~}"; then
+        T_FOLLOW=0
+      elif [ -n "$OPERAND" ]; then
+        T_OPS+=("$mode$OPERAND")
+      fi
       continue
     fi
+    lead=0
+    gits=0
+    write=0
     while [ "$#" -gt 0 ]; do
       if [ "$1" != "git" ]; then
         shift
         continue
       fi
+      gits=$((gits + 1))
+      c_ops=()
+      c_follow=1
+      c_cfg=0
       shift
-      git_dir="$dir"
       while [ "$#" -gt 0 ]; do
         case "$1" in
           commit | push)
-            printf '%s\n' "$git_dir"
-            return 0
+            write=1
+            break 2
             ;;
           -C)
-            git_dir="$(join_dir "$git_dir" "${2:-}")"
+            if ! target_operand "${2-}"; then
+              c_follow=0
+            elif [ -n "$OPERAND" ]; then
+              c_ops+=("P$OPERAND")
+            fi
             shift
             [ "$#" -gt 0 ] && shift
             ;;
-          -c | --git-dir | --work-tree | --namespace | --config-env | --super-prefix | --exec-path | --list-cmds | --attr-source)
+          -c | --config-env)
+            c_cfg=1
             shift
             [ "$#" -gt 0 ] && shift
+            ;;
+          --git-dir | --work-tree | --namespace | --super-prefix | --exec-path | --list-cmds | --attr-source)
+            shift
+            [ "$#" -gt 0 ] && shift
+            ;;
+          -c?* | --config-env=*)
+            c_cfg=1
+            shift
             ;;
           -*) shift ;;
           *) break ;;
         esac
       done
     done
+    if [ "$first" != "git" ]; then
+      [ "$found" -eq 1 ] || T_LOOSE=1
+      [ "$found" -eq 0 ] || other_after=1
+      [ "$gits" -eq 0 ] || T_LOOSE=1
+    fi
+    [ "$gits" -le 1 ] || T_LOOSE=1
+    [ "$write" -eq 1 ] || continue
+    key="${c_follow}${c_ops[*]-}"
+    if [ "$found" -eq 0 ]; then
+      found=1
+      first_key="$key"
+      T_OPS+=(${c_ops[@]+"${c_ops[@]}"})
+      [ "$c_follow" -eq 1 ] || T_FOLLOW=0
+      [ "$c_cfg" -eq 0 ] || T_LOOSE=1
+    elif [ "$key" != "$first_key" ] || [ "$other_after" -eq 1 ] || [ "$c_cfg" -eq 1 ]; then
+      T_LOOSE=1
+    fi
   done < <(printf '%s\n' "$cmd" | tr ';|&()' '\n\n\n\n\n')
-  return 1
+  [ "$found" -eq 1 ] || T_LOOSE=1
 }
-set -f
-TARGET="$(git_write_target "$CMD")" || TARGET="."
-set +f
-if [ -z "$TARGET" ]; then
-  echo "fallow-gate: could not follow the command's cd or -C target; auditing $PWD instead." >&2
-elif [ "$TARGET" != "." ]; then
-  if TOP="$(cd "$TARGET" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null)" && [ -n "$TOP" ]; then
-    # Keep a relative runner pointing at the install found above.
-    case "${RUNNER[0]}" in
-      ./*) RUNNER[0]="$PWD/${RUNNER[0]#./}" ;;
+# Whether the command text has shell syntax the walker does not model:
+# subshells, ||, pipes, a lone &, heredocs, $ expansions, backticks,
+# backslashes, braces, a comment, a separator or newline inside quotes, an
+# unbalanced quote, pushd/popd, GIT_* variables, --git-dir or --work-tree. A
+# command over 8 KiB counts as unmodelled rather than being scanned.
+command_unmodelled() {
+  local rest="$1" pre q inner
+  [ "${#rest}" -le 8192 ] || return 0
+  case "$rest" in
+    *[\(\)\|\`\$\\\{\}]* | *'<<'* | *pushd* | *popd* | *GIT_* | *--git-dir* | *--work-tree*) return 0 ;;
+  esac
+  case "${rest//&&/}" in
+    *'&'*) return 0 ;;
+  esac
+  while :; do
+    pre="${rest%%[\"\']*}"
+    case "$pre" in
+      *'#'*) return 0 ;;
     esac
-    cd "$TOP"
+    [ "$pre" != "$rest" ] || return 1
+    q="${rest:${#pre}:1}"
+    rest="${rest:${#pre}+1}"
+    case "$rest" in
+      *"$q"*) ;;
+      *) return 0 ;;
+    esac
+    inner="${rest%%"$q"*}"
+    case "$inner" in
+      *[';|&()']* | *$'\n'*) return 0 ;;
+    esac
+    rest="${rest:${#inner}+1}"
+  done
+}
+SELF="${BASH_SOURCE[0]-}"
+case "$SELF" in
+  /*) ;;
+  *) SELF="$PWD/$SELF" ;;
+esac
+set -f
+git_write_target "$CMD"
+set +f
+if [ "$T_FOLLOW" -eq 0 ]; then
+  echo "fallow-gate: could not follow the command's cd or -C target; auditing $PWD instead." >&2
+elif [ "${#T_OPS[@]}" -gt 0 ]; then
+  if TOP="$(
+    exec 2>/dev/null
+    CDPATH=
+    for STEP in "${T_OPS[@]}"; do
+      case "$STEP" in
+        L*) cd -L -- "${STEP#L}" || exit 1 ;;
+        *) cd -P -- "${STEP#P}" || exit 1 ;;
+      esac
+    done
+    git rev-parse --show-toplevel
+  )" && [ -n "$TOP" ]; then
+    HERE_TOP="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+    if [ "$TOP" != "$HERE_TOP" ]; then
+      if [ -n "$HERE_TOP" ] && { [ "$T_LOOSE" -eq 1 ] || [ -n "${GIT_DIR:-}${GIT_WORK_TREE:-}" ] || command_unmodelled "$CMD"; }; then
+        echo "fallow-gate: the command has shell syntax this hook does not model; auditing both $PWD and $TOP." >&2
+        if [ -f "$SELF" ] && [ -r "$SELF" ]; then
+          if printf '%s\n' '{"tool_input":{"command":"git commit"}}' | "$BASH" "$SELF" >&2; then
+            HERE_STATUS=0
+          else
+            HERE_STATUS=$?
+          fi
+        else
+          HERE_STATUS=127
+        fi
+        [ "$HERE_STATUS" -ne 2 ] || exit 2
+        if [ "$HERE_STATUS" -ne 0 ]; then
+          echo "fallow-gate: could not audit $PWD separately (exit $HERE_STATUS); auditing $PWD only." >&2
+          TOP=""
+        fi
+      fi
+      if [ -n "$TOP" ]; then
+        # Keep a relative runner pointing at the install found above.
+        case "${RUNNER[0]}" in
+          ./*) RUNNER[0]="$PWD/${RUNNER[0]#./}" ;;
+        esac
+        cd "$TOP"
+      fi
+    fi
   else
-    echo "fallow-gate: command targets $TARGET, which is not inside a git checkout; auditing $PWD instead." >&2
+    echo "fallow-gate: the command's cd or -C target is not a directory inside a git checkout; auditing $PWD instead." >&2
   fi
 fi
 # --- local edit end ---
