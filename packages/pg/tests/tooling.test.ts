@@ -58,6 +58,17 @@ describe("checkMigrationDrift", () => {
     expect(report).toEqual({ snapshots: 2, baseRef: Option.none() });
   });
 
+  it("treats an explicit `base: undefined` as an absent base", async () => {
+    const report = await run(
+      checkMigrationDrift({
+        schema: fixtureSchema,
+        migrationsDir: FIXTURE_MIGRATIONS,
+        base: undefined,
+      }),
+    );
+    expect(report).toEqual({ snapshots: 2, baseRef: Option.none() });
+  });
+
   it("reports drift when the schema moved past the latest snapshot", async () => {
     const drifted = {
       ...fixtureSchema,

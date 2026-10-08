@@ -197,8 +197,9 @@ export interface DatabaseSourceOptions {
   readonly dbNamePrefix: string;
   /** The container image the Testcontainers fallback starts (`pgvector/pgvector:pg17`, `postgres:17`, …). */
   readonly image: string;
-  /** The server probe; {@link probeServer} unless a test substitutes one. */
-  readonly probe?: ServerProbe;
+  /** The server probe; {@link probeServer} when absent or `undefined` (a test substitutes one). */
+  // oxlint-disable-next-line effect/prefer-option-over-null -- the `?: T | undefined` spelling (AGENTS.md → Conventions) lets a caller under `exactOptionalPropertyTypes` forward its own optional; read through `??`, so `undefined` means absent
+  readonly probe?: ServerProbe | undefined;
 }
 
 /**
@@ -276,8 +277,12 @@ export type MigrationRunner<E, R> = (url: Redacted.Redacted<string>) => Effect.E
 
 /** The inputs {@link provisionTestDatabase} takes. */
 export interface ProvisionOptions<E = never, R = never> extends DatabaseSourceOptions {
-  /** Replaces the default runner (for a harness whose migrations are not a drizzle-kit directory). */
-  readonly applyMigrations?: MigrationRunner<E, R>;
+  /**
+   * Replaces the default runner (for a harness whose migrations are not a
+   * drizzle-kit directory); absent or `undefined` keeps the default.
+   */
+  // oxlint-disable-next-line effect/prefer-option-over-null -- the `?: T | undefined` spelling (AGENTS.md → Conventions) lets a caller under `exactOptionalPropertyTypes` forward its own optional; read through `??`, so `undefined` means absent
+  readonly applyMigrations?: MigrationRunner<E, R> | undefined;
 }
 
 /** The default {@link MigrationRunner}: `./migrations` over a one-connection client. */
