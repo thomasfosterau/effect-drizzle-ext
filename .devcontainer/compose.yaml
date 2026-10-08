@@ -1,0 +1,56 @@
+# The dev container's services, started by devcontainer.json. Reproduces CI's
+# one job (.github/workflows/ci.yml): Node at the major CI's `latest` resolves
+# to, plus the same `pgvector/pgvector:pg17` server as CI's `postgres` service
+# container, so `vp run test:integration` provisions its database on that
+# server with no Docker daemon inside the container.
+#
+# The workspace shares the database's network namespace, so the server is at
+# 127.0.0.1:5432 exactly as on a CI runner, and the database environment is
+# CI's: `PGPASSWORD` alone. Because a `PG*` variable is set, an unreachable server is
+# a hard error in the suite's global setup, never a silent fallback to
+# Testcontainers (packages/pg/src/provisioning.ts).
+#
+# Each workspace package's node_modules is a named volume, so the Linux
+# install inside the container never overwrites a host install's
+# platform-specific binaries (oxfmt, oxlint, tsgo, fallow) through the bind
+# mount, or the other way round. Add a volume here when a workspace package is
+# added (pnpm-workspace.yaml: packages/*, tests/*).
+#
+# The server keeps no named volume: the suite drops and recreates its own
+# database on every run anyway, and rebuilding the container starts clean.
+name: effect-drizzle-ext
+
+services:
+  workspace:
+    image: mcr.microsoft.com/devcontainers/javascript-node:5-26-trixie
+    command: sleep infinity
+    volumes:
+      - ..:/workspaces/effect-drizzle-ext:cached
+      - node-modules-root:/workspaces/effect-drizzle-ext/node_modules
+      - node-modules-core:/workspaces/effect-drizzle-ext/packages/core/node_modules
+      - node-modules-pg:/workspaces/effect-drizzle-ext/packages/pg/node_modules
+      - node-modules-dist-consumer:/workspaces/effect-drizzle-ext/tests/dist-consumer/node_modules
+    network_mode: service:postgres
+    environment:
+      PGPASSWORD: postgres
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  node-modules-root:
+  node-modules-core:
+  node-modules-pg:
+  node-modules-dist-consumer:

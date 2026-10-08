@@ -4,6 +4,12 @@ Maintained by Thomas Foster, with a workflow meant to be approachable for both h
 
 Branch model, changesets and PR rules: [AGENTS.md → Branches and pull requests](AGENTS.md#branches-and-pull-requests).
 
+## Dev container
+
+[.devcontainer/](.devcontainer/) reproduces CI's job: Node at the major CI's `latest` currently resolves to, pnpm at the `packageManager` version through corepack, and a `pgvector/pgvector:pg17` server sharing the workspace's network, so `vp run test:integration` runs inside it with no Docker daemon. Its database environment is CI's (`PGPASSWORD=postgres`, server at `127.0.0.1:5432`), and `node_modules/.bin` is on `PATH`, so `vp` and `fallow` work as in CI. Creating it runs `pnpm install --frozen-lockfile`, whose `prepare` step installs the git hooks. Each workspace package's `node_modules` is a named volume, so the container's Linux install and a host install don't overwrite each other's platform-specific binaries; add a volume in compose.yaml when a workspace package is added. The container suggests the EditorConfig and Oxc VS Code extensions. When CI's Node moves to a new major, move the workspace image tag in [compose.yaml](.devcontainer/compose.yaml) with it.
+
+Editors with EditorConfig support pick up [.editorconfig](.editorconfig). Oxfmt reads the same file, so it holds Oxfmt's own settings; formatting changes start in the `fmt` block of `vite.config.ts`.
+
 ## Git hooks
 
 Hooks are managed by Vite+; the editable [.vite-hooks/pre-commit](.vite-hooks/pre-commit) is committed. **pre-commit** runs `vp staged` (format + lint on staged files). There is no pre-push hook.
@@ -12,9 +18,22 @@ Hooks are managed by Vite+; the editable [.vite-hooks/pre-commit](.vite-hooks/pr
 
 [ci.yml](.github/workflows/ci.yml) runs one job: the gates listed in [AGENTS.md → Verification](AGENTS.md#verification), in that order, with `vp run test:integration` against the job's `pgvector/pgvector` service container. [release.yml](.github/workflows/release.yml) runs changesets/action (v2.1.2, SHA-pinned) on `trunk` inside the protected `release` environment: it opens the "Version Packages" PR while unreleased changesets exist (`pnpm run version`: `changeset version` with its auto-formatter disabled — `"format": false` in `.changeset/config.json`, because the `oxfmt` bin Vite+ installs is an IDE-only wrapper that exits 1 on `--write` — then `vp fmt` on the generated changelogs) and, once that PR merges, runs [`scripts/release.sh`](scripts/release.sh) — `pnpm pack` then `npm publish <tarball>` per package under npm OIDC trusted publishing (no `NPM_TOKEN`; provenance left to npm, never forced), then `changeset tag`. `RELEASE_DRY_RUN=1 pnpm run release` exercises the pack and publish steps locally without writing to the registry.
 
+## Fallow baseline
+
+[fallow-baselines/dead-code.json](fallow-baselines/dead-code.json) lists the dead-code findings already on `trunk` (the `message` getters on the pg package's tagged errors, which fallow reports as unused class members, and the dist-consumer's imports of the two packages, which it reports as unlisted dependencies; effect-drizzle-ext#65 tracks fixing them at the source). `.fallowrc.json` points `audit.deadCodeBaseline` at it, so `fallow audit` stops reporting those findings in files a change touches. A finding that is not in the file still counts. Health and duplication have no findings on `trunk`, so they have no baseline.
+
+The file only shrinks. After fixing a listed finding, regenerate it from a tree without built `dist/` output and without fallow's cache, and commit the result. The two dist-consumer entries only appear while `packages/*/dist` is absent (its tsconfig `paths` point at `dist/*.d.ts`), and the `.fallow/` cache can return a result from an earlier tree:
+
+```sh
+rm -rf packages/*/dist .fallow
+vp exec fallow dead-code --format json --quiet --no-cache --save-baseline fallow-baselines/dead-code.json
+```
+
+The command exits 1 while any error-severity finding remains, and writes the file anyway. Never regenerate it to absorb a finding your change introduces: fix the finding instead.
+
 ## Release setup (owner, one-time)
 
-1. **Allow Actions to open the Version Packages PR:** Settings → Actions → General → Workflow permissions → "Allow GitHub Actions to create and approve pull requests".
+1. **Allow Actions to open the Version Packages PR:** Settings → Actions → General → Workflow permissions → "Allow GitHub Actions to create and approve pull requests". (Done: the Release workflow opened #46 on 2026-10-04.)
 2. **Protect the `release` environment:** Settings → Environments → `release` → required reviewers, deployments restricted to `trunk`.
 3. **Bind the trusted publisher for each package** on npmjs.com (package → Settings → Trusted Publisher): GitHub Actions, repository `thomasfosterau/effect-drizzle-ext`, workflow `release.yml`, environment `release`. Both `@thomasfosterau/effect-drizzle-ext` and `@thomasfosterau/effect-drizzle-ext-pg` need their own binding. npm only offers the binding for a package that exists, so a package's very first publish may need a one-off manual `npm publish` of the `0.0.0` bootstrap (as effect-jsonapi's was) before the workflow can take over.
 4. Remove any classic automation token and the `NPM_TOKEN` secret once the bindings exist.
