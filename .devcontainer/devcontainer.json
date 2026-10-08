@@ -1,0 +1,12 @@
+{
+  "$schema": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.base.schema.json",
+  "name": "effect-drizzle-ext",
+  "dockerComposeFile": "compose.yaml",
+  "service": "workspace",
+  "workspaceFolder": "/workspaces/effect-drizzle-ext",
+  "remoteUser": "node",
+  "remoteEnv": {
+    "PATH": "${containerWorkspaceFolder}/node_modules/.bin:${containerEnv:PATH}"
+  },
+  "postCreateCommand": "npm install --global corepack@0.36.0 && corepack enable pnpm && pnpm install --frozen-lockfile"
+}

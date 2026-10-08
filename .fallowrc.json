@@ -66,6 +66,9 @@
       { "from": "dist-consumer", "allow": ["core", "pg"] }
     ]
   },
+  "audit": {
+    "deadCodeBaseline": "fallow-baselines/dead-code.json"
+  },
   "health": {
     "maxCyclomatic": 20,
     "maxCognitive": 15,

@@ -1,0 +1,30 @@
+# Editor defaults that agree with the formatter. Oxfmt (`vp fmt`, `vp check`)
+# reads this file too: indent_style, indent_size, tab_width, end_of_line,
+# insert_final_newline, max_line_length and quote_type become its options
+# wherever the `fmt` block in vite.config.ts leaves them unset, which it does
+# for all of them. So each value below is Oxfmt's default, and editing one
+# reformats the repository: change the formatter in vite.config.ts first, then
+# mirror it here. Leave quote_type out (Oxfmt's default, double, stands).
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 100
+
+# Two trailing spaces are a Markdown hard line break, and Oxfmt keeps them.
+[*.md]
+trim_trailing_whitespace = false
+
+# drizzle-kit's generated fixture chain (packages/pg/tests/fixtures/migrations),
+# which .prettierignore also keeps out of the formatter: tab-indented SQL and no
+# final newline, as drizzle-kit writes them. Never hand-edited.
+[**/migrations/**]
+indent_style = unset
+indent_size = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset

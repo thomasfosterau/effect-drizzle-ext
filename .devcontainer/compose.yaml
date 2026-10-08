@@ -1,0 +1,40 @@
+# The dev container's services, started by devcontainer.json. Reproduces CI's
+# one job (.github/workflows/ci.yml): Node at the major CI's `latest` resolves
+# to, plus the same `pgvector/pgvector:pg17` server as CI's `postgres` service
+# container, so `vp run test:integration` provisions its database on that
+# server with no Docker daemon inside the container.
+#
+# The workspace shares the database's network namespace, so the server is at
+# 127.0.0.1:5432 exactly as on a CI runner, and the environment is CI's:
+# `PGPASSWORD` alone. Because a `PG*` variable is set, an unreachable server is
+# a hard error in the suite's global setup, never a silent fallback to
+# Testcontainers (packages/pg/src/provisioning.ts).
+#
+# The server keeps no named volume: the suite drops and recreates its own
+# database on every run anyway, and rebuilding the container starts clean.
+name: effect-drizzle-ext
+
+services:
+  workspace:
+    image: mcr.microsoft.com/devcontainers/javascript-node:5-26-trixie
+    command: sleep infinity
+    volumes:
+      - ..:/workspaces/effect-drizzle-ext:cached
+    network_mode: service:postgres
+    environment:
+      PGPASSWORD: postgres
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
