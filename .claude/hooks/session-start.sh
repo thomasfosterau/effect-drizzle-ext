@@ -126,9 +126,7 @@ SHIM
 # AGENTS.md's fallow gate runs `fallow audit …` before every commit, and it
 # resolves only from node_modules/.bin. `vp` is included for the remote/web
 # runner, where the global launcher does not exist.
-for tool in tsx fallow; do
-  link_tool "$PROJECT_DIR/node_modules/.bin/$tool"
-done
+link_tool "$PROJECT_DIR/node_modules/.bin/fallow"
 write_vp_shim
 
 # ── 2. Bare `node` (gardeneria #1462) ───────────────────────────────────────────────────
@@ -163,9 +161,7 @@ if [ -f "$PROJECT_DIR/pnpm-lock.yaml" ]; then
     || (cd "$PROJECT_DIR" && pnpm install --frozen-lockfile >/dev/null 2>&1) \
     || log "dependency install failed; continuing"
   # node_modules/.bin only exists after the install, so re-link what it provides.
-  for tool in tsx fallow; do
-    link_tool "$PROJECT_DIR/node_modules/.bin/$tool"
-  done
+  link_tool "$PROJECT_DIR/node_modules/.bin/fallow"
   write_vp_shim
 fi
 
