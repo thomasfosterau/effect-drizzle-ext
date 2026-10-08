@@ -43,7 +43,7 @@ catalog:
   # `./tooling` — a consumer provides its own (these modules only require the
   # services).
   "@effect/platform-node": 4.0.0
-  "@mpsuesser/oxlint-plugin-effect": ^0.5.0
+  "@mpsuesser/oxlint-plugin-effect": ^0.6.0
   # Starts the integration suite's ephemeral `pgvector/pgvector` server when no
   # local PostgreSQL is reachable — see packages/pg/tests/integration/global-setup.ts.
   "@testcontainers/postgresql": ^12.2.0
@@ -105,12 +105,6 @@ overrides:
   # `effect` MUST be a singleton (see the header): force every resolution to
   # the catalog version so a hoisting reshuffle cannot introduce a second copy.
   effect: "catalog:"
-  # `@mpsuesser/oxlint-plugin-effect` 0.5.0 is built on effect 4.0.0-beta.100
-  # and calls `Schema.isIncludes` (renamed `isIncluding` in rc.118), so the
-  # catalog `effect` override above makes `vite.config.ts` fail to load. Keep
-  # the plugin on its own private beta.100 copy. Remove this once the plugin
-  # ships an rc.118 build (website#2015).
-  "@mpsuesser/oxlint-plugin-effect>effect": "4.0.0-beta.100"
   # GHSA-m9gg-hp2v-232j: @grpc/grpc-js <1.14.5 (via @testcontainers) fails `pnpm audit`.
   "@grpc/grpc-js@>=1.14.0 <1.14.5": ^1.14.5
 nodeLinker: hoisted
