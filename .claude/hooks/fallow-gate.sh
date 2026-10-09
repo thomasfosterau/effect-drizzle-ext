@@ -30,21 +30,40 @@ set -euo pipefail
 # exactly those six pieces; the rest of the file is the installer's.
 
 # --- local edit begin (effect-drizzle-ext#61) ---
-# Surface every fail-open notice. Claude Code reads a hook's stderr only when
-# it exits 2, so from here on stderr goes to a temp file and gate_finish, run
-# on exit, replays it to the real stderr (the debug log, or the block reason
-# on exit 2). When the hook exits 0 on a git commit or push without a passing
-# audit (every fail-open path), or after a #58 notice that sets GATE_NOTICE,
-# it also prints one JSON object on stdout whose systemMessage (shown to the
-# user) and hookSpecificOutput.additionalContext (shown to the agent) carry
-# the notice text. A passing audit and a command that is not a git commit or
-# push print nothing. Without jq the command cannot be classified, so the JSON
-# is a fixed literal, printed only when the input mentions commit or push.
+# Surface every fail-open notice. Claude Code shows a hook's stderr only when
+# it exits non-zero (on exit 2 as the block reason, on another code as a
+# non-blocking hook error); on exit 0 stderr goes to its debug log only. So
+# from here on stderr goes to a temp file and gate_finish, run on exit,
+# replays it to the real stderr (the debug log, or the block reason on exit
+# 2). When the hook exits 0 on a git commit or push without a passing audit
+# (every fail-open path), or after a #58 notice that sets GATE_NOTICE, it also
+# prints one JSON object on stdout whose systemMessage (shown to the user) and
+# hookSpecificOutput.additionalContext (shown to the agent) carry the notice
+# text. A passing audit and a command that is not a git commit or push print
+# nothing. Without jq the command cannot be classified, so the JSON is a fixed
+# literal, printed whenever the input mentions commit or push (`echo push`
+# included).
+# The temp file is first filled with 64 KiB of newlines and then opened
+# without truncation, so stderr overwrites space already written and a full
+# TMPDIR cannot turn a block's message into a failed write, which `set -e`
+# would make a silent, non-blocking exit 1. If that fill fails, stderr stays
+# the real stderr. The trailing newlines vanish when gate_finish reads it.
+# gate_finish reads the variables unset here before the script assigns them,
+# so a value inherited from the environment must not leak in.
 # The second #61 block re-arms this trap after `trap cleanup EXIT` replaces it.
+unset GIT_WRITE INPUT STATUS VERDICT IS_ERROR
 GATE_NOTICE=0
 GATE_LOG="$(mktemp 2>/dev/null || true)"
 if [ -n "$GATE_LOG" ]; then
-  exec 9>&2 2>"$GATE_LOG"
+  GATE_PAD=$'\n\n\n\n\n\n\n\n'
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13; do GATE_PAD="$GATE_PAD$GATE_PAD"; done
+  if printf '%s' "$GATE_PAD" 2>/dev/null >"$GATE_LOG"; then
+    exec 9>&2 2<>"$GATE_LOG"
+  else
+    rm -f "$GATE_LOG"
+    GATE_LOG=""
+  fi
+  unset GATE_PAD
 fi
 # Called from the EXIT trap as `gate_finish <exit status> || true`, so errexit
 # is off inside.
@@ -53,7 +72,7 @@ gate_finish() {
   local status="$1" text=""
   if [ -n "$GATE_LOG" ]; then
     exec 2>&9 9>&-
-    [ ! -s "$GATE_LOG" ] || text="$(cat "$GATE_LOG" 2>/dev/null)"
+    { text="$(<"$GATE_LOG")"; } 2>/dev/null || text=""
     rm -f "$GATE_LOG"
     [ -z "$text" ] || printf '%s\n' "$text" >&2
   fi
@@ -447,8 +466,13 @@ fi
 # (the default branch). A dangling origin/HEAD (a clone from before the
 # main -> trunk rename, pruned) falls through to origin/trunk rather than
 # skipping the audit. A base that still does not resolve blocks (exit 2) with
-# the fetch that restores it (effect-drizzle-ext#61); outside a git checkout
-# the audit is skipped. Local git only: this runs before every commit and push.
+# the fetch that restores it (effect-drizzle-ext#61), unless the checkout has
+# no origin remote to fetch from (a scratch `git init` repo): then the audit is
+# skipped with a notice, as it is outside a git checkout. FALLOW_AUDIT_BASE
+# is read from the hook's environment, which is Claude Code's, so a prefix on
+# the command itself does not reach it. This runs wherever #58 moved the hook,
+# and in its re-run of itself. Local git only: it runs before every commit
+# and push.
 if ! git rev-parse --git-dir >/dev/null 2>&1; then
   echo "fallow-gate: not inside a git checkout, skipping audit." >&2
   exit 0
@@ -466,6 +490,10 @@ if [ -z "$BASE" ]; then
   fi
 fi
 if ! resolves "$BASE"; then
+  if ! git remote get-url origin >/dev/null 2>&1; then
+    echo "fallow-gate: no origin remote in $PWD and audit base $BASE does not resolve, so the audit was skipped; set FALLOW_AUDIT_BASE in Claude Code's environment (not on the command line) to pin a base." >&2
+    exit 0
+  fi
   case "$BASE" in
     origin/*) FIX="fetch it with 'git fetch origin ${BASE#origin/}:refs/remotes/$BASE'" ;;
     *) FIX="fetch it" ;;
