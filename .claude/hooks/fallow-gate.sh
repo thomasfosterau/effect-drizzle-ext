@@ -46,14 +46,16 @@ set -euo pipefail
 # The temp file is first filled with 16 KiB of newlines and then opened
 # without truncation, so stderr overwrites space already written and a full
 # TMPDIR cannot turn a block's message into a failed write, which `set -e`
-# would make a silent, non-blocking exit 1. 16 KiB covers the hook's own
-# messages (about 0.5 KiB) and a typical verdict-fail report (about 5 KiB);
-# a longer report written while TMPDIR fills can still fail. The fill holds
-# that space while fallow runs, and fallow writes its report to TMPDIR too, so
-# when the space left after the fill is smaller than the report, the audit
-# fails open with a notice; the fill is kept small to keep that window narrow
-# (effect-drizzle-ext#71). If the fill fails, stderr stays the real stderr.
-# The trailing newlines vanish when gate_finish reads it.
+# would make a silent, non-blocking exit 1. If the fill fails, stderr stays
+# the real stderr. The trailing newlines vanish when gate_finish reads it.
+# Holding 16 KiB while fallow runs would take the space fallow needs for its
+# own report (effect-drizzle-ext#71), so gate_release shrinks the reservation
+# to the text written so far plus 4 KiB, which covers the hook's later
+# messages (about 0.5 KiB), just before the #58 re-run and the audit. A
+# verdict-fail report (about 5 KiB, often more) can then outgrow it: when
+# copying the report to stderr fails, `set -e` exits 1, and the second #61
+# trap turns that into a block (exit 2) and prints the report from fallow's
+# output file to the real stderr instead.
 # gate_finish reads the variables unset here before the script assigns them,
 # so a value inherited from the environment must not leak in.
 # The second #61 block re-arms this trap after `trap cleanup EXIT` replaces it.
@@ -71,6 +73,25 @@ if [ -n "$GATE_LOG" ]; then
   fi
   unset GATE_PAD
 fi
+# Rewrites the temp file as the text written so far plus 4 KiB of newlines,
+# releasing the rest of the 16 KiB, and reopens stderr just past that text.
+# The rewrite fits in the space it frees; if it still fails, stderr goes back
+# to the real stderr with the text replayed there.
+gate_release() {
+  local text pad=$'\n\n\n\n\n\n\n\n'
+  [ -n "$GATE_LOG" ] || return 0
+  for _ in 1 2 3 4 5 6 7 8 9; do pad="$pad$pad"; done
+  { text="$(<"$GATE_LOG")"; } 2>/dev/null || text=""
+  [ -z "$text" ] || text="$text"$'\n'
+  if printf '%s%s' "$text" "$pad" 2>/dev/null >"$GATE_LOG" && exec 2<>"$GATE_LOG"; then
+    printf '%s' "$text" >&2
+  else
+    exec 2>&9 9>&-
+    rm -f "$GATE_LOG"
+    GATE_LOG=""
+    printf '%s' "$text" >&2
+  fi
+}
 # Called from the EXIT trap as `gate_finish <exit status> || true`, so errexit
 # is off inside.
 # shellcheck disable=SC2329
@@ -218,7 +239,18 @@ trap cleanup EXIT
 
 # --- local edit begin (effect-drizzle-ext#61) ---
 # `trap cleanup EXIT` above replaced the first #61 block's trap; run both.
-trap 'GATE_STATUS=$?; cleanup; gate_finish "$GATE_STATUS" || true; exit "$GATE_STATUS"' EXIT
+# A verdict-fail exit other than 2 means copying the report to stderr failed
+# (gate_release left too little room in a full TMPDIR), so it still blocks and
+# the report goes to the real stderr, restored by gate_finish, from TMP_JSON
+# before cleanup removes it.
+# shellcheck disable=SC2329
+gate_fail_report() {
+  [ "$GATE_STATUS" -ne 0 ] && [ "$GATE_STATUS" -ne 2 ] && [ "${VERDICT-}" = fail ] || return 0
+  GATE_STATUS=2
+  echo "fallow-gate: blocked by fallow ${VERSION:-unknown} at $BIN_DESC; writing its report to the stderr log in TMPDIR failed, so here it is in full:" >&2
+  cat "$TMP_JSON" >&2
+}
+trap 'GATE_STATUS=$?; gate_finish "$GATE_STATUS" || true; gate_fail_report || true; cleanup; exit "$GATE_STATUS"' EXIT
 # --- local edit end ---
 
 # --- local edit begin (effect-drizzle-ext#58) ---
@@ -431,6 +463,9 @@ elif [ "${#T_OPS[@]}" -gt 0 ]; then
         echo "fallow-gate: the command has shell syntax this hook does not model; auditing both $PWD and $TOP." >&2
         # The child's notices reach this hook's stderr; its stdout is JSON
         # only when it failed open (#61), which this hook's own JSON reports.
+        # It reserves its own stderr space and runs its own audit, so release
+        # this hook's reservation first (#71).
+        gate_release
         if [ -f "$SELF" ] && [ -r "$SELF" ]; then
           if HERE_JSON="$(printf '%s\n' '{"tool_input":{"command":"git commit"}}' | "$BASH" "$SELF")"; then
             HERE_STATUS=0
@@ -476,12 +511,13 @@ fi
 # no origin remote to fetch from (a scratch `git init` repo): then the audit is
 # skipped with a notice, as it is outside a git checkout. A checkout that
 # shares this project's git directory (the project itself or one of its
-# worktrees, same `--git-common-dir` as $CLAUDE_PROJECT_DIR) blocks even
-# without an origin, so renaming the remote does not turn the block off
-# (effect-drizzle-ext#71). FALLOW_AUDIT_BASE is read from the hook's
-# environment, which is Claude Code's, so a prefix on the command itself does
-# not reach it. This runs wherever #58 moved the hook, and in its re-run of
-# itself. Local git only: it runs before every commit and push.
+# worktrees, same `--git-common-dir` as an absolute $CLAUDE_PROJECT_DIR, read
+# with git's location variables cleared) blocks even without an origin, so
+# renaming the remote does not turn the block off (effect-drizzle-ext#71).
+# FALLOW_AUDIT_BASE is read from the hook's environment, which is Claude
+# Code's, so a prefix on the command itself does not reach it. This runs
+# wherever #58 moved the hook, and in its re-run of itself. Local git only: it
+# runs before every commit and push.
 if ! git rev-parse --git-dir >/dev/null 2>&1; then
   echo "fallow-gate: not inside a git checkout, skipping audit." >&2
   exit 0
@@ -515,9 +551,19 @@ if ! resolves "$BASE"; then
     HAS_ORIGIN=0
     HERE_COMMON="$(common_git_dir)"
     PROJECT_COMMON=""
-    if [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -d "$CLAUDE_PROJECT_DIR" ]; then
-      PROJECT_COMMON="$(common_git_dir "$CLAUDE_PROJECT_DIR")"
-    fi
+    # Only an absolute CLAUDE_PROJECT_DIR names the project wherever #58
+    # moved the hook, and a GIT_DIR in the hook's environment would answer
+    # for it instead, so clear git's location variables for that lookup.
+    case "${CLAUDE_PROJECT_DIR:-}" in
+      /*)
+        if [ -d "$CLAUDE_PROJECT_DIR" ]; then
+          PROJECT_COMMON="$(
+            unset GIT_DIR GIT_COMMON_DIR GIT_WORK_TREE
+            common_git_dir "$CLAUDE_PROJECT_DIR"
+          )"
+        fi
+        ;;
+    esac
     if [ -z "$PROJECT_COMMON" ] || [ "$HERE_COMMON" != "$PROJECT_COMMON" ]; then
       echo "fallow-gate: no origin remote in $PWD and audit base $BASE does not resolve, so the audit was skipped; set FALLOW_AUDIT_BASE in Claude Code's environment (not on the command line) to pin a base." >&2
       exit 0
@@ -548,6 +594,8 @@ if ! resolves "$BASE"; then
   } >&2
   exit 2
 fi
+# fallow writes its report to TMPDIR, so free the stderr reservation first.
+gate_release
 # --- local edit end ---
 
 if "${RUNNER[@]}" audit --format json --quiet --explain --gate-marker agent --base "$BASE" >"$TMP_JSON" 2>"$TMP_ERR"; then
