@@ -41,13 +41,19 @@ set -euo pipefail
 # hookSpecificOutput.additionalContext (shown to the agent) carry the notice
 # text. A passing audit and a command that is not a git commit or push print
 # nothing. Without jq the command cannot be classified, so the JSON is a fixed
-# literal, printed whenever the input mentions commit or push (`echo push`
-# included).
-# The temp file is first filled with 64 KiB of newlines and then opened
+# literal, printed whenever the hook input (the command, its description, the
+# cwd, the transcript path) mentions commit or push (`echo push` included).
+# The temp file is first filled with 16 KiB of newlines and then opened
 # without truncation, so stderr overwrites space already written and a full
 # TMPDIR cannot turn a block's message into a failed write, which `set -e`
-# would make a silent, non-blocking exit 1. If that fill fails, stderr stays
-# the real stderr. The trailing newlines vanish when gate_finish reads it.
+# would make a silent, non-blocking exit 1. 16 KiB covers the hook's own
+# messages (about 0.5 KiB) and a typical verdict-fail report (about 5 KiB);
+# a longer report written while TMPDIR fills can still fail. The fill holds
+# that space while fallow runs, and fallow writes its report to TMPDIR too, so
+# when the space left after the fill is smaller than the report, the audit
+# fails open with a notice; the fill is kept small to keep that window narrow
+# (effect-drizzle-ext#71). If the fill fails, stderr stays the real stderr.
+# The trailing newlines vanish when gate_finish reads it.
 # gate_finish reads the variables unset here before the script assigns them,
 # so a value inherited from the environment must not leak in.
 # The second #61 block re-arms this trap after `trap cleanup EXIT` replaces it.
@@ -56,7 +62,7 @@ GATE_NOTICE=0
 GATE_LOG="$(mktemp 2>/dev/null || true)"
 if [ -n "$GATE_LOG" ]; then
   GATE_PAD=$'\n\n\n\n\n\n\n\n'
-  for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13; do GATE_PAD="$GATE_PAD$GATE_PAD"; done
+  for _ in 1 2 3 4 5 6 7 8 9 10 11; do GATE_PAD="$GATE_PAD$GATE_PAD"; done
   if printf '%s' "$GATE_PAD" 2>/dev/null >"$GATE_LOG"; then
     exec 9>&2 2<>"$GATE_LOG"
   else
@@ -468,11 +474,14 @@ fi
 # skipping the audit. A base that still does not resolve blocks (exit 2) with
 # the fetch that restores it (effect-drizzle-ext#61), unless the checkout has
 # no origin remote to fetch from (a scratch `git init` repo): then the audit is
-# skipped with a notice, as it is outside a git checkout. FALLOW_AUDIT_BASE
-# is read from the hook's environment, which is Claude Code's, so a prefix on
-# the command itself does not reach it. This runs wherever #58 moved the hook,
-# and in its re-run of itself. Local git only: it runs before every commit
-# and push.
+# skipped with a notice, as it is outside a git checkout. A checkout that
+# shares this project's git directory (the project itself or one of its
+# worktrees, same `--git-common-dir` as $CLAUDE_PROJECT_DIR) blocks even
+# without an origin, so renaming the remote does not turn the block off
+# (effect-drizzle-ext#71). FALLOW_AUDIT_BASE is read from the hook's
+# environment, which is Claude Code's, so a prefix on the command itself does
+# not reach it. This runs wherever #58 moved the hook, and in its re-run of
+# itself. Local git only: it runs before every commit and push.
 if ! git rev-parse --git-dir >/dev/null 2>&1; then
   echo "fallow-gate: not inside a git checkout, skipping audit." >&2
   exit 0
@@ -489,22 +498,50 @@ if [ -z "$BASE" ]; then
     BASE="origin/trunk"
   fi
 fi
+# Prints the absolute common git directory of the checkout at $1 (default:
+# here), or nothing. A git before 2.31 echoes the unknown --path-format option
+# on its own line, so multi-line output counts as nothing.
+common_git_dir() {
+  local dir
+  dir="$(git -C "${1:-.}" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 0
+  case "$dir" in
+    *$'\n'*) ;;
+    *) printf '%s' "$dir" ;;
+  esac
+}
 if ! resolves "$BASE"; then
+  HAS_ORIGIN=1
   if ! git remote get-url origin >/dev/null 2>&1; then
-    echo "fallow-gate: no origin remote in $PWD and audit base $BASE does not resolve, so the audit was skipped; set FALLOW_AUDIT_BASE in Claude Code's environment (not on the command line) to pin a base." >&2
-    exit 0
+    HAS_ORIGIN=0
+    HERE_COMMON="$(common_git_dir)"
+    PROJECT_COMMON=""
+    if [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -d "$CLAUDE_PROJECT_DIR" ]; then
+      PROJECT_COMMON="$(common_git_dir "$CLAUDE_PROJECT_DIR")"
+    fi
+    if [ -z "$PROJECT_COMMON" ] || [ "$HERE_COMMON" != "$PROJECT_COMMON" ]; then
+      echo "fallow-gate: no origin remote in $PWD and audit base $BASE does not resolve, so the audit was skipped; set FALLOW_AUDIT_BASE in Claude Code's environment (not on the command line) to pin a base." >&2
+      exit 0
+    fi
   fi
   case "$BASE" in
     origin/*) FIX="fetch it with 'git fetch origin ${BASE#origin/}:refs/remotes/$BASE'" ;;
     *) FIX="fetch it" ;;
   esac
+  WHERE=""
+  if [ "$HAS_ORIGIN" -eq 0 ]; then
+    FIX="add an origin remote with 'git remote add origin <url>' (or 'git remote rename <name> origin' if it was renamed), then $FIX"
+    WHERE=" in Claude Code's environment (not on the command line)"
+  fi
   {
     echo "fallow-gate: blocked: audit base $BASE does not resolve in this checkout, so fallow audit cannot run."
+    if [ "$HAS_ORIGIN" -eq 0 ]; then
+      echo "fallow-gate: $PWD has no origin remote, but it shares the git directory of this project ($CLAUDE_PROJECT_DIR), so it blocks rather than skipping the audit."
+    fi
     if [ -n "${FALLOW_AUDIT_BASE:-}" ]; then
-      echo "fallow-gate: FALLOW_AUDIT_BASE names it; $FIX, or set FALLOW_AUDIT_BASE to a ref that exists (unset, the base is origin/HEAD or origin/trunk), then retry."
+      echo "fallow-gate: FALLOW_AUDIT_BASE names it; $FIX, or set FALLOW_AUDIT_BASE$WHERE to a ref that exists (unset, the base is origin/HEAD or origin/trunk), then retry."
     else
-      echo "fallow-gate: $FIX, or set FALLOW_AUDIT_BASE to a ref that exists, then retry."
-      if [ -n "${HEAD_REF:-}" ]; then
+      echo "fallow-gate: $FIX, or set FALLOW_AUDIT_BASE$WHERE to a ref that exists, then retry."
+      if [ -n "${HEAD_REF:-}" ] && [ "$HAS_ORIGIN" -eq 1 ]; then
         echo "fallow-gate: origin/HEAD points at $HEAD_REF, which does not resolve; repoint it with 'git remote set-head origin --auto'."
       fi
     fi
