@@ -49,18 +49,39 @@ set -euo pipefail
 # would make a silent, non-blocking exit 1. If the fill fails, stderr stays
 # the real stderr. The trailing newlines vanish when gate_finish reads it.
 # Holding 16 KiB while fallow runs would take the space fallow needs for its
-# own report (effect-drizzle-ext#71), so gate_release shrinks the reservation
-# to the text written so far plus 4 KiB, which covers the hook's later
-# messages (about 0.5 KiB), just before the #58 re-run and the audit. A
-# verdict-fail report (about 5 KiB, often more) can then outgrow it: when
-# copying the report to stderr fails, `set -e` exits 1, and the second #61
-# trap turns that into a block (exit 2) and prints the report from fallow's
-# output file to the real stderr instead.
+# own report (effect-drizzle-ext#71), so gate_release shrinks the reservation,
+# just before the #58 re-run and the audit, to the text written so far plus
+# newlines up to the next 4 KiB page boundary at least 2 KiB past it. The
+# 2 KiB covers the hook's later messages (about 1.1 KiB at most, measured with
+# 110-character paths), and ending on a page boundary keeps a short notice
+# from costing a second page (effect-drizzle-ext#74). A verdict-fail report
+# (about 5 KiB, often more) can then outgrow it: when copying the report to
+# stderr fails, `set -e` exits 1, and the second #61 trap turns that into a
+# block (exit 2) and prints the report from fallow's output file to the real
+# stderr instead. In the #58 re-run, fd 2 is the parent's log in TMPDIR, so
+# the parent hands its real stderr down on fd 8, marked by
+# FALLOW_GATE_REAL_STDERR=8 in the re-run's environment, and a converted
+# block goes there (GATE_UP=1). A run started by Claude Code has neither, so
+# it keeps using fd 9.
+# Accepted residual window (owner decision in effect-drizzle-ext#74): one
+# 4 KiB page of each live reservation is still held while fallow writes its
+# report to TMPDIR. A report needing P KiB of pages therefore fails open,
+# visibly (exit 0 with the JSON notice `fallow audit exited 1, skipping.`),
+# when F KiB are free in TMPDIR and P <= F < P + 4, or P <= F < P + 8 for the
+# re-run's audit in a both-audits run, where the parent's page is held too.
+# Only a report over 12 KiB can hit it: below 16 KiB free no reservation is
+# taken.
 # gate_finish reads the variables unset here before the script assigns them,
 # so a value inherited from the environment must not leak in.
 # The second #61 block re-arms this trap after `trap cleanup EXIT` replaces it.
 unset GIT_WRITE INPUT STATUS VERDICT IS_ERROR
 GATE_NOTICE=0
+GATE_CONVERT=0
+GATE_UP=0
+if [ "${FALLOW_GATE_REAL_STDERR-}" = 8 ] && { : >&8; } 2>/dev/null; then
+  GATE_UP=1
+fi
+unset FALLOW_GATE_REAL_STDERR
 GATE_LOG="$(mktemp 2>/dev/null || true)"
 if [ -n "$GATE_LOG" ]; then
   GATE_PAD=$'\n\n\n\n\n\n\n\n'
@@ -73,16 +94,19 @@ if [ -n "$GATE_LOG" ]; then
   fi
   unset GATE_PAD
 fi
-# Rewrites the temp file as the text written so far plus 4 KiB of newlines,
-# releasing the rest of the 16 KiB, and reopens stderr just past that text.
-# The rewrite fits in the space it frees; if it still fails, stderr goes back
-# to the real stderr with the text replayed there.
+# Rewrites the temp file as the text written so far plus newlines up to the
+# next 4096-byte boundary at least 2048 bytes past it, releasing the rest of
+# the 16 KiB, and reopens stderr just past that text. The rewrite fits in the
+# space it frees; if it still fails, stderr goes back to the real stderr with
+# the text replayed there.
 gate_release() {
-  local text pad=$'\n\n\n\n\n\n\n\n'
+  local text len pad=$'\n\n\n\n\n\n\n\n'
   [ -n "$GATE_LOG" ] || return 0
-  for _ in 1 2 3 4 5 6 7 8 9; do pad="$pad$pad"; done
+  for _ in 1 2 3 4 5 6 7 8 9 10; do pad="$pad$pad"; done
   { text="$(<"$GATE_LOG")"; } 2>/dev/null || text=""
   [ -z "$text" ] || text="$text"$'\n'
+  len="$(LC_ALL=C; printf %s "${#text}")"
+  pad="${pad:0:2048 + (4096 - (len + 2048) % 4096) % 4096}"
   if printf '%s%s' "$text" "$pad" 2>/dev/null >"$GATE_LOG" && exec 2<>"$GATE_LOG"; then
     printf '%s' "$text" >&2
   else
@@ -101,8 +125,11 @@ gate_finish() {
     exec 2>&9 9>&-
     { text="$(<"$GATE_LOG")"; } 2>/dev/null || text=""
     rm -f "$GATE_LOG"
-    [ -z "$text" ] || printf '%s\n' "$text" >&2
   fi
+  # A #58 re-run's fd 2 is now its parent's log in TMPDIR, where a converted
+  # block (second #61 block) failed to fit once already.
+  [ "$GATE_CONVERT" -eq 0 ] || [ "$GATE_UP" -eq 0 ] || exec 2>&8
+  [ -z "$text" ] || printf '%s\n' "$text" >&2
   [ "$status" -eq 0 ] && [ "${GIT_WRITE-1}" != 0 ] || return 0
   if [ "$GATE_NOTICE" -eq 0 ] && [ "${STATUS-}" = 0 ] && [ "${IS_ERROR-}" != true ] && [ -n "${VERDICT-}" ]; then
     return 0
@@ -240,17 +267,22 @@ trap cleanup EXIT
 # --- local edit begin (effect-drizzle-ext#61) ---
 # `trap cleanup EXIT` above replaced the first #61 block's trap; run both.
 # A verdict-fail exit other than 2 means copying the report to stderr failed
-# (gate_release left too little room in a full TMPDIR), so it still blocks and
-# the report goes to the real stderr, restored by gate_finish, from TMP_JSON
-# before cleanup removes it.
+# (gate_release left too little room in a full TMPDIR), so gate_convert makes
+# it a block and the report goes to the real stderr, restored by gate_finish
+# (fd 8 in a #58 re-run), from TMP_JSON before cleanup removes it.
 # shellcheck disable=SC2329
-gate_fail_report() {
+gate_convert() {
   [ "$GATE_STATUS" -ne 0 ] && [ "$GATE_STATUS" -ne 2 ] && [ "${VERDICT-}" = fail ] || return 0
   GATE_STATUS=2
+  GATE_CONVERT=1
+}
+# shellcheck disable=SC2329
+gate_fail_report() {
+  [ "$GATE_CONVERT" -eq 1 ] || return 0
   echo "fallow-gate: blocked by fallow ${VERSION:-unknown} at $BIN_DESC; writing its report to the stderr log in TMPDIR failed, so here it is in full:" >&2
   cat "$TMP_JSON" >&2
 }
-trap 'GATE_STATUS=$?; gate_finish "$GATE_STATUS" || true; gate_fail_report || true; cleanup; exit "$GATE_STATUS"' EXIT
+trap 'GATE_STATUS=$?; gate_convert || true; gate_finish "$GATE_STATUS" || true; gate_fail_report || true; cleanup; exit "$GATE_STATUS"' EXIT
 # --- local edit end ---
 
 # --- local edit begin (effect-drizzle-ext#58) ---
@@ -464,10 +496,14 @@ elif [ "${#T_OPS[@]}" -gt 0 ]; then
         # The child's notices reach this hook's stderr; its stdout is JSON
         # only when it failed open (#61), which this hook's own JSON reports.
         # It reserves its own stderr space and runs its own audit, so release
-        # this hook's reservation first (#71).
+        # this hook's reservation first (#71). Its stderr is this hook's log,
+        # so it also gets the real stderr on fd 8 for a converted block (#74):
+        # fd 9 while the log is in use, else fd 2.
         gate_release
+        REAL_FD=2
+        [ -z "$GATE_LOG" ] || REAL_FD=9
         if [ -f "$SELF" ] && [ -r "$SELF" ]; then
-          if HERE_JSON="$(printf '%s\n' '{"tool_input":{"command":"git commit"}}' | "$BASH" "$SELF")"; then
+          if HERE_JSON="$(printf '%s\n' '{"tool_input":{"command":"git commit"}}' | FALLOW_GATE_REAL_STDERR=8 "$BASH" "$SELF" 8>&"$REAL_FD")"; then
             HERE_STATUS=0
           else
             HERE_STATUS=$?
