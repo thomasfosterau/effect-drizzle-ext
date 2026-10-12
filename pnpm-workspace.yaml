@@ -37,12 +37,12 @@ catalog:
   # node_modules/@effect/tsgo/dist/effect-tsgo.cjs before bumping any of the
   # three. Pin set in step with the preferenceflow application (the freshest).
   "@effect/tsgo": 0.46.1
-  "@effect/sql-pg": 4.0.2
+  "@effect/sql-pg": 4.0.3
   # The Node `FileSystem` / `Path` / `ChildProcessSpawner` layer the pg
   # package's tests provide to `./migrations`, `./testing`'s provisioning and
   # `./tooling` — a consumer provides its own (these modules only require the
   # services).
-  "@effect/platform-node": 4.0.2
+  "@effect/platform-node": 4.0.3
   "@mpsuesser/oxlint-plugin-effect": ^0.6.0
   # Starts the integration suite's ephemeral `pgvector/pgvector` server when no
   # local PostgreSQL is reachable — see packages/pg/tests/integration/global-setup.ts.
