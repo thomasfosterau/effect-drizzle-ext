@@ -17,10 +17,12 @@ export default defineConfig({
         input: cacheInputs,
         output: [],
       },
+      // One subshell plus `!dist/**`, for the reasons on core's `build`
+      // (effect-drizzle-ext#79).
       build: {
-        command: "rm -rf dist && tsc -p tsconfig.build.json",
+        command: "(rm -rf dist && tsc -p tsconfig.build.json)",
         dependsOn: [{ task: "build", from: "dependencies" }],
-        input: cacheInputs,
+        input: [...cacheInputs, "!dist/**"],
         output: ["dist/**"],
       },
       "test:unit": {
