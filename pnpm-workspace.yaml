@@ -25,7 +25,7 @@ catalogMode: strict
 catalog:
   "@changesets/changelog-github": ^1.0.1
   "@changesets/cli": ^3.0.3
-  "@effect/language-service": ^0.87.4
+  "@effect/language-service": ^0.87.5
   # Effect Language Service as a native (TypeScript-Go) binary — the TS7 side
   # of the 6/7 split. `effect-tsgo patch` overwrites the native `tsc` binary
   # with an Effect-patched build matched by gitHead, so this pins in lockstep
@@ -37,12 +37,12 @@ catalog:
   # node_modules/@effect/tsgo/dist/effect-tsgo.cjs before bumping any of the
   # three. Pin set in step with the preferenceflow application (the freshest).
   "@effect/tsgo": 0.46.1
-  "@effect/sql-pg": 4.0.2
+  "@effect/sql-pg": 4.0.5
   # The Node `FileSystem` / `Path` / `ChildProcessSpawner` layer the pg
   # package's tests provide to `./migrations`, `./testing`'s provisioning and
   # `./tooling` — a consumer provides its own (these modules only require the
   # services).
-  "@effect/platform-node": 4.0.2
+  "@effect/platform-node": 4.0.5
   "@mpsuesser/oxlint-plugin-effect": ^0.6.0
   # Starts the integration suite's ephemeral `pgvector/pgvector` server when no
   # local PostgreSQL is reachable — see packages/pg/tests/integration/global-setup.ts.
@@ -58,7 +58,7 @@ catalog:
   # The optional peer `@thomasfosterau/effect-drizzle-ext-pg/tooling` diffs
   # schemas with (`drizzle-kit/api-postgres`); always the drizzle-orm pin.
   drizzle-kit: 1.0.0-rc.5-5935859
-  effect: 4.0.2
+  effect: 4.0.5
   effect-solutions: ^0.5.3
   fallow: 3.32.0
   # TypeScript 6/7 side-by-side: TS7 (the native Go compiler) ships no JS API
