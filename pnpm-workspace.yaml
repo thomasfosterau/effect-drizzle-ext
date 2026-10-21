@@ -76,7 +76,7 @@ catalog:
   # core package, and `vitest` must match vite-plus's exact pin (0.3.2 →
   # 4.1.11) because the `vitest: "catalog:"` override forces every resolution
   # to the catalog singleton.
-  vite-plus: 0.3.2
+  vite-plus: 1.1.0
   vite: npm:@voidzero-dev/vite-plus-core@0.3.2
   vitest: 4.1.11
 
