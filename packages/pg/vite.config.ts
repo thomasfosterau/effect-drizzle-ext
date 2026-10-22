@@ -29,28 +29,26 @@ export default defineConfig({
       check: {
         command: "tsc -p tsconfig.json",
         dependsOn: [{ task: "check", from: "dependencies" }],
-        input: cacheInputs,
-        output: [],
+        cache: { input: cacheInputs, output: [] },
       },
       // One subshell plus `!dist/**`, for the reasons on core's `build`
       // (effect-drizzle-ext#79).
       build: {
         command: "(rm -rf dist && tsc -p tsconfig.build.json)",
         dependsOn: [{ task: "build", from: "dependencies" }],
-        input: [...cacheInputs, "!dist/**"],
-        output: ["dist/**"],
+        cache: { input: [...cacheInputs, "!dist/**"], output: ["dist/**"] },
       },
       "test:unit": {
         command: "vp test run tests",
-        env: ["VITEST_MAX_WORKERS", "NODE_OPTIONS"],
-        input: cacheInputs,
-        output: [],
+        cache: { env: ["VITEST_MAX_WORKERS", "NODE_OPTIONS"], input: cacheInputs, output: [] },
       },
       "test:coverage": {
         command: "vp test run tests --coverage",
-        env: ["VITEST_MAX_WORKERS", "NODE_OPTIONS"],
-        input: cacheInputs,
-        output: ["coverage/**"],
+        cache: {
+          env: ["VITEST_MAX_WORKERS", "NODE_OPTIONS"],
+          input: cacheInputs,
+          output: ["coverage/**"],
+        },
       },
     },
   },

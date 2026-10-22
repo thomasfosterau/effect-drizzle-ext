@@ -37,8 +37,7 @@ export default defineConfig({
     tasks: {
       check: {
         command: "tsc -p tsconfig.json",
-        input: cacheInputs,
-        output: [],
+        cache: { input: cacheInputs, output: [] },
       },
       // Emits `dist/` (JavaScript + declarations) with the native, Effect-
       // patched `tsc`. `rm -rf` first so a renamed module leaves no stale file.
@@ -59,20 +58,19 @@ export default defineConfig({
       // keep. `vp run -r --no-cache build` clears a stray.
       build: {
         command: "(rm -rf dist && tsc -p tsconfig.build.json)",
-        input: [...cacheInputs, "!dist/**"],
-        output: ["dist/**"],
+        cache: { input: [...cacheInputs, "!dist/**"], output: ["dist/**"] },
       },
       "test:unit": {
         command: "vp test run tests",
-        env: ["VITEST_MAX_WORKERS", "NODE_OPTIONS"],
-        input: cacheInputs,
-        output: [],
+        cache: { env: ["VITEST_MAX_WORKERS", "NODE_OPTIONS"], input: cacheInputs, output: [] },
       },
       "test:coverage": {
         command: "vp test run tests --coverage",
-        env: ["VITEST_MAX_WORKERS", "NODE_OPTIONS"],
-        input: cacheInputs,
-        output: ["coverage/**"],
+        cache: {
+          env: ["VITEST_MAX_WORKERS", "NODE_OPTIONS"],
+          input: cacheInputs,
+          output: ["coverage/**"],
+        },
       },
     },
   },
