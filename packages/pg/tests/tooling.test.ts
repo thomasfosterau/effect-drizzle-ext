@@ -181,7 +181,7 @@ describe("checkDagIntegrity", () => {
 
 describe("checkBaseAncestry", () => {
   const base = {
-    ref: "origin/main",
+    ref: "origin/trunk",
     dirs: ["1_a"],
     head: Option.some(entry("1_a", "a", ROOT_SENTINEL_ID)),
   };
@@ -207,16 +207,16 @@ describe("checkBaseAncestry", () => {
       },
     );
     expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatch(/2_b were generated on a checkout that predates origin\/main/);
+    expect(issues[0]).toMatch(/2_b were generated on a checkout that predates origin\/trunk/);
   });
 });
 
 describe("resolveBaseRef", () => {
   it("prefers MIGRATION_BASE_REF, then origin/$GITHUB_BASE_REF, else none", () => {
-    expect(resolveBaseRef({ MIGRATION_BASE_REF: "main", GITHUB_BASE_REF: "x" })).toEqual(
-      Option.some("main"),
+    expect(resolveBaseRef({ MIGRATION_BASE_REF: "trunk", GITHUB_BASE_REF: "x" })).toEqual(
+      Option.some("trunk"),
     );
-    expect(resolveBaseRef({ GITHUB_BASE_REF: "main" })).toEqual(Option.some("origin/main"));
+    expect(resolveBaseRef({ GITHUB_BASE_REF: "trunk" })).toEqual(Option.some("origin/trunk"));
     expect(resolveBaseRef({})).toEqual(Option.none());
   });
 });
@@ -238,12 +238,12 @@ describe("readBaseMigrations", () => {
                 { cwd: repo },
               ),
             );
-          yield* git("init", "--quiet", "--initial-branch=main");
+          yield* git("init", "--quiet", "--initial-branch=trunk");
           yield* fs.copy(FIXTURE_MIGRATIONS, path.join(repo, "db", "migrations"));
           yield* git("add", ".");
           yield* git("commit", "--quiet", "-m", "base");
           return yield* readBaseMigrations({
-            ref: "main",
+            ref: "trunk",
             migrationsPath: "db/migrations",
             cwd: repo,
           });

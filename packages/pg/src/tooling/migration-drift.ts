@@ -29,7 +29,7 @@
  * 3. **Base ancestry (pull requests only).** A migration must be generated on
  *    a checkout whose snapshot chain descends from the base branch's CURRENT
  *    head; checks 1–2 are internal to the checkout, so a branch forked from
- *    week-old `main` passes both while carrying a migration whose regenerated
+ *    week-old `trunk` passes both while carrying a migration whose regenerated
  *    constraints silently omit everything the base added since. Runs only
  *    when a base is supplied ({@link resolveBaseRef} reads one from
  *    `MIGRATION_BASE_REF` / `GITHUB_BASE_REF`), and only when the branch adds
@@ -315,7 +315,7 @@ export interface BaseRefEnvironment {
 
 /**
  * The base ref for the ancestry check, when one is knowable: an explicit
- * `MIGRATION_BASE_REF` wins (local use: `MIGRATION_BASE_REF=origin/main`),
+ * `MIGRATION_BASE_REF` wins (local use: `MIGRATION_BASE_REF=origin/trunk`),
  * else `origin/$GITHUB_BASE_REF` — which GitHub Actions sets only on
  * `pull_request` events, so pushes and local runs skip the check.
  */
@@ -397,7 +397,7 @@ const readLocal = (
 
 /** Where the base branch's migrations are read from, through `git`. */
 export interface GitBase {
-  /** The base ref, e.g. `origin/main` — from {@link resolveBaseRef}. */
+  /** The base ref, e.g. `origin/trunk` — from {@link resolveBaseRef}. */
   readonly ref: string;
   /** The migrations directory relative to the repository root, e.g. `packages/database/migrations`. */
   readonly migrationsPath: string;
