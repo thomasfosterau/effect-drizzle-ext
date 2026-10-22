@@ -11,6 +11,14 @@ Both extend drizzle-orm's own Effect integration (`drizzle-orm/effect-postgres`,
 
 **Disclaimer:** this repository and its packages have been created using Claude Code. The API is in flux; expect churn and breaking changes.
 
+## Install
+
+```sh
+pnpm add @thomasfosterau/effect-drizzle-ext @thomasfosterau/effect-drizzle-ext-pg effect drizzle-orm @effect/sql-pg
+```
+
+The core package alone (`effect`, `drizzle-orm` peers) covers derivation, errors, sorting and the driver-agnostic services; add the pg package for the `@effect/sql-pg` binding. Each package README lists its optional peers.
+
 ## Quick start
 
 ```ts
@@ -44,7 +52,7 @@ export const { Database, CurrentTransaction, transact, readHandle } = database;
 
 ## Development
 
-See [CONTRIBUTING.md](CONTRIBUTING.md); agent conventions are in [AGENTS.md](AGENTS.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md); agent conventions are in [AGENTS.md](AGENTS.md). Releases: [PUBLISHING.md](PUBLISHING.md). Report vulnerabilities through [SECURITY.md](SECURITY.md).
 
 ## License
 
