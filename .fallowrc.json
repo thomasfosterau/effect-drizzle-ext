@@ -22,7 +22,8 @@
     "packages/pg/tests/integration/global-setup.ts",
     "packages/pg/vitest.integration.config.ts",
     "tests/dist-consumer/src/*.ts",
-    "**/vite.config.ts"
+    "**/vite.config.ts",
+    "vitest.coverage.config.ts"
   ],
   "ignorePatterns": ["**/dist/**", "**/coverage/**"],
   "ignoreDependencies": [
@@ -72,6 +73,7 @@
   "health": {
     "maxCyclomatic": 20,
     "maxCognitive": 15,
-    "maxCrap": 30
+    "maxCrap": 30,
+    "coverage": "coverage/coverage-final.json"
   }
 }

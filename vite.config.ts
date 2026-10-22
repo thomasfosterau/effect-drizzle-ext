@@ -175,6 +175,16 @@ export default defineConfig({
         ],
         cache: false,
       },
+      // Both packages' unit suites under one Istanbul map at
+      // `coverage/coverage-final.json`, the map `fallow audit` reads
+      // (`.fallowrc.json` → `health.coverage`); see vitest.coverage.config.ts.
+      // Not a CI step: run it before the fallow gate (AGENTS.md →
+      // Verification). cache: false — the map on disk is the point, and a
+      // stale one would score the audit against old code.
+      "test:coverage": {
+        command: "vp test run --config vitest.coverage.config.ts --coverage",
+        cache: false,
+      },
       // Runs against an EPHEMERAL LOCAL database: the global setup provisions
       // a fresh database on a reachable localhost PostgreSQL server (the
       // `postgres` service container in ci.yml) or, absent one, on a

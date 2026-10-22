@@ -1,4 +1,5 @@
 import { defineConfig } from "vite-plus";
+import { packageTasks } from "../../vite.package.ts";
 
 /**
  * Same fingerprint shape and rationale as packages/core/vite.config.ts,
@@ -24,34 +25,7 @@ const cacheInputs = [
 ];
 
 export default defineConfig({
-  run: {
-    tasks: {
-      check: {
-        command: "tsc -p tsconfig.json",
-        dependsOn: [{ task: "check", from: "dependencies" }],
-        cache: { input: cacheInputs, output: [] },
-      },
-      // One subshell plus `!dist/**`, for the reasons on core's `build`
-      // (effect-drizzle-ext#79).
-      build: {
-        command: "(rm -rf dist && tsc -p tsconfig.build.json)",
-        dependsOn: [{ task: "build", from: "dependencies" }],
-        cache: { input: [...cacheInputs, "!dist/**"], output: ["dist/**"] },
-      },
-      "test:unit": {
-        command: "vp test run tests",
-        cache: { env: ["VITEST_MAX_WORKERS", "NODE_OPTIONS"], input: cacheInputs, output: [] },
-      },
-      "test:coverage": {
-        command: "vp test run tests --coverage",
-        cache: {
-          env: ["VITEST_MAX_WORKERS", "NODE_OPTIONS"],
-          input: cacheInputs,
-          output: ["coverage/**"],
-        },
-      },
-    },
-  },
+  run: { tasks: packageTasks(cacheInputs) },
   test: {
     include: ["tests/**/*.test.ts"],
     // `tests/integration/` is this package's slice of the ROOT
