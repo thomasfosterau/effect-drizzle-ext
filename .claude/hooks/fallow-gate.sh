@@ -18,16 +18,18 @@ set -euo pipefail
 # diverge on prereleases (BSD sorts `2.48.0-alpha.1` ABOVE `2.48.0`, GNU below).
 # If you set a prerelease floor explicitly, verify the behavior on the target OS.
 #
-# Local edits (effect-drizzle-ext#30, #55, #58, #61): this paragraph, the four
-# blocks between "local edit" markers below (a #61 block directly before the
-# jq check, a second #61 block directly after `trap cleanup EXIT`, then the
-# #58 block directly before the #30 one) and `--base "$BASE"` on the audit
-# call are not generated. The installer passes no --base, audits the hook's
-# own directory rather than the checkout a `cd <dir> &&` or `git -C <dir>` in
-# the command targets, and writes its fail-open notices to stderr only, which
-# Claude Code keeps in its debug log when the hook exits 0. After regenerating
-# with `fallow hooks install --target agent --agent claude --force`, re-apply
-# exactly those six pieces; the rest of the file is the installer's.
+# Local edits (effect-drizzle-ext#30, #55, #58, #61, #73): this paragraph, the
+# five blocks between "local edit" markers below (a #61 block directly before
+# the jq check, the #73 block directly after `VERSION_RAW=`, a second #61
+# block directly after `trap cleanup EXIT`, then the #58 block directly before
+# the #30 one) and `--base "$BASE"` on the audit call are not generated. The
+# installer passes no --base, audits the hook's own directory rather than the
+# checkout a `cd <dir> &&` or `git -C <dir>` in the command targets, writes
+# its fail-open notices to stderr only, which Claude Code keeps in its debug
+# log when the hook exits 0, and keeps every line of `fallow --version`. After
+# regenerating with `fallow hooks install --target agent --agent claude
+# --force`, re-apply exactly those seven pieces; the rest of the file is the
+# installer's.
 
 # --- local edit begin (effect-drizzle-ext#61) ---
 # Surface every fail-open notice. Claude Code shows a hook's stderr only when
@@ -239,6 +241,11 @@ else
 fi
 
 VERSION_RAW="$("${RUNNER[@]}" --version 2>/dev/null || true)"
+# --- local edit begin (effect-drizzle-ext#73) ---
+# Through the npm launcher, `fallow --version` prints a second `verified: …`
+# line; keep the first so VERSION and every block message stay one line.
+VERSION_RAW="${VERSION_RAW%%$'\n'*}"
+# --- local edit end ---
 VERSION="${VERSION_RAW#fallow }"
 VERSION="${VERSION%% *}"
 
