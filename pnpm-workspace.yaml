@@ -116,6 +116,10 @@ overrides:
   effect: "catalog:"
   # GHSA-m9gg-hp2v-232j: @grpc/grpc-js <1.14.5 (via @testcontainers) fails `pnpm audit`.
   "@grpc/grpc-js@>=1.14.0 <1.14.5": ^1.14.5
+  # launch-editor <=2.14.1 (via @changesets/cli) fails `pnpm audit --audit-level
+  # high` (fs.existsSync check bypassable on Windows); 2.14.2 is patched.
+  # Remove once @changesets/cli resolves a patched version on its own.
+  "launch-editor@<=2.14.1": ^2.14.2
 nodeLinker: hoisted
 allowBuilds:
   # cpu-features / ssh2 / protobufjs arrive via @testcontainers/postgresql;
