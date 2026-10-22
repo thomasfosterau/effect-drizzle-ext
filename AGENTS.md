@@ -64,7 +64,7 @@ Steps 2–7 are CI's job, in CI's order ([ci.yml](.github/workflows/ci.yml)). `C
 
 ## Effect
 
-Consult effect-solutions before writing Effect code (`vp exec effect-solutions list`, then `vp exec effect-solutions show <topic>…`: data-modeling, services-and-layers, error-handling, testing, basics); never guess at an Effect pattern. If it isn't enough, read `node_modules/effect/dist/*.d.ts`.
+Read the installed package before writing Effect code: `node_modules/effect/AGENTS.md` and `node_modules/effect/ai-docs/` (the pinned version ships both), then the declarations and sources (`node_modules/effect/dist/*.d.ts`, `node_modules/effect/src`). Never guess at an Effect API.
 
 - The pinned version is the `effect` entry in `pnpm-workspace.yaml`'s catalog; the published peer floor is under `catalogs.peers`.
 - Tagged errors are `Schema.TaggedError<Self>()(tag, fields)` classes (the rc spelling; `Schema.TaggedErrorClass` was the beta-line name).

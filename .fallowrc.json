@@ -28,7 +28,6 @@
   "ignorePatterns": ["**/dist/**", "**/coverage/**"],
   "ignoreDependencies": [
     "@types/node",
-    "effect-solutions",
     "@effect/tsgo",
     "@effect/language-service",
     "@typescript/native",

@@ -9,9 +9,9 @@ The `@effect/sql-pg` binding for `@thomasfosterau/effect-drizzle-ext`: `Database
 ## Install
 
 ```bash
-npm install @thomasfosterau/effect-drizzle-ext-pg @thomasfosterau/effect-drizzle-ext effect drizzle-orm @effect/sql-pg
+pnpm add @thomasfosterau/effect-drizzle-ext-pg @thomasfosterau/effect-drizzle-ext effect drizzle-orm @effect/sql-pg
 # optional: ./tooling's schema guards, ./testing's container fallback
-npm install --save-dev drizzle-kit @testcontainers/postgresql
+pnpm add --save-dev drizzle-kit @testcontainers/postgresql
 ```
 
 `effect` (`>=4.0.0-rc.118`), `drizzle-orm` (`>=1.0.0-rc.5`) and `@effect/sql-pg` (`>=4.0.0-rc.118`) are peer dependencies, built against `effect@4.0.0-rc.118`, `drizzle-orm@1.0.0-rc.5-ab785fc` and `@effect/sql-pg@4.0.0-rc.118`. Both floors are rc.118 because that release moved `effect/unstable/*` to `effect/*`; the client constructors below are written against `@effect/sql-pg`'s own wire protocol, and `pg` is no longer a peer. `drizzle-kit` (`>=1.0.0-rc.5`, for `./tooling`) and `@testcontainers/postgresql` (`>=12`, for `./testing`'s container fallback) are **optional** peers. `@thomasfosterau/effect-drizzle-ext` is a regular dependency, not a peer — it supplies the driver-agnostic `makeDatabaseServices` factory this package specialises. Node.js 22 or newer is required.

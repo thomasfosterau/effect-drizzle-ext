@@ -62,7 +62,6 @@ catalog:
   # schemas with (`drizzle-kit/api-postgres`); always the drizzle-orm pin.
   drizzle-kit: 1.0.0-rc.5-5935859
   effect: 4.0.5
-  effect-solutions: ^0.5.3
   fallow: 3.34.1
   # TypeScript 6/7 side-by-side: TS7 (the native Go compiler) ships no JS API
   # until 7.1, so JS-API consumers (@effect/language-service) stay on TS6 while

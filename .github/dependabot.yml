@@ -1,29 +1,37 @@
-# Dependabot version-update configuration (a subset of the gardeneria
-# application's, whose catalog this workspace mirrors).
+# Dependabot version updates. The `npm` ecosystem at `/` reads the pnpm
+# workspace, its catalogs and pnpm-lock.yaml.
 #
-# `groups` collect dependencies that MUST move together: the Effect 4 release
-# line is a lockstep-versioned singleton set; the vitest toolchain is pinned to
-# vite-plus's exact versions.
+# Dependabot puts a dependency in the FIRST group whose patterns match, so the
+# groups run specific → general, and each lockstep set is a group that takes
+# every update type (major included) so its members can never move apart:
 #
-# `@effect/tsgo`, `typescript` (the TS 6 alias) and `@typescript/native` (TS 7)
-# are one set: `effect-tsgo patch` matches the native `tsc` and `oxlint` by
-# gitHead / version and hard-errors on any pairing it has no artifact for, so
-# a PR that moves one of them alone goes red. They move by hand, together with
-# `vite-plus`, after checking the `components` table in
-# `node_modules/@effect/tsgo/dist/effect-tsgo.cjs`. Their *version* updates are
-# ignored below (SECURITY updates stay enabled, as for drizzle-orm), and
-# `@effect/tsgo` is excluded from the `effect` group's `@effect/*` pattern.
+# - `toolchain`: `effect-tsgo patch` matches the native `tsc` (@typescript/native)
+#   and the `oxlint` / `oxlint-tsgolint` that vite-plus carries by gitHead and
+#   hard-errors on a pairing it has no artifact for, failing `pnpm install`;
+#   vite-plus pins its own oxlint, oxfmt and vitest exactly, the `vite` /
+#   `vitest` catalog entries and `@vitest/coverage-istanbul` must equal those
+#   pins, and the Effect lint plugin runs inside that oxlint. A group PR can
+#   still go red when no @effect/tsgo release supports the new oxlint yet:
+#   read the `components` table in node_modules/@effect/tsgo/dist/effect-tsgo.cjs
+#   (pnpm-workspace.yaml's comments say how).
+# - `effect`: the Effect 4 line is a lockstep-versioned singleton set
+#   (`effect`, `@effect/sql-pg`, `@effect/platform-node`, the language
+#   service); `@effect/tsgo` belongs to the toolchain set instead.
+# - `drizzle`: drizzle-kit is always the drizzle-orm pin. Both are
+#   commit-suffixed prereleases with no meaningful semver bump to compute, so
+#   their *version* updates are ignored below and the group carries only
+#   security updates; move them by hand, together.
+# - `testcontainers`, `changesets`, `fallow`: sets released together.
+# - `minor-and-patch`: every other minor / patch update in one PR, so PR
+#   volume stays low; a major outside the sets above stays its own PR.
 #
-# drizzle-orm is on a commit-suffixed prerelease with no meaningful semver bump
-# to compute, so its *version* updates are ignored while SECURITY updates stay
-# enabled (the ignore is scoped to the `version-update:semver-*` update types;
-# a bare `dependency-name` ignore would block security updates too).
+# Not bumpable by Dependabot: the `@grpc/grpc-js` security override in
+# pnpm-workspace.yaml's `overrides` (a transitive pin of @testcontainers).
+# Revisit it by hand whenever the `testcontainers` group moves (AGENTS.md →
+# Commands).
 #
-# `@vitest/coverage-istanbul` must equal the vitest vite-plus bundles, and
-# vite-plus / vitest / vite are ignored for the reason above, so its version
-# updates are ignored too: alone it could only open a PR that breaks coverage.
-#
-# `cooldown` mirrors pnpm-workspace.yaml's `minimumReleaseAge`.
+# `cooldown` mirrors pnpm-workspace.yaml's `minimumReleaseAge` (1 day), with
+# first-party `@thomasfosterau/*` exempt as `minimumReleaseAgeExclude` is.
 #
 # `docker-compose` watches the dev container's images (.devcontainer/compose.yaml).
 # The workspace image's Node major tracks CI's `latest` and pgvector's `pg17`
@@ -41,23 +49,64 @@ updates:
       - "dependencies"
     commit-message:
       prefix: "chore"
-      prefix-development: "chore"
     cooldown:
       default-days: 1
       exclude:
         - "@thomasfosterau/*"
     groups:
+      toolchain:
+        applies-to: version-updates
+        patterns:
+          - "vite-plus"
+          - "vite"
+          - "vitest"
+          - "@vitest/*"
+          - "oxlint"
+          - "oxfmt"
+          - "oxlint-tsgolint"
+          - "@effect/tsgo"
+          - "@typescript/native"
+          - "typescript"
+          - "@typescript/typescript6"
+          - "@mpsuesser/oxlint-plugin-effect"
+        update-types: ["major", "minor", "patch"]
       effect:
+        applies-to: version-updates
         patterns:
           - "effect"
           - "@effect/*"
         exclude-patterns:
           - "@effect/tsgo"
-      vitest-toolchain:
+        update-types: ["major", "minor", "patch"]
+      drizzle:
+        applies-to: version-updates
         patterns:
-          - "vitest"
-          - "@vitest/coverage-istanbul"
-          - "vite-plus"
+          - "drizzle-orm"
+          - "drizzle-kit"
+        update-types: ["major", "minor", "patch"]
+      testcontainers:
+        applies-to: version-updates
+        patterns:
+          - "pg"
+          - "@types/pg"
+          - "testcontainers"
+          - "@testcontainers/*"
+        update-types: ["major", "minor", "patch"]
+      changesets:
+        applies-to: version-updates
+        patterns:
+          - "@changesets/*"
+        update-types: ["major", "minor", "patch"]
+      fallow:
+        applies-to: version-updates
+        patterns:
+          - "fallow"
+        update-types: ["major", "minor", "patch"]
+      minor-and-patch:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types: ["minor", "patch"]
     ignore:
       - dependency-name: "drizzle-orm"
         update-types:
@@ -66,49 +115,7 @@ updates:
             "version-update:semver-minor",
             "version-update:semver-patch",
           ]
-      - dependency-name: "@effect/tsgo"
-        update-types:
-          [
-            "version-update:semver-major",
-            "version-update:semver-minor",
-            "version-update:semver-patch",
-          ]
-      - dependency-name: "typescript"
-        update-types:
-          [
-            "version-update:semver-major",
-            "version-update:semver-minor",
-            "version-update:semver-patch",
-          ]
-      - dependency-name: "@typescript/native"
-        update-types:
-          [
-            "version-update:semver-major",
-            "version-update:semver-minor",
-            "version-update:semver-patch",
-          ]
-      - dependency-name: "vite"
-        update-types:
-          [
-            "version-update:semver-major",
-            "version-update:semver-minor",
-            "version-update:semver-patch",
-          ]
-      - dependency-name: "vitest"
-        update-types:
-          [
-            "version-update:semver-major",
-            "version-update:semver-minor",
-            "version-update:semver-patch",
-          ]
-      - dependency-name: "@vitest/coverage-istanbul"
-        update-types:
-          [
-            "version-update:semver-major",
-            "version-update:semver-minor",
-            "version-update:semver-patch",
-          ]
-      - dependency-name: "vite-plus"
+      - dependency-name: "drizzle-kit"
         update-types:
           [
             "version-update:semver-major",
@@ -124,8 +131,11 @@ updates:
     labels:
       - "dependencies"
     commit-message:
-      prefix: "ci"
-      include: "scope"
+      prefix: "chore"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
   - package-ecosystem: "docker-compose"
     directory: "/.devcontainer"
     schedule:
