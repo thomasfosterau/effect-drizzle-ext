@@ -148,7 +148,7 @@ const pgErrorFactsOf = (node: ErrorNode): Option.Option<PgErrorFacts> =>
 // ── The bounded, cycle-guarded walk ────────────────────────────────
 
 /** True when `error` is a fresh object worth descending into (within depth, not yet visited). */
-const isSearchable = (error: unknown, depth: number, seen: Set<unknown>): error is object =>
+const isSearchable = (error: unknown, depth: number, seen: Set<unknown>): error is ErrorNode =>
   Predicate.isObjectOrArray(error) && depth < MAX_ERROR_DEPTH && !seen.has(error);
 
 /**
@@ -175,16 +175,15 @@ const childErrorNodes = (node: ErrorNode): unknown[] => [
  * a cause chain.
  */
 const searchErrorGraph = <A>(
-  error: unknown,
+  cause: unknown,
   match: (node: ErrorNode) => Option.Option<A>,
   depth: number,
   seen: Set<unknown>,
 ): Option.Option<A> => {
-  if (!isSearchable(error, depth, seen)) return Option.none();
-  seen.add(error);
-  const node = error as ErrorNode;
-  return Option.orElse(match(node), () =>
-    Array.findFirst(childErrorNodes(node), (child) =>
+  if (!isSearchable(cause, depth, seen)) return Option.none();
+  seen.add(cause);
+  return Option.orElse(match(cause), () =>
+    Array.findFirst(childErrorNodes(cause), (child) =>
       searchErrorGraph(child, match, depth + 1, seen),
     ),
   );
@@ -200,6 +199,7 @@ const searchErrorGraph = <A>(
  * The walk is bounded (depth 8) and cycle-guarded, so a self-referential or
  * pathologically deep graph terminates.
  */
+// oxlint-disable-next-line effect/no-unknown-parameters -- public entry over an opaque failure graph (any caught value); narrowing it would break callers
 export const findPgError = (error: unknown): Option.Option<PgErrorFacts> =>
   // The cycle guard needs *reference* identity across an arbitrary error graph:
   // `HashSet`'s structural equality would mis-merge distinct-but-equal nodes and
@@ -355,6 +355,7 @@ const makeTransactionFailure = (
  * whose SQLSTATE is outside the classified families (a syntax error, a
  * connection failure — `SqlError.reason` already covers those well).
  */
+// oxlint-disable-next-line effect/no-unknown-parameters -- public entry over an opaque failure graph (any caught value); narrowing it would break callers
 export const classifyError = (error: unknown): Option.Option<ClassifiedError> =>
   Option.flatMap(findPgError(error), (facts) =>
     Option.orElse<ClassifiedError, ClassifiedError>(makeConstraintViolation(facts, error), () =>
@@ -363,15 +364,15 @@ export const classifyError = (error: unknown): Option.Option<ClassifiedError> =>
   );
 
 /** The `23505` classification for `error`, if that is what it is. */
-const uniqueViolationOf = (error: unknown): Option.Option<UniqueViolation> =>
+const uniqueViolationOf = (cause: unknown): Option.Option<UniqueViolation> =>
   Option.map(
-    Option.filter(findPgError(error), (facts) => facts.code === UNIQUE_VIOLATION),
-    (facts) => makeUniqueViolation(facts, error),
+    Option.filter(findPgError(cause), (facts) => facts.code === UNIQUE_VIOLATION),
+    (facts) => makeUniqueViolation(facts, cause),
   );
 
 /** The constraint-family classification for `error`, if that is what it is. */
-const constraintViolationOf = (error: unknown): Option.Option<ConstraintViolation> =>
-  Option.flatMap(findPgError(error), (facts) => makeConstraintViolation(facts, error));
+const constraintViolationOf = (cause: unknown): Option.Option<ConstraintViolation> =>
+  Option.flatMap(findPgError(cause), (facts) => makeConstraintViolation(facts, cause));
 
 // ── Predicates ─────────────────────────────────────────────────────
 
@@ -398,6 +399,7 @@ const uniqueViolationNode = (node: ErrorNode): Option.Option<true> => {
  * wrapping. It also matches a `23505` declared under a `code` that is not
  * SQLSTATE-shaped, which {@link classifyError} skips.
  */
+// oxlint-disable-next-line effect/no-unknown-parameters -- public predicate over an opaque failure graph (any caught value); narrowing it would break callers
 export const isUniqueViolation = (error: unknown): boolean =>
   // oxlint-disable-next-line effect/avoid-native-object-helpers -- reference identity is the point
   Option.isSome(searchErrorGraph(error, uniqueViolationNode, 0, new Set()));
@@ -406,6 +408,7 @@ export const isUniqueViolation = (error: unknown): boolean =>
  * True when `error` is (or wraps) an integrity-constraint violation — one of
  * the five `23xxx` classes {@link classifyError} recognises.
  */
+// oxlint-disable-next-line effect/no-unknown-parameters -- public predicate over an opaque failure graph (any caught value); narrowing it would break callers
 export const isConstraintViolation = (error: unknown): boolean =>
   Option.isSome(constraintViolationOf(error));
 
@@ -415,6 +418,7 @@ export const isConstraintViolation = (error: unknown): boolean =>
  * (`40P01`). Retrying a {@link ConstraintViolation} is pointless; retrying
  * these is the documented remedy.
  */
+// oxlint-disable-next-line effect/no-unknown-parameters -- public predicate over an opaque failure graph (any caught value); narrowing it would break callers
 export const isRetryableTransactionFailure = (error: unknown): boolean =>
   Option.isSome(
     Option.filter(

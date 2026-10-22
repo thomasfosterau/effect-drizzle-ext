@@ -27,8 +27,10 @@
  */
 
 import { Resource } from "@thomasfosterau/effect-jsonapi";
+import * as Arr from "effect/Array";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
+import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
 import * as SchemaAST from "effect/SchemaAST";
 import {
@@ -91,28 +93,20 @@ export type ResourceColumnsMetaOf<R extends AnyResource> = {
  * is the inner schema's. The type-level counterpart is
  * {@link ResourceColumnsMetaOf}.
  */
-export const resourceColumns = (resource: AnyResource): Record<string, DbColumn> => {
-  /*
-   * NOT migrated to `Option`: this union is not a modelling choice, it names
-   * the runtime shape `Resource.attributeAnnotations` actually returns from
-   * `@thomasfosterau/effect-jsonapi` (an optional peer, outside this
-   * workspace) — an attribute with no annotations is a literal `undefined`
-   * entry. Writing `Option` here would be a false description of the value
-   * being cast.
-   */
-  /* oxlint-disable effect/prefer-option-over-null -- names an external package's runtime shape at a cast */
-  const annotations = Resource.attributeAnnotations(resource) as Record<
-    string,
-    Record<string, unknown> | undefined
-  >;
-  /* oxlint-enable effect/prefer-option-over-null */
-  const out: Record<string, DbColumn> = {};
-  for (const name in annotations) {
-    const meta = annotations[name]?.[DB_COLUMN_KEY];
-    if (meta !== undefined) out[name] = meta as DbColumn;
-  }
-  return out;
-};
+export const resourceColumns = (resource: AnyResource): Record<string, DbColumn> =>
+  // `Resource.attributeAnnotations` (an optional peer, outside this workspace)
+  // reports an attribute with no annotations as a literal `undefined` entry;
+  // the foreign `undefined` becomes an `Option` on the same expression.
+  R.getSomes(
+    R.map(Resource.attributeAnnotations(resource), (annotations) =>
+      Option.map(
+        Option.fromUndefinedOr(annotations?.[DB_COLUMN_KEY]),
+        // SAFETY: DB_COLUMN_KEY is namespaced to this package and only
+        // `dbColumn` / `dbColumnFor` write it, always with a `DbColumn` value.
+        (meta) => meta as DbColumn,
+      ),
+    ),
+  );
 
 /**
  * Project a resource definition's per-attribute numeric bounds into plain data
@@ -123,14 +117,14 @@ export const resourceColumns = (resource: AnyResource): Record<string, DbColumn>
  * `deriveCheckConstraints`.
  */
 export const resourceColumnBounds = (resource: AnyResource): Record<string, ColumnBounds> => {
+  // SAFETY: `Resource.attributes` returns the resource object's
+  // `Schema.Struct.Fields`; every value is a schema.
   const fields = Resource.attributes(resource) as Record<string, Schema.Constraint>;
-  const columns = resourceColumns(resource);
-  const out: Record<string, ColumnBounds> = {};
-  for (const name in columns) {
-    const bounds = numericBounds(fields[name]);
-    if (Option.isSome(bounds)) out[name] = { column: columns[name], ...bounds.value };
-  }
-  return out;
+  return R.getSomes(
+    R.map(resourceColumns(resource), (column, name) =>
+      Option.map(numericBounds(fields[name]), (bounds): ColumnBounds => ({ column, ...bounds })),
+    ),
+  );
 };
 
 // ── Resource projection shapes ────────────────────────────────────────
@@ -175,7 +169,7 @@ const ISO_PROBE = "2024-01-02T03:04:05.000Z";
  * only a `Date` instance). A decoder is built per call: this is start-up
  * introspection over a model, not a hot path.
  */
-const decodesFromJson = (schema: Schema.Top, input: unknown): Option.Option<unknown> =>
+const decodesFromJson = (schema: Schema.Top, input: Schema.Json): Option.Option<unknown> =>
   // SAFETY: an attribute schema's decoding needs no services (a resource's
   // attributes are plain codecs), which `Schema.Top` cannot express.
   Schema.decodeUnknownOption(Schema.toCodecJson(schema as Schema.Codec<unknown>))(input);
@@ -199,7 +193,7 @@ export const resourceAttributeProjections = (
   // `Schema.Struct.Fields`; every value is a schema.
   const fields = Resource.attributes(resource) as Record<string, Schema.Top>;
   const columns = resourceColumns(resource);
-  return Object.entries(fields).map(([key, schema]) => ({
+  return Arr.map(R.toEntries(fields), ([key, schema]) => ({
     key,
     optional: SchemaAST.isOptional(schema.ast),
     nullable: Option.isSome(decodesFromJson(schema, null)),

@@ -52,6 +52,8 @@ export const makeDeriveResourceColumns = <B extends ColumnBuilders>(
 ): (<R extends AnyResource>(resource: R) => DerivedResourceColumns<R, B>) => {
   const derive = makeDeriveColumns(builders, options);
   return <R extends AnyResource>(resource: R): DerivedResourceColumns<R, B> =>
+    // SAFETY: `resourceColumns` projects exactly the annotated attributes
+    // `ResourceColumnsMetaOf` keys, so the derived map is the one it describes.
     derive.fromMeta(resourceColumns(resource)) as DerivedResourceColumns<R, B>;
 };
 

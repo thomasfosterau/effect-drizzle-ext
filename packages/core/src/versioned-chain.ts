@@ -55,6 +55,8 @@ import {
   type SetIsPrimaryKey,
   type SetNotNull,
 } from "drizzle-orm/pg-core";
+import * as Arr from "effect/Array";
+import * as Predicate from "effect/Predicate";
 
 // ── Subtype table pair ────────────────────────────────────────────────
 
@@ -455,6 +457,11 @@ export interface CurrentVersionViewDeps<
   merge: TMerge | ((versionZero: TRoot) => TMerge);
 }
 
+/** Whether a `merge` is the function form, which receives the birth-row alias. */
+const isMergeFunction = <TRoot, TMerge>(
+  merge: TMerge | ((versionZero: TRoot) => TMerge),
+): merge is (versionZero: TRoot) => TMerge => Predicate.isFunction(merge);
+
 /**
  * Build a `currentVersionView` bound to a root version table + identity row.
  * `schema.view(name).as(...)` with the uniform join chain generated from
@@ -485,13 +492,16 @@ export const makeCurrentVersionView =
     name: string,
     { leaf, through = [], optional = [], on = [], columns }: CurrentVersionViewConfig<TColumns>,
   ): CurrentVersionViewResult<TColumns, TMerge> => {
+    // `.from()` infers its selection from the table's generic; pinned to the
+    // `PgTable` base it is, the sub-select keeps its explicit selection.
+    const rootTable: PgTable = rootVersion;
     const view = schema.view(name).as((qb) => {
       // Current version per node, resolved from the root version table — the
       // single home of currency. This sub-select drives the FROM so the leaf
       // join below fails closed on a partial chain.
       const current = qb
         .select({ id: rootVersion.id, version: max(rootVersion.version).as("current_version") })
-        .from(rootVersion as unknown as PgTable)
+        .from(rootTable)
         .groupBy(rootVersion.id)
         .as("current_version");
       // A function `merge` additionally resolves the node's birth row (`version
@@ -499,10 +509,11 @@ export const makeCurrentVersionView =
       // plain-object `merge` skips this entirely — no extra join, no change to
       // the emitted SQL beyond what `columns` already determines (see the
       // `CurrentVersionViewDeps.merge` doc for why that matters).
-      const versionZero =
-        typeof merge === "function" ? alias(rootVersion, "version_zero") : undefined;
+      const versionZero = isMergeFunction(merge) ? alias(rootVersion, "version_zero") : undefined;
       const mergeColumns =
-        typeof merge === "function" ? merge(versionZero as unknown as TRoot) : merge;
+        // SAFETY: `versionZero` is an alias of `rootVersion` (defined whenever
+        // `merge` is a function), exposing the same columns under another name.
+        isMergeFunction(merge) ? merge(versionZero as TRoot) : merge;
       // `select(columns)` fixes the selection; the join chain appended below only
       // widens the FROM. The chain is built untyped because its join shapes
       // alternate, and the builder's return type re-pins the selection from
@@ -513,15 +524,13 @@ export const makeCurrentVersionView =
       // reason: dynamic join chain.
       let q: any = select;
       q = q.innerJoin(leaf, and(eq(current.id, leaf.id), eq(current.version, leaf.version)));
-      for (const t of through) {
-        q = q.innerJoin(t, and(eq(current.id, t.id), eq(current.version, t.version)));
-      }
-      for (const t of optional) {
-        q = q.leftJoin(t, and(eq(current.id, t.id), eq(current.version, t.version)));
-      }
-      for (const t of on) {
-        q = q.innerJoin(t, eq(current.id, t.id));
-      }
+      q = Arr.reduce(through, q, (acc, t) =>
+        acc.innerJoin(t, and(eq(current.id, t.id), eq(current.version, t.version))),
+      );
+      q = Arr.reduce(optional, q, (acc, t) =>
+        acc.leftJoin(t, and(eq(current.id, t.id), eq(current.version, t.version))),
+      );
+      q = Arr.reduce(on, q, (acc, t) => acc.innerJoin(t, eq(current.id, t.id)));
       q = q.innerJoin(identity, eq(current.id, identity.id));
       q = q.innerJoin(
         rootVersion,
@@ -533,9 +542,13 @@ export const makeCurrentVersionView =
           and(eq(current.id, versionZero.id), eq(versionZero.version, 0n)),
         );
       }
+      // SAFETY: the joins only widen the FROM clause; the selection is still
+      // exactly `select`'s.
       return q as typeof select;
     });
-    return view as unknown as CurrentVersionViewResult<TColumns, TMerge>;
+    // SAFETY: the view selects exactly `columns` + `merge` (see the doc above);
+    // `CurrentVersionViewResult` re-pins that selection's `$inferSelect`.
+    return view as CurrentVersionViewResult<TColumns, TMerge>;
   };
 
 // ── Version-chain read shapes ─────────────────────────────────────────
@@ -578,8 +591,17 @@ export type VersionSnapshot<
 > = VersionChainEntry<Action> &
   Extra & {
     /** Every leaf-chain domain column at this version, keyed by column name. */
+    // oxlint-disable-next-line effect/no-unsafe-dictionary-type -- public type: column values are whatever the driver decodes for the consumer's columns; narrowing it would break producers
     readonly columns: Readonly<Record<string, unknown>>;
   };
+
+/** The `createdAt` / `updatedAt` pair {@link versionTimestamps} returns. */
+export interface VersionTimestamps {
+  /** The birth row's timestamp, or `updatedAt` when the view merges none in. */
+  readonly createdAt: Date;
+  /** The current version's `timestamp`. */
+  readonly updatedAt: Date;
+}
 
 /**
  * The `createdAt` / `updatedAt` pair of a current-version row: `updatedAt` is
@@ -592,7 +614,7 @@ export type VersionSnapshot<
 export const versionTimestamps = (row: {
   readonly timestamp: Date;
   readonly createdAt?: Date | null | undefined;
-}): { readonly createdAt: Date; readonly updatedAt: Date } => ({
+}): VersionTimestamps => ({
   createdAt: row.createdAt ?? row.timestamp,
   updatedAt: row.timestamp,
 });

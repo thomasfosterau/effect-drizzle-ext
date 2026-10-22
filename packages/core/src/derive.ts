@@ -40,6 +40,8 @@ import {
   type ExtraConfigColumn,
   type PgTableExtraConfigValue,
 } from "drizzle-orm/pg-core";
+import * as Arr from "effect/Array";
+import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
 import {
   fieldColumnBounds,
@@ -144,12 +146,32 @@ export interface DeriveOptions {
  * A fluent view of a Drizzle column builder — the chainable `.notNull()` /
  * `.default()` / `.references()` methods the registry's widened
  * `ColumnBuilderBase` return type hides. Runtime-real; used only to type the
- * dynamic build chain.
+ * dynamic build chain. Typed to exactly what the chain passes.
  */
-interface FluentColumn {
+interface FluentColumn extends ColumnBuilderBase {
   notNull(): FluentColumn;
-  default(value: unknown): FluentColumn;
-  references(ref: () => AnyPgColumn, actions?: unknown): FluentColumn;
+  default(value: NonNullable<DbColumn["default"]>): FluentColumn;
+  references(
+    ref: () => AnyPgColumn,
+    actions: Pick<DbColumnReference, "onDelete" | "onUpdate">,
+  ): FluentColumn;
+}
+
+/**
+ * The derivation pair {@link makeDeriveColumns} returns for builder registry
+ * `B`: `fromMeta` over an already-projected metadata map, `fromFields` over a
+ * `Schema.Struct`'s fields. Both throw {@link DerivationError} at module load
+ * on a misdeclared column.
+ */
+export interface DeriveColumns<B extends ColumnBuilders> {
+  /** Derive the builders an already-projected metadata map declares. */
+  readonly fromMeta: <Meta extends Record<string, DbColumn>>(
+    metas: Meta,
+  ) => DerivedColumns<Meta, B>;
+  /** Derive the builders a `Schema.Struct`'s annotated fields declare. */
+  readonly fromFields: <F extends Schema.Struct.Fields>(
+    fields: F,
+  ) => DerivedColumns<FieldColumnsMetaOf<F>, B>;
 }
 
 /**
@@ -165,54 +187,50 @@ interface FluentColumn {
 export const makeDeriveColumns = <B extends ColumnBuilders>(
   builders: B,
   options: DeriveOptions = {},
-): {
-  readonly fromMeta: <Meta extends Record<string, DbColumn>>(
-    metas: Meta,
-  ) => DerivedColumns<Meta, B>;
-  readonly fromFields: <F extends Schema.Struct.Fields>(
-    fields: F,
-  ) => DerivedColumns<FieldColumnsMetaOf<F>, B>;
-} => {
-  const buildColumns = (metas: Record<string, DbColumn>): Record<string, ColumnBuilderBase> => {
-    const columns: Record<string, ColumnBuilderBase> = {};
-    for (const name in metas) {
-      const meta = metas[name];
-      const build = builders[meta.pg as keyof B];
-      if (build === undefined) {
-        throw new DerivationError({
-          message: `no builder registered for column kind '${meta.pg}'`,
-        });
-      }
-      // The registry widens each builder's return to `ColumnBuilderBase`, so the
-      // fluent `.notNull()` / `.default()` / `.references()` methods aren't on the
-      // static type — bridge through `unknown` to a fluent view. The runtime
-      // builders are the real Drizzle ones, which carry these methods.
-      let column = build(meta.column) as unknown as FluentColumn;
-      if (meta.notNull) column = column.notNull();
-      if (meta.default !== undefined) column = column.default(meta.default);
-      if (meta.references !== undefined) {
-        if (options.resolveReference === undefined) {
-          throw new DerivationError({
-            message: `column '${meta.column}' declares a reference but no resolveReference hook was provided`,
-          });
-        }
-        const target = options.resolveReference(meta.references);
-        column = column.references(target, {
-          onDelete: meta.references.onDelete,
-          onUpdate: meta.references.onUpdate,
-        });
-      }
-      columns[name] = column as unknown as ColumnBuilderBase;
+): DeriveColumns<B> => {
+  const buildColumn = (meta: DbColumn): ColumnBuilderBase => {
+    const build = builders[meta.pg];
+    if (build === undefined) {
+      throw new DerivationError({
+        message: `no builder registered for column kind '${meta.pg}'`,
+      });
     }
-    return columns;
+    // SAFETY: the registry widens each builder's return to `ColumnBuilderBase`,
+    // hiding the fluent `.notNull()` / `.default()` / `.references()` methods;
+    // the runtime builders are the real Drizzle ones, which carry them.
+    let column = build(meta.column) as FluentColumn;
+    if (meta.notNull) column = column.notNull();
+    if (meta.default !== undefined) column = column.default(meta.default);
+    if (meta.references !== undefined) {
+      if (options.resolveReference === undefined) {
+        throw new DerivationError({
+          message: `column '${meta.column}' declares a reference but no resolveReference hook was provided`,
+        });
+      }
+      const target = options.resolveReference(meta.references);
+      column = column.references(target, {
+        onDelete: meta.references.onDelete,
+        onUpdate: meta.references.onUpdate,
+      });
+    }
+    return column;
   };
+  const buildColumns = (metas: Record<string, DbColumn>): Record<string, ColumnBuilderBase> =>
+    R.fromEntries(
+      Arr.map(R.toEntries(metas), ([name, meta]) => [name, buildColumn(meta)] as const),
+    );
 
   return {
     fromMeta: <Meta extends Record<string, DbColumn>>(metas: Meta): DerivedColumns<Meta, B> =>
+      // SAFETY: `buildColumns` maps every key of `metas` to the builder its
+      // `pg` kind selects, with `.notNull()` applied exactly when `notNull`
+      // is true — the per-entry computation `DerivedColumns` describes.
       buildColumns(metas) as DerivedColumns<Meta, B>,
     fromFields: <F extends Schema.Struct.Fields>(
       fields: F,
     ): DerivedColumns<FieldColumnsMetaOf<F>, B> =>
+      // SAFETY: `fieldColumns` projects exactly the annotated fields
+      // `FieldColumnsMetaOf` keys, and `buildColumns` maps each as in `fromMeta`.
       buildColumns(fieldColumns(fields)) as DerivedColumns<FieldColumnsMetaOf<F>, B>,
   };
 };
@@ -275,10 +293,8 @@ const boundExpression = (column: ExtraConfigColumn, bounds: ColumnBounds): SQL =
  */
 export const deriveCheckConstraintsFrom =
   (bounds: Record<string, ColumnBounds>, tableName: string) =>
-  (table: Record<string, ExtraConfigColumn>): PgTableExtraConfigValue[] => {
-    const constraints: PgTableExtraConfigValue[] = [];
-    for (const attribute in bounds) {
-      const columnBounds = bounds[attribute];
+  (table: Record<string, ExtraConfigColumn>): PgTableExtraConfigValue[] =>
+    Arr.map(R.toEntries(bounds), ([attribute, columnBounds]) => {
       const column = table[attribute];
       if (column === undefined) {
         throw new DerivationError({
@@ -294,10 +310,8 @@ export const deriveCheckConstraintsFrom =
       const name =
         columnBounds.column.checkName ??
         `${tableName}_${columnBounds.column.column}_${boundSuffix(columnBounds)}`;
-      constraints.push(check(name, guarded));
-    }
-    return constraints;
-  };
+      return check(name, guarded);
+    });
 
 /**
  * {@link deriveCheckConstraintsFrom} over a `Schema.Struct`'s fields: the

@@ -160,6 +160,9 @@ export const executeRows = <T extends Record<string, unknown>>(
   query: SQLWrapper | string,
 ): Effect.Effect<readonly T[], EffectDrizzleQueryError> =>
   Effect.map(db.execute(query), (result) =>
+    // SAFETY: `T` is the row type the caller asserts its query selects (the
+    // driver hands rows back untyped); a non-array result is the driver's
+    // result object, whose `rows` holds those rows when present.
     Array.isArray(result)
       ? (result as readonly T[])
       : ((result as { rows?: readonly T[] }).rows ?? []),

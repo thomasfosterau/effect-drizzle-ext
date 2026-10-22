@@ -89,6 +89,8 @@ export const makeReferenceRegistry = (): ReferenceRegistry => {
             `— call register(${reference.table}) in its table module`,
         });
       }
+      // SAFETY: `getColumns` returns the table's column map keyed by property
+      // name; every value is a Drizzle column, and a miss is checked below.
       const column = (getColumns(table.value) as Record<string, AnyPgColumn>)[reference.column];
       if (column === undefined) {
         throw new DerivationError({
