@@ -1,4 +1,4 @@
-import { defineConfig } from "vite-plus";
+import { defineConfig, type TestUserConfig } from "vite-plus";
 import { packageTasks } from "../../vite.package.ts";
 
 /**
@@ -24,40 +24,33 @@ const cacheInputs = [
   { pattern: "pnpm-lock.yaml", base: "workspace" as const },
 ];
 
-/**
- * `maxWorkers` from `VITEST_MAX_WORKERS` when it is set (and non-empty), and
- * no `maxWorkers` key at all otherwise, so vitest's own default stands.
- */
-interface WorkerLimit {
-  maxWorkers?: number;
-}
-const workerLimit: WorkerLimit = {};
-if (process.env.VITEST_MAX_WORKERS) {
-  workerLimit.maxWorkers = Number(process.env.VITEST_MAX_WORKERS);
-}
+/** The unit-test config: this package's tests (integration excluded), timeout and coverage gate. */
+const test: TestUserConfig = {
+  include: ["tests/**/*.test.ts"],
+  // `tests/integration/` is this package's slice of the ROOT
+  // `test:integration` run — a vitest project registered in the root
+  // config, not part of the unit suite. Without this exclusion the
+  // `tests/**` include above sweeps those specs into `test:unit`, where
+  // they would run with no provisioned database and no global setup.
+  exclude: ["**/node_modules/**", "**/dist/**", "tests/integration/**"],
+  testTimeout: 30_000,
+  coverage: {
+    provider: "istanbul",
+    reporter: ["text-summary", "json-summary"],
+    reportsDirectory: "./coverage",
+    include: ["src/**/*.ts"],
+    exclude: ["**/*.d.ts"],
+    // Most of this package only does something against a live database; the
+    // unit gate covers the pure surface (connect-retry classification, the
+    // rollback-signal walk, layer composition). Ratchet upward as it grows.
+    thresholds: { statements: 40, branches: 30, functions: 40, lines: 40 },
+  },
+};
+// `VITEST_MAX_WORKERS` caps the worker pool only when set; unset, the key stays
+// absent and Vitest picks its own default.
+if (process.env.VITEST_MAX_WORKERS) test.maxWorkers = Number(process.env.VITEST_MAX_WORKERS);
 
 export default defineConfig({
   run: { tasks: packageTasks(cacheInputs) },
-  test: {
-    include: ["tests/**/*.test.ts"],
-    // `tests/integration/` is this package's slice of the ROOT
-    // `test:integration` run — a vitest project registered in the root
-    // config, not part of the unit suite. Without this exclusion the
-    // `tests/**` include above sweeps those specs into `test:unit`, where
-    // they would run with no provisioned database and no global setup.
-    exclude: ["**/node_modules/**", "**/dist/**", "tests/integration/**"],
-    testTimeout: 30_000,
-    ...workerLimit,
-    coverage: {
-      provider: "istanbul",
-      reporter: ["text-summary", "json-summary"],
-      reportsDirectory: "./coverage",
-      include: ["src/**/*.ts"],
-      exclude: ["**/*.d.ts"],
-      // Most of this package only does something against a live database; the
-      // unit gate covers the pure surface (connect-retry classification, the
-      // rollback-signal walk, layer composition). Ratchet upward as it grows.
-      thresholds: { statements: 40, branches: 30, functions: 40, lines: 40 },
-    },
-  },
+  test,
 });
