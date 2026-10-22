@@ -1,5 +1,6 @@
 import { defineConfig, type TestUserConfig } from "vite-plus";
-import { packageTasks } from "../../vite.package.ts";
+import manifest from "./package.json" with { type: "json" };
+import { packageConfig } from "../../vite.package.ts";
 
 /**
  * Input fingerprint for this package's cached tasks: auto tracking minus
@@ -50,7 +51,4 @@ const test: TestUserConfig = {
 // absent and Vitest picks its own default.
 if (process.env.VITEST_MAX_WORKERS) test.maxWorkers = Number(process.env.VITEST_MAX_WORKERS);
 
-export default defineConfig({
-  run: { tasks: packageTasks(cacheInputs) },
-  test,
-});
+export default defineConfig({ ...packageConfig(cacheInputs, manifest), test });

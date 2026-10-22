@@ -70,7 +70,8 @@ catalog:
   tsx: ^4.23.15
   # TypeScript 6/7 side-by-side: TS7 (the native Go compiler) ships no JS API
   # until 7.1, so JS-API consumers (@effect/language-service) stay on TS6 while
-  # native `tsc` type-checks AND emits this library's `dist/`. The alias keeps
+  # native `tsc` type-checks this library and emits the declarations `vp pack`
+  # bundles into `dist/` (vite.package.ts's `packageBuild`). The alias keeps
   # the package importable as `typescript` name-stable at the TS6 JS compiler
   # (bin `tsc6`); `@typescript/native` is TS7 (bin `tsc`). Pinned exact:
   # @typescript/native's gitHead must match @effect/tsgo's bundled binary.

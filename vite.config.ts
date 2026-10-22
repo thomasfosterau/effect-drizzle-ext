@@ -82,6 +82,7 @@ export default defineConfig({
       // these files.
       {
         files: [
+          "vite.package.ts",
           "**/vite.config.ts",
           "**/vitest.config.ts",
           "**/vitest.integration.config.ts",
