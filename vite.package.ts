@@ -2,7 +2,7 @@
  * @copyright Thomas Foster
  *
  * The task graph both published packages share (`check`, `build`,
- * `test:unit`, `test:coverage`). Each `packages/<name>/vite.config.ts` passes
+ * `test:unit`, `test:coverage`, `docgen`). Each `packages/<name>/vite.config.ts` passes
  * its own cache fingerprint (the inputs differ per package; each config says
  * why) and keeps its own vitest block.
  */
@@ -17,7 +17,7 @@ type CacheInputs = ReadonlyArray<
 >;
 
 /**
- * The four package tasks over `cacheInputs`. A sibling workspace package is
+ * The five package tasks over `cacheInputs`. A sibling workspace package is
  * consumed through its `exports`, so `check` and `build` depend on the same
  * task in every workspace dependency (an empty edge for a package with none).
  */
@@ -59,6 +59,14 @@ export const packageTasks = (cacheInputs: CacheInputs): RunTasks => {
     "test:coverage": {
       command: "vp test run tests --coverage",
       cache: { env: testEnv, input, output: ["coverage/**"] },
+    },
+    // Type-checks AND RUNS every JSDoc `@example` (docgen.json sets
+    // `runExamples`). Examples import the packages by name, exactly as a
+    // consumer would; the workspace `exports` resolve that name to `src/`, so
+    // no build is needed first. `docs/` is generated and gitignored.
+    docgen: {
+      command: "docgen",
+      cache: { input: [...input, "!docs/**"], output: ["docs/**"] },
     },
   };
 };

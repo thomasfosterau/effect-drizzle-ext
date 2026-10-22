@@ -149,7 +149,16 @@ export const applyMigrationList = (
  *
  * @example
  * ```ts
- * const applied = applyMigrations(MIGRATIONS_DIR).pipe(
+ * import * as NodeServices from "@effect/platform-node/NodeServices";
+ * import * as PgClient from "@effect/sql-pg/PgClient";
+ * import { applyMigrations } from "@thomasfosterau/effect-drizzle-ext-pg/migrations";
+ * import * as Effect from "effect/Effect";
+ * import * as Redacted from "effect/Redacted";
+ *
+ * const url = Redacted.make("postgres://postgres@localhost:5432/app_test");
+ *
+ * // Building the Effect connects to nothing; running it applies the chain.
+ * export const applied = applyMigrations("packages/database/migrations").pipe(
  *   Effect.provide(PgClient.layer({ url, maxConnections: 1 })),
  *   Effect.provide(NodeServices.layer),
  * );

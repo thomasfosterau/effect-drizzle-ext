@@ -137,6 +137,16 @@ export default defineConfig({
         command: "vp test run --config vitest.coverage.config.ts --coverage",
         cache: false,
       },
+      // Every package's docgen: compiles AND RUNS each JSDoc `@example`
+      // (see vite.package.ts). A pure graph node, like `check`.
+      docgen: {
+        command: "echo 'docgen: every example compiled and ran'",
+        dependsOn: [
+          "@thomasfosterau/effect-drizzle-ext#docgen",
+          "@thomasfosterau/effect-drizzle-ext-pg#docgen",
+        ],
+        cache: false,
+      },
       // Runs against an EPHEMERAL LOCAL database: the global setup provisions
       // a fresh database on a reachable localhost PostgreSQL server (the
       // `postgres` service container in ci.yml) or, absent one, on a

@@ -29,7 +29,7 @@
  * Depends on Drizzle. The annotation layer ({@link .}) stays free of any
  * versioning opinion — this interpreter is opt-in.
  *
- * @module effect-drizzle-ext/versioned-chain
+ * @module versioned-chain
  */
 
 import { and, eq, getTableName, max } from "drizzle-orm";

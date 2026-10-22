@@ -27,6 +27,9 @@ catalogMode: strict
 catalog:
   "@changesets/changelog-github": ^1.0.1
   "@changesets/cli": ^3.0.3
+  # Compiles AND RUNS every JSDoc `@example` (the `docgen` task); needs `tsx`
+  # and a TypeScript JS API — the TS6 alias below satisfies its peer.
+  "@effect/docgen": ^4.0.5
   "@effect/language-service": ^0.87.5
   # Effect Language Service as a native (TypeScript-Go) binary — the TS7 side
   # of the 6/7 split. `effect-tsgo patch` overwrites the native `tsc` binary
@@ -63,6 +66,8 @@ catalog:
   drizzle-kit: 1.0.0-rc.5-5935859
   effect: 4.0.5
   fallow: 3.34.1
+  # Runs docgen's compiled examples.
+  tsx: ^4.23.15
   # TypeScript 6/7 side-by-side: TS7 (the native Go compiler) ships no JS API
   # until 7.1, so JS-API consumers (@effect/language-service) stay on TS6 while
   # native `tsc` type-checks AND emits this library's `dist/`. The alias keeps

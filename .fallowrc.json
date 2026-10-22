@@ -25,7 +25,7 @@
     "**/vite.config.ts",
     "vitest.coverage.config.ts"
   ],
-  "ignorePatterns": ["**/dist/**", "**/coverage/**"],
+  "ignorePatterns": ["**/dist/**", "**/coverage/**", "**/docs/**"],
   "ignoreDependencies": [
     "@types/node",
     "@effect/tsgo",
@@ -37,7 +37,9 @@
     "vite-plus",
     "@changesets/cli",
     "@vitest/coverage-istanbul",
-    "fallow"
+    "fallow",
+    "@effect/docgen",
+    "tsx"
   ],
   "rules": {
     "unused-files": "error",

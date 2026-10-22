@@ -77,5 +77,8 @@ jobs:
         run: vp run test:integration
       - name: Build
         run: vp run -r build
+      # Type-checks AND runs every JSDoc @example (docgen, runExamples).
+      - name: Verify documentation examples (docgen)
+        run: vp run docgen
       - name: Audit
         run: pnpm audit --audit-level high

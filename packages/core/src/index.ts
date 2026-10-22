@@ -40,7 +40,7 @@
  * field straight to a reader with no cast. `Schema.Top` is strictly narrower, so
  * this widening accepts everything a `Schema.Top` parameter would.
  *
- * @module .
+ * @module index
  */
 
 import * as Arr from "effect/Array";

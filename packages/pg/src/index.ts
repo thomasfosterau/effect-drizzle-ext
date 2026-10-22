@@ -117,9 +117,14 @@ export interface PgDatabase<
  *
  * @example
  * ```ts
+ * import { makePgDatabase } from "@thomasfosterau/effect-drizzle-ext-pg";
+ *
+ * const relations = {}; // the application's drizzle relations graph
  * const database = makePgDatabase({ relations, key: "Database" });
  * export const { Database, CurrentTransaction, transact, readHandle } = database;
  * export type Database = typeof database.Database.Identifier; // "Database"
+ *
+ * console.log(Database.key); // "Database"
  * ```
  */
 export const makePgDatabase = <Relations extends AnyRelations, const Key extends string>(options: {

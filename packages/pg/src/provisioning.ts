@@ -345,6 +345,16 @@ const startContainer = (
  *
  * @example
  * ```ts
+ * // vitest global setup
+ * import * as NodeServices from "@effect/platform-node/NodeServices";
+ * import { provisionTestDatabase } from "@thomasfosterau/effect-drizzle-ext-pg/testing";
+ * import * as Effect from "effect/Effect";
+ * import * as Exit from "effect/Exit";
+ * import * as Redacted from "effect/Redacted";
+ * import * as Scope from "effect/Scope";
+ *
+ * const MIGRATIONS_DIR = "packages/database/migrations";
+ *
  * export default async function setup() {
  *   const scope = Effect.runSync(Scope.make());
  *   const database = await Effect.runPromise(

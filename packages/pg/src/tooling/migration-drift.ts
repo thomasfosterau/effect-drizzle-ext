@@ -560,22 +560,26 @@ export interface MigrationDriftReport {
  *
  * @example
  * ```ts
- * // packages/database/scripts/check-migration-drift.ts
- * import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
+ * // An application's `db:migration-drift` task, run with `NodeRuntime.runMain`.
  * import * as NodeServices from "@effect/platform-node/NodeServices";
- * import * as schema from "../src/schema.ts";
+ * import { checkMigrationDrift, resolveBaseRef } from "@thomasfosterau/effect-drizzle-ext-pg/tooling";
+ * import { integer, pgTable } from "drizzle-orm/pg-core";
+ * import * as Effect from "effect/Effect";
+ * import * as Option from "effect/Option";
+ * import * as path from "node:path";
  *
- * const repoRoot = path.resolve(import.meta.dirname, "../../..");
+ * const schema = { widget: pgTable("widget", { id: integer().primaryKey() }) };
+ * const repoRoot = process.cwd();
  * const base = Option.map(resolveBaseRef(process.env), (ref) => ({
  *   ref,
  *   migrationsPath: "packages/database/migrations",
  *   cwd: repoRoot,
  * }));
- * checkMigrationDrift({
+ * export const program = checkMigrationDrift({
  *   schema,
  *   migrationsDir: path.join(repoRoot, "packages/database/migrations"),
  *   base,
- * }).pipe(Effect.provide(NodeServices.layer), NodeRuntime.runMain);
+ * }).pipe(Effect.provide(NodeServices.layer));
  * ```
  */
 export const checkMigrationDrift = (
