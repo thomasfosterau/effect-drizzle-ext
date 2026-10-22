@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import { getTableConfig, pgTable } from "drizzle-orm/pg-core";
 import type { PgTable } from "drizzle-orm/pg-core";
+import * as Arr from "effect/Array";
 import * as Schema from "effect/Schema";
 import {
   bytea,
@@ -22,12 +23,35 @@ import {
 /** A minimal Effect Schema fixture for {@link jsonbSchema} tests. */
 const Fixture = Schema.Struct({ id: Schema.String, count: Schema.Finite });
 
+/** JSON text of an arbitrary value, the codec's driver-side representation. */
+const Json = Schema.fromJsonString(Schema.Unknown);
+
+/** What a fixture lookup throws when the table has no column of that name. */
+class NoSuchColumn extends Schema.TaggedError<NoSuchColumn>()("NoSuchColumn", {
+  column: Schema.String,
+}) {}
+
 /** Looks up one column by name from a materialised table's DDL config. */
 const columnNamed = (table: PgTable, name: string) => {
   const column = getTableConfig(table).columns.find((c) => c.name === name);
-  if (!column) throw new Error(`no such column: ${name}`);
+  if (!column) throw new NoSuchColumn({ column: name });
   return column;
 };
+
+type Column = ReturnType<typeof columnNamed>;
+
+/**
+ * What the tests hand the codec: JSON text, or an already-parsed object that
+ * may or may not satisfy {@link Fixture}.
+ */
+type DriverInput = string | { readonly id: string; readonly count?: number | string };
+
+/** The codec's decode side; Drizzle types both codec sides `any`. */
+const fromDriver = (column: Column, value: DriverInput): typeof Fixture.Type =>
+  column.mapFromDriverValue(value);
+
+/** The codec's encode side; Drizzle types both codec sides `any`. */
+const toDriver = (column: Column, value: DriverInput): string => column.mapToDriverValue(value);
 
 describe("bytea", () => {
   it("is a bytea column", () => {
@@ -54,11 +78,11 @@ describe("jsonbSchema", () => {
     const column = columnNamed(table, "data");
     const value = { id: "a", count: 3 };
 
-    const driverValue: unknown = (column.mapToDriverValue as (v: unknown) => unknown)(value);
-    expect(typeof driverValue).toBe("string");
-    expect(JSON.parse(driverValue as string)).toEqual(value);
+    const driverValue = toDriver(column, value);
+    expect(driverValue).toBeTypeOf("string");
+    expect(Schema.decodeSync(Json)(driverValue)).toEqual(value);
 
-    const roundTripped = (column.mapFromDriverValue as (v: unknown) => unknown)(driverValue);
+    const roundTripped = fromDriver(column, driverValue);
     expect(roundTripped).toEqual(value);
   });
 
@@ -69,7 +93,7 @@ describe("jsonbSchema", () => {
 
     // node-pg parses jsonb before this codec ever sees it, so `fromDriver`
     // receives the object directly, not the JSON text `toDriver` produced.
-    const decoded = (column.mapFromDriverValue as (v: unknown) => unknown)(value);
+    const decoded = fromDriver(column, value);
     expect(decoded).toEqual(value);
   });
 
@@ -78,7 +102,7 @@ describe("jsonbSchema", () => {
     const column = columnNamed(table, "data");
     const value = { id: "c", count: 9 };
 
-    const decoded = (column.mapFromDriverValue as (v: unknown) => unknown)(JSON.stringify(value));
+    const decoded = fromDriver(column, Schema.encodeSync(Json)(value));
     expect(decoded).toEqual(value);
   });
 
@@ -88,39 +112,33 @@ describe("jsonbSchema", () => {
 
     // Not valid JSON, and not a Fixture either — both the JSON.parse and the
     // schema decode fail, so this exercises the `onNone` fallback path.
-    expect(() =>
-      (column.mapFromDriverValue as (v: unknown) => unknown)("{not valid json"),
-    ).toThrow();
+    expect(() => fromDriver(column, "{not valid json")).toThrow();
   });
 
   it("throws on a value the schema rejects", () => {
     const table = pgTable("widget", { data: jsonbSchema(Fixture)("data") });
     const column = columnNamed(table, "data");
 
-    expect(() =>
-      (column.mapFromDriverValue as (v: unknown) => unknown)({ id: "d" /* missing count */ }),
-    ).toThrow();
+    expect(() => fromDriver(column, { id: "d" /* missing count */ })).toThrow();
   });
 
   it("throws encoding a value the schema rejects", () => {
     const table = pgTable("widget", { data: jsonbSchema(Fixture)("data") });
     const column = columnNamed(table, "data");
 
-    expect(() =>
-      (column.mapToDriverValue as (v: unknown) => unknown)({ id: "e", count: "not a number" }),
-    ).toThrow();
+    expect(() => toDriver(column, { id: "e", count: "not a number" })).toThrow();
   });
 });
 
 describe("timestamps", () => {
   it("emits a NOT NULL timestamptz pair defaulting to now()", () => {
     const table = pgTable("widget", { ...timestamps() });
-    for (const name of ["created_at", "updated_at"]) {
+    Arr.forEach(["created_at", "updated_at"], (name) => {
       const column = columnNamed(table, name);
       expect(column.getSQLType()).toBe("timestamp with time zone");
       expect(column.notNull).toBe(true);
       expect(column.hasDefault).toBe(true);
-    }
+    });
   });
 
   it("mints fresh builders each call — mutating one table's pair leaves another's untouched", () => {

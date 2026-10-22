@@ -12,6 +12,10 @@
  */
 
 import { describe, expect, it } from "vite-plus/test";
+import type { ColumnBuilderBase } from "drizzle-orm";
+import * as Arr from "effect/Array";
+import * as Order from "effect/Order";
+import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
 import {
   boolean,
@@ -48,18 +52,21 @@ const widgetFields = {
 };
 
 /** Materialise a set of derived column builders into a real table to inspect the DDL shape. */
-const columnsOf = (cols: Record<string, unknown>) =>
+const columnsOf = (cols: Readonly<Record<string, ColumnBuilderBase>>) =>
+  // SAFETY: every builder in `builders` is a pg-core builder, so each derived
+  // `ColumnBuilderBase` is a pg column builder at runtime; the derivation's
+  // return type is the dialect-neutral base, which `pgTable` does not accept.
   getTableConfig(pgTable("widget", cols as never)).columns;
 
 describe("makeDeriveColumns.fromFields", () => {
   it("derives one builder per annotated field, dropping plain ones", () => {
     const derived = makeDeriveColumns(builders).fromFields(widgetFields);
-    expect(Object.keys(derived).sort()).toEqual(["active", "name", "size"]);
+    expect(Arr.sort(R.keys(derived), Order.String)).toEqual(["active", "name", "size"]);
   });
 
   it("applies notNull and default from the annotation", () => {
     const derived = makeDeriveColumns(builders).fromFields(widgetFields);
-    const byName = Object.fromEntries(columnsOf(derived).map((c) => [c.name, c]));
+    const byName = R.fromEntries(columnsOf(derived).map((c) => [c.name, c]));
     expect(byName.name.notNull).toBe(true);
     expect(byName.size.notNull).toBe(false);
     expect(byName.size.hasDefault).toBe(true);
@@ -92,6 +99,8 @@ describe("makeDeriveColumns.fromFields", () => {
       },
     });
     expect(columnsOf(derive.fromFields(fkFields)).map((c) => c.name)).toContain("owner_id");
+    // SAFETY: `uuid` in `builders` is pg-core's, so the derived builder is a pg
+    // column builder at runtime behind the dialect-neutral return type.
     const config = getTableConfig(pgTable("gadget", derive.fromFields(fkFields) as never));
     expect(config.foreignKeys.length).toBe(1);
     expect(config.foreignKeys[0].onDelete).toBe("cascade");
@@ -119,13 +128,10 @@ describe("makeDeriveColumns.fromFields", () => {
       }),
     };
     expect(() => makeDeriveColumns(builders).fromFields(fkFields)).toThrow(/no resolveReference/);
-    try {
-      makeDeriveColumns(builders).fromFields(fkFields);
-      expect.unreachable("should have thrown");
-    } catch (error) {
-      expect(error).toBeInstanceOf(DerivationError);
-      expect((error as DerivationError)._tag).toBe("DerivationError");
-    }
+    expect(() => makeDeriveColumns(builders).fromFields(fkFields)).toThrow(DerivationError);
+    expect(() => makeDeriveColumns(builders).fromFields(fkFields)).toThrow(
+      expect.objectContaining({ _tag: "DerivationError" }),
+    );
   });
 });
 
@@ -187,6 +193,8 @@ describe("deriveFieldCheckConstraints", () => {
   /** Materialise the derived checks by building a real table around them. */
   const checksOf = () => {
     const derive = makeDeriveColumns(builders);
+    // SAFETY: the builders are pg-core's and the checks are pg-core `check`s;
+    // both derivations return dialect-neutral types `pgTable` does not accept.
     const table = pgTable(
       "bounded_widget",
       derive.fromFields(boundedFields) as never,
@@ -235,6 +243,8 @@ describe("deriveCheckConstraintsFrom", () => {
   });
 
   it("renders an exclusive-minimum-only bound as a bare comparison named min", () => {
+    // SAFETY: the derived checks are pg-core `check`s behind a dialect-neutral
+    // return type `pgTable`'s extra-config parameter does not accept.
     const table = pgTable(
       "gauge",
       { reading: integer("reading").notNull() },

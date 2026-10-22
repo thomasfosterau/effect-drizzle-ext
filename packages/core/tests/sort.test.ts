@@ -30,7 +30,7 @@ import {
   vector,
 } from "drizzle-orm/pg-core";
 import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
+import * as R from "effect/Record";
 import { describe, expect, it } from "vite-plus/test";
 import {
   chronologicalOrder,
@@ -42,6 +42,7 @@ import {
   UnsupportedSortError,
 } from "../src/sort.ts";
 import { makeCurrentVersionView } from "../src/versioned-chain.ts";
+import { runSync } from "./harness.ts";
 
 // ── fixture: a two-level chain and its current-version view ──────────────
 
@@ -124,14 +125,12 @@ const orderClause = (order: ReadonlyArray<OrderTerm>): string => {
 
 /** Resolve then render, the way a list operation does. */
 const orderByFor = (options: Omit<ResolveSortOrderOptions, "view">): string =>
-  orderClause(Effect.runSync(resolveSortOrder({ view: postView, ...options })));
+  orderClause(runSync(resolveSortOrder({ view: postView, ...options })));
 
 /** Resolve and return the failure, if any. */
-const failureOf = (options: Omit<ResolveSortOrderOptions, "view">): UnsupportedSortError => {
-  const exit = Effect.runSyncExit(Effect.flip(resolveSortOrder({ view: postView, ...options })));
-  if (Exit.isFailure(exit)) throw new Error("resolveSortOrder unexpectedly succeeded");
-  return exit.value;
-};
+const failureOf = (options: Omit<ResolveSortOrderOptions, "view">): UnsupportedSortError =>
+  // `flip` turns an unexpected success into the failure `runSync` throws.
+  runSync(Effect.flip(resolveSortOrder({ view: postView, ...options })));
 
 const keys = (...fields: string[]): ReadonlyArray<SortKey> =>
   fields.map((field) =>
@@ -146,7 +145,7 @@ describe("sortableColumnsFor", () => {
   const sortable = sortableColumnsFor(postView);
 
   it("publishes the view's own scalar columns under their keys", () => {
-    expect(Object.keys(sortable)).toEqual(
+    expect(R.keys(sortable)).toEqual(
       expect.arrayContaining(["id", "name", "description", "publishedAt", "draft", "slug"]),
     );
   });
@@ -154,7 +153,7 @@ describe("sortableColumnsFor", () => {
   it("publishes `createdAt` and `updatedAt`", () => {
     // `createdAt` is the view's `SQL.Aliased` birth-row timestamp; `updatedAt`
     // is the current version's `timestamp` under its resource-facing name.
-    expect(Object.keys(sortable)).toEqual(expect.arrayContaining(["createdAt", "updatedAt"]));
+    expect(R.keys(sortable)).toEqual(expect.arrayContaining(["createdAt", "updatedAt"]));
   });
 
   it("withholds the version-chain internals", () => {
@@ -173,7 +172,7 @@ describe("sortableColumnsFor", () => {
   });
 
   it("derives exactly the scalar set of a view without an aliased merge", () => {
-    expect(Object.keys(sortableColumnsFor(plainView)).toSorted()).toEqual([
+    expect(R.keys(sortableColumnsFor(plainView)).toSorted()).toEqual([
       "draft",
       "id",
       "slug",
@@ -270,7 +269,7 @@ describe("resolveSortOrder with a client sort", () => {
   });
 
   it("keeps the page window bounded — sorting never removes the LIMIT", () => {
-    const order = Effect.runSync(resolveSortOrder({ view: postView, sort: keys("-publishedAt") }));
+    const order = runSync(resolveSortOrder({ view: postView, sort: keys("-publishedAt") }));
     const query = db
       .select({ id: postView.id })
       .from(postView)
@@ -327,7 +326,7 @@ describe("resolveSortOrder rejects what a resource does not expose", () => {
 
 describe("chronologicalOrder", () => {
   const render = (options: Omit<Parameters<typeof chronologicalOrder>[0], "view">): string =>
-    orderClause(Effect.runSync(chronologicalOrder({ view: postView, ...options })));
+    orderClause(runSync(chronologicalOrder({ view: postView, ...options })));
 
   it("defaults to newest first with a mirrored tiebreak", () => {
     expect(render({})).toBe(`order by "post_view"."timestamp" desc, "post_view"."id" desc`);

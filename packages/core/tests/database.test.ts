@@ -31,6 +31,7 @@ import {
   type ReadSurface,
   type TransactionalDatabase,
 } from "../src/database.ts";
+import { runPromise } from "./harness.ts";
 
 /**
  * A sentinel transaction handle: every read member reports the handle's label,
@@ -166,11 +167,11 @@ describe("makeDatabaseServices", () => {
 
 describe("readHandle (#1883)", () => {
   it("returns the ambient transaction when one is open", async () => {
-    expect(await Effect.runPromise(provideOpenTransaction(readHandle, TX_HANDLE))).toBe(TX_HANDLE);
+    expect(await runPromise(provideOpenTransaction(readHandle, TX_HANDLE))).toBe(TX_HANDLE);
   });
 
   it("falls back to the Database client when no transaction is open", async () => {
-    expect(await Effect.runPromise(provideDatabase(readHandle))).toBe(DB_HANDLE);
+    expect(await runPromise(provideDatabase(readHandle))).toBe(DB_HANDLE);
   });
 
   it("does not require CurrentTransaction to run — the fallback is total", async () => {
@@ -178,25 +179,25 @@ describe("readHandle (#1883)", () => {
     // is a `None`, not a defect. If this ever throws, the resolver has started
     // yielding the key directly and every read-path caller has silently gained
     // a "must be inside a transaction" requirement.
-    await expect(Effect.runPromise(provideDatabase(readHandle))).resolves.toBe(DB_HANDLE);
+    await expect(runPromise(provideDatabase(readHandle))).resolves.toBe(DB_HANDLE);
   });
 
   it("narrows to the read surface without losing the handle's own signatures", async () => {
-    const handle = await Effect.runPromise(provideOpenTransaction(readHandle, TX_HANDLE));
+    const handle = await runPromise(provideOpenTransaction(readHandle, TX_HANDLE));
     expect(handle.select()).toBe("transaction");
     expect(handle.$count()).toBe("transaction".length);
   });
 
   it("opens nothing — a read has no boundary to lose", async () => {
-    await Effect.runPromise(provideOpenTransaction(readHandle, TX_HANDLE));
-    await Effect.runPromise(provideDatabase(readHandle));
+    await runPromise(provideOpenTransaction(readHandle, TX_HANDLE));
+    await runPromise(provideDatabase(readHandle));
     expect(opened).toHaveLength(0);
   });
 });
 
 describe("transact (#1883)", () => {
   it("opens on the Database client and provides the new handle as CurrentTransaction", async () => {
-    const seen = await Effect.runPromise(provideDatabase(transact(CurrentTransaction)));
+    const seen = await runPromise(provideDatabase(transact(CurrentTransaction)));
 
     expect(opened).toHaveLength(1);
     expect(opened[0]?.on).toBe("database");
@@ -210,7 +211,7 @@ describe("transact (#1883)", () => {
     // condition 3). That the nested boundary is opened on the ambient handle
     // rather than on the client is what makes it nest on a driver that does
     // not pin the open connection to the fiber.
-    const [outer, inner] = await Effect.runPromise(
+    const [outer, inner] = await runPromise(
       provideDatabase(
         transact(
           Effect.gen(function* () {
@@ -230,7 +231,7 @@ describe("transact (#1883)", () => {
   });
 
   it("restores the outer handle once the inner boundary closes", async () => {
-    const restored = await Effect.runPromise(
+    const restored = await runPromise(
       provideDatabase(
         transact(
           Effect.gen(function* () {
@@ -249,9 +250,7 @@ describe("transact (#1883)", () => {
     // The ambient transaction need not have come from `transact` — a driver's
     // own `db.transaction` callback, or a test harness that opens one and
     // provides it, is the same case.
-    const seen = await Effect.runPromise(
-      provideOpenTransaction(transact(CurrentTransaction), TX_HANDLE),
-    );
+    const seen = await runPromise(provideOpenTransaction(transact(CurrentTransaction), TX_HANDLE));
 
     expect(opened).toHaveLength(1);
     expect(opened[0]?.on).toBe("transaction");

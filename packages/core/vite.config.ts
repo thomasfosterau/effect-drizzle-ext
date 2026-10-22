@@ -1,4 +1,4 @@
-import { defineConfig } from "vite-plus";
+import { defineConfig, type TestUserConfig } from "vite-plus";
 import { packageTasks } from "../../vite.package.ts";
 
 /**
@@ -33,21 +33,24 @@ const cacheInputs = [
   { pattern: "pnpm-lock.yaml", base: "workspace" as const },
 ];
 
+/** The unit-test config: this package's tests, timeout and coverage gate. */
+const test: TestUserConfig = {
+  include: ["tests/**/*.test.ts"],
+  testTimeout: 30_000,
+  coverage: {
+    provider: "istanbul",
+    reporter: ["text-summary", "json-summary"],
+    reportsDirectory: "./coverage",
+    include: ["src/**/*.ts"],
+    exclude: ["**/*.d.ts"],
+    thresholds: { statements: 90, branches: 85, functions: 90, lines: 90 },
+  },
+};
+// `VITEST_MAX_WORKERS` caps the worker pool only when set; unset, the key stays
+// absent and Vitest picks its own default.
+if (process.env.VITEST_MAX_WORKERS) test.maxWorkers = Number(process.env.VITEST_MAX_WORKERS);
+
 export default defineConfig({
   run: { tasks: packageTasks(cacheInputs) },
-  test: {
-    include: ["tests/**/*.test.ts"],
-    testTimeout: 30_000,
-    ...(process.env.VITEST_MAX_WORKERS
-      ? { maxWorkers: Number(process.env.VITEST_MAX_WORKERS) }
-      : {}),
-    coverage: {
-      provider: "istanbul",
-      reporter: ["text-summary", "json-summary"],
-      reportsDirectory: "./coverage",
-      include: ["src/**/*.ts"],
-      exclude: ["**/*.d.ts"],
-      thresholds: { statements: 90, branches: 85, functions: 90, lines: 90 },
-    },
-  },
+  test,
 });
