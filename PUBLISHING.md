@@ -10,7 +10,7 @@ Releases are automated with [Changesets](https://github.com/changesets/changeset
 
 `RELEASE_DRY_RUN=1 pnpm run release` exercises the pack and publish steps locally without writing to the registry.
 
-The job installs with `pnpm install --frozen-lockfile --ignore-scripts` and sets `pnpm_config_verify_deps_before_run: "false"`, so no dependency's install script runs while the job holds `id-token: write`. The build doesn't need the root `prepare` step: the unpatched native `tsc` emits the same `dist/` (the Effect patch only adds diagnostics).
+The job installs with `pnpm install --frozen-lockfile --ignore-scripts` and sets `pnpm_config_verify_deps_before_run: "false"`, so no dependency's install script runs while the job holds `id-token: write`. The build doesn't need the root `prepare` step: `vp pack` builds the same `dist/` with the unpatched native compiler (the Effect patch only adds diagnostics).
 
 ## Maintainer setup (owner, one-time)
 
