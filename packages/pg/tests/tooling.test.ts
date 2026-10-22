@@ -14,11 +14,13 @@ import { eq } from "drizzle-orm";
 import { text, uuid } from "drizzle-orm/pg-core";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
+import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
+import * as Schema from "effect/Schema";
 import { ChildProcess } from "effect/process";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
-import { describe, expect, it } from "vite-plus/test";
+import { afterAll, assert, describe, expect, it } from "vite-plus/test";
 import * as fixtureSchema from "./fixtures/schema.ts";
 import {
   checkBaseAncestry,
@@ -39,9 +41,13 @@ import {
 
 const FIXTURE_MIGRATIONS = `${import.meta.dirname}/fixtures/migrations`;
 
+/** The suite's runtime: the Node file system, path and child-process services. */
+const runtime = ManagedRuntime.make(NodeServices.layer);
+afterAll(() => runtime.dispose());
+
 const run = <A, E>(
   effect: Effect.Effect<A, E, FileSystem.FileSystem | Path.Path | ChildProcessSpawner>,
-): Promise<A> => Effect.runPromise(effect.pipe(Effect.provide(NodeServices.layer)));
+): Promise<A> => runtime.runPromise(effect);
 
 const entry = (dir: string, id: string, ...prevIds: string[]): SnapshotEntry => ({
   dir,
@@ -98,7 +104,7 @@ describe("checkMigrationDrift", () => {
           yield* fs.makeDirectory(fork);
           yield* fs.writeFileString(
             path.join(fork, "snapshot.json"),
-            JSON.stringify({
+            yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({
               version: "8",
               dialect: "postgres",
               id: "11111111-1111-4111-8111-111111111111",
@@ -255,7 +261,7 @@ describe("readBaseMigrations", () => {
 
 describe("checkViewDependencies", () => {
   it("passes on the fixture schema's one view", async () => {
-    expect(await Effect.runPromise(checkViewDependencies({ schema: fixtureSchema }))).toEqual({
+    expect(await run(checkViewDependencies({ schema: fixtureSchema }))).toEqual({
       viewCount: 1,
     });
   });
@@ -274,7 +280,7 @@ describe("checkViewDependencies", () => {
             .innerJoin(widget, eq(widget.id, widgetView.id)),
         ),
     };
-    const error = await Effect.runPromise(Effect.flip(checkViewDependencies({ schema: layered })));
+    const error = await run(Effect.flip(checkViewDependencies({ schema: layered })));
     expect(error).toBeInstanceOf(ViewDependencyError);
     if (!(error instanceof ViewDependencyError)) throw error;
     expect(error.edges).toEqual([{ from: "fixture.labelled_view", to: "fixture.widget_view" }]);
@@ -300,7 +306,7 @@ describe("view definition parsing", () => {
 
   it("matches quoted and bare qualified references, never an unqualified alias", () => {
     const [a, b, c] = views;
-    if (a === undefined || b === undefined || c === undefined) throw new Error("three views");
+    assert(a !== undefined && b !== undefined && c !== undefined, "three views");
     expect(referencesView(b, a)).toBe(true);
     expect(referencesView(c, a)).toBe(false);
     expect(referencesView(a, a)).toBe(false);

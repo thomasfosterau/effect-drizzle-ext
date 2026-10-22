@@ -157,6 +157,12 @@ const findDanglingParents = (
   );
 };
 
+/** What {@link traverse} found: every id reached, and the first cycle (as directory labels). */
+interface Traversal {
+  readonly reachable: ReadonlySet<string>;
+  readonly cycle: Option.Option<ReadonlyArray<string>>;
+}
+
 /**
  * DFS from `starts` backward through `prevIds`, three-state (visiting /
  * done) so a back-edge (a cycle) is told apart from ordinary convergence.
@@ -165,10 +171,7 @@ const findDanglingParents = (
 const traverse = (
   starts: ReadonlyArray<SnapshotEntry>,
   entries: ReadonlyArray<SnapshotEntry>,
-): {
-  readonly reachable: ReadonlySet<string>;
-  readonly cycle: Option.Option<ReadonlyArray<string>>;
-} => {
+): Traversal => {
   // oxlint-disable-next-line effect/avoid-native-object-helpers -- an id → entry index built once for the walk; never escapes
   const byId = new Map(entries.map((entry) => [entry.snapshot.id, entry]));
   // oxlint-disable-next-line effect/avoid-native-object-helpers -- the DFS colouring, shared across successive starts so a node left `done` stays done
@@ -328,7 +331,17 @@ export const resolveBaseRef = (env: BaseRefEnvironment): Option.Option<string> =
 /** A migration directory name: drizzle-kit's all-digit prefix and a slug. */
 const MIGRATION_DIR = /^\d+_/;
 
-const parseSnapshot = (file: string, text: string): Effect.Effect<unknown, MalformedSnapshot> =>
+/**
+ * A parsed `snapshot.json`, checked (not decoded) against
+ * {@link SnapshotIdentity}: the value is the whole parsed document, every
+ * member drizzle-kit reads included, so it can be handed on unchanged.
+ */
+type ParsedSnapshot = typeof SnapshotIdentity.Type;
+
+const parseSnapshot = (
+  file: string,
+  text: string,
+): Effect.Effect<ParsedSnapshot, MalformedSnapshot> =>
   Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(text).pipe(
     Effect.filterOrFail(Schema.is(SnapshotIdentity), (raw) => raw),
     Effect.mapError((cause) => new MalformedSnapshot({ file, cause })),
@@ -339,11 +352,11 @@ interface ReadSnapshot extends SnapshotEntry {
   readonly raw: unknown;
 }
 
-const toEntry = (dir: string, raw: unknown): ReadSnapshot => {
-  // SAFETY: `parseSnapshot` has checked `raw` against `SnapshotIdentity`.
-  const identity = raw as typeof SnapshotIdentity.Type;
-  return { dir, raw, snapshot: { id: identity.id, prevIds: identity.prevIds ?? [] } };
-};
+const toEntry = (dir: string, raw: ParsedSnapshot): ReadSnapshot => ({
+  dir,
+  raw,
+  snapshot: { id: raw.id, prevIds: raw.prevIds ?? [] },
+});
 
 /**
  * Every migration directory under `migrationsDir` (sorted by name) and the
@@ -410,19 +423,16 @@ const findBaseHead = (
   base: GitBase,
   dirs: ReadonlyArray<string>,
 ): Effect.Effect<Option.Option<SnapshotEntry>, never, ChildProcessSpawner> =>
-  Effect.gen(function* () {
-    // oxlint-disable-next-line effect/imperative-loops -- newest first, stopping at the first readable snapshot: one `git show` per directory until then, not one per directory
-    for (const dir of dirs.toReversed()) {
-      const raw = yield* Effect.option(
-        Effect.flatMap(
-          git(base, ["show", `${base.ref}:${base.migrationsPath}/${dir}/snapshot.json`]),
-          (text) => parseSnapshot(dir, text),
-        ),
-      );
-      if (Option.isSome(raw)) return Option.some<SnapshotEntry>(toEntry(dir, raw.value));
-    }
-    return Option.none<SnapshotEntry>();
-  });
+  // Newest first, stopping at the first readable snapshot: one `git show` per
+  // directory until then, not one per directory.
+  Effect.findFirstFilter(dirs.toReversed(), (dir) =>
+    Effect.result(
+      Effect.flatMap(
+        git(base, ["show", `${base.ref}:${base.migrationsPath}/${dir}/snapshot.json`]),
+        (text) => Effect.map(parseSnapshot(dir, text), (raw): SnapshotEntry => toEntry(dir, raw)),
+      ),
+    ),
+  );
 
 /**
  * The base branch's migration state, read with `git ls-tree` / `git show` so
@@ -470,7 +480,7 @@ const isAmbiguousDiff = (cause: unknown): boolean =>
   Predicate.isError(cause) && cause.message.includes("was called without a HintsHandler");
 
 const checkZeroDrift = (
-  schema: Record<string, unknown>,
+  schema: MigrationDriftOptions["schema"],
   latest: Option.Option<ReadSnapshot>,
   label: string,
 ): Effect.Effect<ReadonlyArray<string>, SchemaDiffError> =>
@@ -525,6 +535,7 @@ const checkZeroDrift = (
 /** The inputs {@link checkMigrationDrift} takes. */
 export interface MigrationDriftOptions {
   /** The schema module (`import * as schema from "./schema.ts"`), as drizzle-kit's `generateDrizzleJson` takes it. */
+  // oxlint-disable-next-line effect/no-unsafe-dictionary-type -- drizzle-kit's boundary: `generateDrizzleJson(imports: Record<string, unknown>)` takes a module namespace of arbitrary exports, which it sorts itself; this is that parameter, forwarded unchanged
   readonly schema: Record<string, unknown>;
   /** The committed drizzle-kit migrations directory. */
   readonly migrationsDir: string;

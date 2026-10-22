@@ -25,8 +25,9 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
 import * as Redacted from "effect/Redacted";
-import { describe, expect, it } from "vite-plus/test";
+import { assert, describe, expect, it } from "vite-plus/test";
 import { makePgDatabase } from "../../src/index.ts";
 import { makeTestTransaction, testDatabaseLayer } from "../../src/testing.ts";
 
@@ -70,14 +71,17 @@ const classifyRejection = Effect.fn("errors.classifyRejection")(function* (state
     Effect.flatMap(CurrentTransaction, (tx) => tx.execute(sql.raw(statement))),
   );
   expect(Exit.isFailure(attempt)).toBe(true);
-  if (!Exit.isFailure(attempt)) throw new Error("unreachable: the statement should have failed");
+  assert(Exit.isFailure(attempt), "unreachable: the statement should have failed");
   return classifyError(attempt.cause);
 });
 
 /** Unwrap a classification the spec has just asserted is present. */
 const classified = <A>(option: Option.Option<A>): A => {
   expect(Option.isSome(option)).toBe(true);
-  return Option.getOrThrow(option);
+  return Option.match(option, {
+    onNone: () => expect.unreachable("expected a classification"),
+    onSome: (value) => value,
+  });
 };
 
 describe("classifyError against the live driver", () => {
@@ -93,7 +97,7 @@ describe("classifyError against the live driver", () => {
         );
         expect(violation._tag).toBe("UniqueViolation");
         expect(violation).toMatchObject({ _tag: "UniqueViolation" });
-        if (violation._tag !== "UniqueViolation") return;
+        if (!Predicate.isTagged(violation, "UniqueViolation")) return;
         expect(violation.constraint).toEqual(Option.some("edx_child_slug_key"));
         expect(violation.table).toEqual(Option.some("edx_child"));
         expect(Option.isSome(violation.detail)).toBe(true);
@@ -112,7 +116,7 @@ describe("classifyError against the live driver", () => {
           ),
         );
         expect(violation._tag).toBe("ForeignKeyViolation");
-        if (violation._tag !== "ForeignKeyViolation") return;
+        if (!Predicate.isTagged(violation, "ForeignKeyViolation")) return;
         expect(violation.constraint).toEqual(Option.some("edx_child_parent_fkey"));
         expect(violation.table).toEqual(Option.some("edx_child"));
         expect(Option.isSome(violation.detail)).toBe(true);
@@ -131,7 +135,7 @@ describe("classifyError against the live driver", () => {
           ),
         );
         expect(violation._tag).toBe("NotNullViolation");
-        if (violation._tag !== "NotNullViolation") return;
+        if (!Predicate.isTagged(violation, "NotNullViolation")) return;
         expect(violation.column).toEqual(Option.some("slug"));
         expect(violation.table).toEqual(Option.some("edx_child"));
       }),
@@ -149,7 +153,7 @@ describe("classifyError against the live driver", () => {
           ),
         );
         expect(violation._tag).toBe("CheckViolation");
-        if (violation._tag !== "CheckViolation") return;
+        if (!Predicate.isTagged(violation, "CheckViolation")) return;
         expect(violation.constraint).toEqual(Option.some("edx_child_score_positive"));
         expect(violation.table).toEqual(Option.some("edx_child"));
       }),

@@ -48,6 +48,7 @@ import * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
 import * as Schema from "effect/Schema";
 import { SqlClient } from "effect/sql/SqlClient";
+import * as Str from "effect/String";
 
 /** drizzle-kit's statement separator inside a `migration.sql`. */
 export const STATEMENT_BREAKPOINT = "--> statement-breakpoint";
@@ -82,7 +83,7 @@ export const splitStatements = (sql: string): ReadonlyArray<string> =>
   sql
     .split(STATEMENT_BREAKPOINT)
     .map((statement) => statement.trim())
-    .filter((statement) => statement.length > 0);
+    .filter(Str.isNonEmpty);
 
 /**
  * Every migration under `dir`, in apply order (directory-name order). Only

@@ -53,7 +53,7 @@ describe("makePgDatabase", () => {
 
   it("carries the driver-agnostic surface through unchanged", () => {
     const database = makePgDatabase({ relations, key: "UnitDb" });
-    expect(typeof database.transact).toBe("function");
+    expect(database.transact).toBeTypeOf("function");
     expect(Effect.isEffect(database.readHandle)).toBe(true);
   });
 

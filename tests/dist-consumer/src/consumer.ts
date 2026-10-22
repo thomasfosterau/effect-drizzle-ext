@@ -173,24 +173,33 @@ export const roundTrip: Uint8Array = hexToBytea(byteaToHex(new Uint8Array([1, 2]
 
 // oxlint-disable-next-line effect/prefer-option-over-null -- `combineFilters` yields the `SQL | undefined` Drizzle's `.where()` reads
 export const where: SQL | undefined = combineFilters(sql`1 = 1`, undefined);
+// SAFETY: a type-level fixture — only the `Page` type `pageOf` infers from a
+// `BookRow` is asserted; no member of the row is read for its value.
 export const page = pageOf([{ ...({} as BookRow), [`__totalCount`]: 3 }], (row) => row.title);
 export const total = totalCountColumn;
 const pagination = boundedPagination({ maxLimit: 100, defaultLimit: 20 });
 export const rows = executeRows<{ readonly one: number }>(
-  { execute: () => Effect.succeed([{ one: 1 }] as unknown) },
+  { execute: () => Effect.succeed([{ one: 1 }]) },
   sql`select 1 as one`,
 );
 
 // ── errors ────────────────────────────────────────────────────────────────
 
-export const classified: Option.Option<ClassifiedError> = classifyError(new Error("x"));
-export const facts = findPgError(new Error("x"));
+/** An arbitrary failure value for the classifiers, which accept any. */
+class ProbeError extends Schema.TaggedError<ProbeError>()("ProbeError", {
+  message: Schema.String,
+}) {}
+
+export const classified: Option.Option<ClassifiedError> = classifyError(
+  new ProbeError({ message: "x" }),
+);
+export const facts = findPgError(new ProbeError({ message: "x" }));
 export const recovered = Effect.fail(
   new UniqueViolation({
     constraint: Option.some("book_pkey"),
     table: Option.none(),
     detail: Option.none(),
-    cause: new Error("dup"),
+    cause: new ProbeError({ message: "dup" }),
   }),
 ).pipe(catchUniqueViolation((violation) => Effect.succeed(violation.constraint)));
 
@@ -302,7 +311,9 @@ export const pinged: Layer.Layer<PgClient.PgClient, SqlError> = Pg.pgClientFromU
 });
 const testTransaction = PgTesting.makeTestTransaction(appDatabase);
 export const savepointed = testTransaction.attemptInSavepoint(Effect.succeed(1));
-export const retryable: boolean = PgTesting.isRetryableConnectFailure(new Error("x"));
+export const retryable: boolean = PgTesting.isRetryableConnectFailure(
+  new ProbeError({ message: "x" }),
+);
 export const testLayer: Layer.Layer<"AppDb", SqlError> = PgTesting.testDatabaseLayer(appDatabase, {
   url: Redacted.make("postgresql://postgres@127.0.0.1:5432/test"),
 });

@@ -2,10 +2,12 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as PgClient from "@effect/sql-pg/PgClient";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
+import * as Layer from "effect/Layer";
+import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Path from "effect/Path";
 import * as Redacted from "effect/Redacted";
 import type { SqlClient } from "effect/sql/SqlClient";
-import { describe, expect, it } from "vite-plus/test";
+import { afterAll, describe, expect, it } from "vite-plus/test";
 import { applyMigrations, MigrationError } from "../../src/migrations.ts";
 
 /**
@@ -16,15 +18,15 @@ import { applyMigrations, MigrationError } from "../../src/migrations.ts";
  */
 const url = Redacted.make(process.env.DATABASE_URL_TEST ?? "");
 
+/** The suite's runtime: one single-connection pool on `DATABASE_URL_TEST`, plus the Node services. */
+const runtime = ManagedRuntime.make(
+  Layer.merge(PgClient.layer({ url, maxConnections: 1 }), NodeServices.layer),
+);
+afterAll(() => runtime.dispose());
+
 const run = <A, E>(
   effect: Effect.Effect<A, E, PgClient.PgClient | SqlClient | FileSystem.FileSystem | Path.Path>,
-): Promise<A> =>
-  Effect.runPromise(
-    effect.pipe(
-      Effect.provide(PgClient.layer({ url, maxConnections: 1 })),
-      Effect.provide(NodeServices.layer),
-    ),
-  );
+): Promise<A> => runtime.runPromise(effect);
 
 describe("provisioning", () => {
   it("answers a query on DATABASE_URL_TEST", async () => {

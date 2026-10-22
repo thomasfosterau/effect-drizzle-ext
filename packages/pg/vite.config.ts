@@ -24,6 +24,18 @@ const cacheInputs = [
   { pattern: "pnpm-lock.yaml", base: "workspace" as const },
 ];
 
+/**
+ * `maxWorkers` from `VITEST_MAX_WORKERS` when it is set (and non-empty), and
+ * no `maxWorkers` key at all otherwise, so vitest's own default stands.
+ */
+interface WorkerLimit {
+  maxWorkers?: number;
+}
+const workerLimit: WorkerLimit = {};
+if (process.env.VITEST_MAX_WORKERS) {
+  workerLimit.maxWorkers = Number(process.env.VITEST_MAX_WORKERS);
+}
+
 export default defineConfig({
   run: { tasks: packageTasks(cacheInputs) },
   test: {
@@ -35,9 +47,7 @@ export default defineConfig({
     // they would run with no provisioned database and no global setup.
     exclude: ["**/node_modules/**", "**/dist/**", "tests/integration/**"],
     testTimeout: 30_000,
-    ...(process.env.VITEST_MAX_WORKERS
-      ? { maxWorkers: Number(process.env.VITEST_MAX_WORKERS) }
-      : {}),
+    ...workerLimit,
     coverage: {
       provider: "istanbul",
       reporter: ["text-summary", "json-summary"],
