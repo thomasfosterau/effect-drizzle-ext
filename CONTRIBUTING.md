@@ -20,16 +20,7 @@ Hooks are managed by Vite+; the editable [.vite-hooks/pre-commit](.vite-hooks/pr
 
 ## Fallow baseline
 
-[fallow-baselines/dead-code.json](fallow-baselines/dead-code.json) lists the dead-code findings already on `trunk` (the `message` getters on the pg package's tagged errors, which fallow reports as unused class members, and the dist-consumer's imports of the two packages, which it reports as unlisted dependencies; effect-drizzle-ext#65 tracks fixing them at the source). `.fallowrc.json` points `audit.deadCodeBaseline` at it, so `fallow audit` stops reporting those findings in files a change touches. A finding that is not in the file still counts. Health and duplication have no findings on `trunk`, so they have no baseline.
-
-The file only shrinks. After fixing a listed finding, regenerate it from a tree without built `dist/` output and without fallow's cache, and commit the result. The two dist-consumer entries only appear while `packages/*/dist` is absent (its tsconfig `paths` point at `dist/*.d.ts`), and the `.fallow/` cache can return a result from an earlier tree:
-
-```sh
-rm -rf packages/*/dist .fallow
-vp exec fallow dead-code --format json --quiet --no-cache --save-baseline fallow-baselines/dead-code.json
-```
-
-The command exits 1 while any error-severity finding remains, and writes the file anyway. Never regenerate it to absorb a finding your change introduces: fix the finding instead.
+There is none. `fallow dead-code`, health and duplication report no findings on `trunk`, so `fallow audit` compares a change against an empty set: fix a finding your change introduces rather than adding a baseline to absorb it. (The `message` getters on the pg package's tagged errors and the dist-consumer's imports of the two packages, which an earlier baseline carried, stopped being reported with fallow 3.34.1; effect-drizzle-ext#65.)
 
 ## Pre-PR checklist
 
