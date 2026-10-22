@@ -11,7 +11,9 @@
  */
 
 import { describe, expect, it } from "vite-plus/test";
+import * as Arr from "effect/Array";
 import * as Option from "effect/Option";
+import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
 import {
   type ColumnBounds,
@@ -29,6 +31,11 @@ import {
   readDbTable,
   type UnwrapColumn,
 } from "../src/index.ts";
+
+/** What a hostile `toJsonSchema` hook throws: the walker must swallow it. */
+class WalkerContextError extends Schema.TaggedError<WalkerContextError>()("WalkerContextError", {
+  message: Schema.String,
+}) {}
 
 type PgKind = "text" | "integer" | "boolean";
 const pinned = dbColumnFor<PgKind>();
@@ -144,11 +151,13 @@ describe("dbTable annotation", () => {
   it("attaches the metadata non-enumerably", () => {
     const target = { kind: "plain" };
     dbTable(target, { name: "gadget" });
-    expect(Object.keys(target)).toEqual(["kind"]);
+    expect(R.keys(target)).toEqual(["kind"]);
     expect(Object.getOwnPropertySymbols(target)).toEqual([
       Symbol.for("effect-drizzle-ext/dbTable"),
     ]);
-    expect(JSON.stringify(target)).toBe('{"kind":"plain"}');
+    expect(Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(target)).toBe(
+      '{"kind":"plain"}',
+    );
   });
 
   it("accepts the bare TableMeta a flat consumer needs (no level)", () => {
@@ -206,10 +215,12 @@ describe("numericBounds", () => {
       Schema.isGreaterThanOrEqualTo(0),
       Schema.isLessThanOrEqualTo(10, {
         toJsonSchema: () => {
-          throw new Error("this filter needs a CheckInput the walker cannot give");
+          throw new WalkerContextError({
+            message: "this filter needs a CheckInput the walker cannot give",
+          });
         },
       }),
-      // A filter whose compiler yields no fragment at all. Cast because
+      // SAFETY: a filter whose compiler yields no fragment at all. Cast because
       // effect's own `ToJsonSchema.Check` promises an object; the walker
       // guards against `null` because an annotation is foreign data, not
       // because the type admits it.
@@ -264,12 +275,12 @@ describe("fieldColumns", () => {
   it("gives up on a column buried deeper than the wrapper-depth cap", () => {
     // Slack above the deepest supported shape (`optional(NullOr(annotated))`,
     // three peels); past the cap the field drops rather than spinning the walk.
-    let deep: Schema.Constraint = dbColumn(Schema.String, {
+    const column: Schema.Top = dbColumn(Schema.String, {
       column: "deep",
       pg: "text",
       notNull: false,
     });
-    for (let i = 0; i < 10; i += 1) deep = Schema.NullOr(deep as Schema.Top);
+    const deep = Arr.reduce(Arr.range(1, 10), column, (wrapped) => Schema.NullOr(wrapped));
     expect(fieldColumns({ deep })).toEqual({});
   });
 
@@ -291,7 +302,7 @@ describe("fieldColumns", () => {
       },
       nickname: { column: "nickname", pg: "text", notNull: false },
     };
-    expect(Object.keys(meta)).not.toContain("note");
+    expect(R.keys(meta)).not.toContain("note");
     expect(meta.name.pg).toBe("text");
   });
 });

@@ -48,6 +48,7 @@ import * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
 import * as Schema from "effect/Schema";
 import { SqlClient } from "effect/sql/SqlClient";
+import * as Str from "effect/String";
 
 /** drizzle-kit's statement separator inside a `migration.sql`. */
 export const STATEMENT_BREAKPOINT = "--> statement-breakpoint";
@@ -82,7 +83,7 @@ export const splitStatements = (sql: string): ReadonlyArray<string> =>
   sql
     .split(STATEMENT_BREAKPOINT)
     .map((statement) => statement.trim())
-    .filter((statement) => statement.length > 0);
+    .filter(Str.isNonEmpty);
 
 /**
  * Every migration under `dir`, in apply order (directory-name order). Only
@@ -148,7 +149,16 @@ export const applyMigrationList = (
  *
  * @example
  * ```ts
- * const applied = applyMigrations(MIGRATIONS_DIR).pipe(
+ * import * as NodeServices from "@effect/platform-node/NodeServices";
+ * import * as PgClient from "@effect/sql-pg/PgClient";
+ * import { applyMigrations } from "@thomasfosterau/effect-drizzle-ext-pg/migrations";
+ * import * as Effect from "effect/Effect";
+ * import * as Redacted from "effect/Redacted";
+ *
+ * const url = Redacted.make("postgres://postgres@localhost:5432/app_test");
+ *
+ * // Building the Effect connects to nothing; running it applies the chain.
+ * export const applied = applyMigrations("packages/database/migrations").pipe(
  *   Effect.provide(PgClient.layer({ url, maxConnections: 1 })),
  *   Effect.provide(NodeServices.layer),
  * );

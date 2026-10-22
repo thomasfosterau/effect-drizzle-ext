@@ -11,6 +11,7 @@
  */
 
 import * as HashSet from "effect/HashSet";
+import * as Struct from "effect/Struct";
 import { describe, expect, expectTypeOf, it } from "vite-plus/test";
 import { insertValues, type UpdateSet, updateSetMap } from "../src/update.ts";
 
@@ -46,7 +47,7 @@ describe("updateSetMap", () => {
   });
 
   it("keeps the input's own key order", () => {
-    expect(Object.keys(updateSetMap({ slug: "s", name: "n", summary: "t" }, writable))).toEqual([
+    expect(Struct.keys(updateSetMap({ slug: "s", name: "n", summary: "t" }, writable))).toEqual([
       "slug",
       "name",
       "summary",
@@ -55,6 +56,7 @@ describe("updateSetMap", () => {
 
   it("accepts any iterable of writable keys", () => {
     expect(updateSetMap({ id: "x", name: "N" }, ["name"])).toEqual({ name: "N" });
+    // oxlint-disable-next-line effect/avoid-native-object-helpers -- pins the native `Set` a consumer passes; `writable` already covers `HashSet`
     expect(updateSetMap({ id: "x", name: "N" }, new Set(["name"]))).toEqual({ name: "N" });
   });
 
@@ -66,7 +68,8 @@ describe("updateSetMap", () => {
       readonly summary?: string | null | undefined;
     };
     /* oxlint-enable effect/prefer-option-over-null */
-    const set = updateSetMap({ id: "x" } as Input, ["name", "summary"] as const);
+    const input: Input = { id: "x" };
+    const set = updateSetMap(input, ["name", "summary"] as const);
     // oxlint-disable-next-line effect/prefer-option-over-null -- the tri-state output shape under test
     expectTypeOf(set).toEqualTypeOf<{ readonly name?: string; readonly summary?: string | null }>();
     expectTypeOf(set).toEqualTypeOf<UpdateSet<Input, "name" | "summary">>();

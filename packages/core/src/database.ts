@@ -215,11 +215,21 @@ export interface DatabaseServices<Db, Tx extends ReadSurface, Key extends string
  *
  * @example
  * ```ts
+ * import { makeDatabaseServices } from "@thomasfosterau/effect-drizzle-ext/database";
+ * // Any driver's handle types fit; these are the `@effect/sql-pg` binding's.
+ * import type { PgDatabaseClient, PgTransaction } from "@thomasfosterau/effect-drizzle-ext-pg";
+ *
+ * const relations = {}; // the application's drizzle relations graph
+ * type AppDatabase = PgDatabaseClient<typeof relations>;
+ * type AppTransaction = PgTransaction<typeof relations>;
+ *
  * const services = makeDatabaseServices<AppDatabase, AppTransaction>()({
  *   key: "Database",
  * });
  * export const { Database, CurrentTransaction, transact, readHandle } = services;
  * export type Database = typeof services.Database.Identifier; // "Database"
+ *
+ * console.log(Database.key); // "Database"
  * ```
  */
 export const makeDatabaseServices =

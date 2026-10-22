@@ -112,6 +112,17 @@ export const bytea = (
   })(name);
 
 /**
+ * The `created_at` / `updated_at` builder pair {@link timestamps} returns:
+ * `timestamptz`, `NOT NULL`, defaulting to `now()`.
+ */
+export interface TimestampColumns {
+  /** `created_at timestamptz NOT NULL DEFAULT now()`. */
+  readonly createdAt: SetHasDefault<SetNotNull<PgTimestampBuilder>>;
+  /** `updated_at timestamptz NOT NULL DEFAULT now()`. */
+  readonly updatedAt: SetHasDefault<SetNotNull<PgTimestampBuilder>>;
+}
+
+/**
  * A fresh `created_at` / `updated_at` pair: `timestamptz`, `NOT NULL`,
  * defaulting to `now()`.
  *
@@ -131,10 +142,7 @@ export const bytea = (
  * hand-written lines occupied keeps generated SQL byte-identical, so
  * adopting this helper does not move a baseline migration.
  */
-export const timestamps = (): {
-  readonly createdAt: SetHasDefault<SetNotNull<PgTimestampBuilder>>;
-  readonly updatedAt: SetHasDefault<SetNotNull<PgTimestampBuilder>>;
-} => ({
+export const timestamps = (): TimestampColumns => ({
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

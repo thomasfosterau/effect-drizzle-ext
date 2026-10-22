@@ -22,12 +22,12 @@
     "packages/pg/tests/integration/global-setup.ts",
     "packages/pg/vitest.integration.config.ts",
     "tests/dist-consumer/src/*.ts",
-    "**/vite.config.ts"
+    "**/vite.config.ts",
+    "vitest.coverage.config.ts"
   ],
-  "ignorePatterns": ["**/dist/**", "**/coverage/**"],
+  "ignorePatterns": ["**/dist/**", "**/coverage/**", "**/docs/**"],
   "ignoreDependencies": [
     "@types/node",
-    "effect-solutions",
     "@effect/tsgo",
     "@effect/language-service",
     "@typescript/native",
@@ -37,7 +37,9 @@
     "vite-plus",
     "@changesets/cli",
     "@vitest/coverage-istanbul",
-    "fallow"
+    "fallow",
+    "@effect/docgen",
+    "tsx"
   ],
   "rules": {
     "unused-files": "error",
@@ -72,6 +74,7 @@
   "health": {
     "maxCyclomatic": 20,
     "maxCognitive": 15,
-    "maxCrap": 30
+    "maxCrap": 30,
+    "coverage": "coverage/coverage-final.json"
   }
 }

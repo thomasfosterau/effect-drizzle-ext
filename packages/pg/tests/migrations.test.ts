@@ -10,14 +10,25 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
+import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Path from "effect/Path";
-import { describe, expect, it } from "vite-plus/test";
+import * as Schema from "effect/Schema";
+import { afterAll, describe, expect, it } from "vite-plus/test";
 import { MigrationError, readMigrations, splitStatements } from "../src/migrations.ts";
 
 const FIXTURE_MIGRATIONS = `${import.meta.dirname}/fixtures/migrations`;
 
+/** The suite's runtime: the Node file system and path services. */
+const runtime = ManagedRuntime.make(NodeServices.layer);
+afterAll(() => runtime.dispose());
+
 const run = <A, E>(effect: Effect.Effect<A, E, FileSystem.FileSystem | Path.Path>): Promise<A> =>
-  Effect.runPromise(effect.pipe(Effect.provide(NodeServices.layer)));
+  runtime.runPromise(effect);
+
+/** A stand-in for the driver error a failed statement carries. */
+class StatementFailed extends Schema.TaggedError<StatementFailed>()("StatementFailed", {
+  message: Schema.String,
+}) {}
 
 describe("splitStatements", () => {
   it("splits on drizzle-kit's breakpoint, trimming and dropping empty chunks", () => {
@@ -73,7 +84,10 @@ describe("readMigrations", () => {
 
 describe("MigrationError", () => {
   it("names the migration that failed", () => {
-    const error = new MigrationError({ migration: "0002_second", cause: new Error("boom") });
+    const error = new MigrationError({
+      migration: "0002_second",
+      cause: new StatementFailed({ message: "boom" }),
+    });
     expect(error._tag).toBe("MigrationError");
     expect(error.message).toBe("migration '0002_second' failed");
   });

@@ -11,7 +11,11 @@
 
 import { describe, expect, it } from "vite-plus/test";
 import { Resource } from "@thomasfosterau/effect-jsonapi";
+import type { ColumnBuilderBase } from "drizzle-orm";
+import * as Arr from "effect/Array";
 import * as Option from "effect/Option";
+import * as Order from "effect/Order";
+import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
 import { getTableConfig, integer, PgDialect, pgTable, text, uuid } from "drizzle-orm/pg-core";
 import { dbColumn, type DbColumn } from "../src/index.ts";
@@ -171,9 +175,11 @@ describe("makeDeriveResourceColumns", () => {
     const derive = makeDeriveResourceColumns(builders, {
       resolveReference: () => () => owner.id,
     });
+    // SAFETY: every builder in `builders` is a pg-core builder, so each derived
+    // column is a pg column builder at runtime behind the dialect-neutral type.
     const columns = getTableConfig(pgTable("widget", derive(WidgetResource) as never)).columns;
-    const byName = Object.fromEntries(columns.map((c) => [c.name, c]));
-    expect(Object.keys(byName).sort()).toEqual(["name", "owner_id", "size"]);
+    const byName = R.fromEntries(columns.map((c) => [c.name, c]));
+    expect(Arr.sort(R.keys(byName), Order.String)).toEqual(["name", "owner_id", "size"]);
     expect(byName.name.notNull).toBe(true);
     expect(byName.size.hasDefault).toBe(true);
     expect(byName.size.default).toBe(0);
@@ -192,15 +198,17 @@ describe("makeDeriveResourceColumns", () => {
       note: Schema.String,
     };
     const options = { resolveReference: () => () => owner.id };
-    const shape = (columns: Record<string, unknown>) =>
+    const ddlOf = (columns: Readonly<Record<string, ColumnBuilderBase>>) =>
+      // SAFETY: both derivations build from the pg-core `builders`, so every
+      // column is a pg column builder at runtime behind the dialect-neutral type.
       getTableConfig(pgTable("widget", columns as never)).columns.map((c) => ({
         name: c.name,
         type: c.getSQLType(),
         notNull: c.notNull,
         hasDefault: c.hasDefault,
       }));
-    expect(shape(makeDeriveResourceColumns(builders, options)(WidgetResource))).toEqual(
-      shape(makeDeriveColumns(builders, options).fromFields(fields)),
+    expect(ddlOf(makeDeriveResourceColumns(builders, options)(WidgetResource))).toEqual(
+      ddlOf(makeDeriveColumns(builders, options).fromFields(fields)),
     );
   });
 
@@ -245,6 +253,8 @@ describe("deriveCheckConstraints", () => {
 
   const checksOf = () => {
     const derive = makeDeriveResourceColumns(builders);
+    // SAFETY: the builders are pg-core's and the checks are pg-core `check`s;
+    // both derivations return dialect-neutral types `pgTable` does not accept.
     return getTableConfig(
       pgTable(
         "bounded_widget_version",
@@ -284,6 +294,8 @@ describe("deriveCheckConstraints", () => {
       }),
     };
     const dialect = new PgDialect();
+    // SAFETY: the builders are pg-core's and the checks are pg-core `check`s;
+    // both derivations return dialect-neutral types `pgTable` does not accept.
     const fieldChecks = getTableConfig(
       pgTable(
         "bounded_widget_version",
@@ -348,7 +360,7 @@ describe("resourceAttributeProjections", () => {
     },
   });
   const projections = resourceAttributeProjections(PersonResource);
-  const byKey = Object.fromEntries(projections.map((p) => [p.key, p]));
+  const byKey = R.fromEntries(projections.map((p) => [p.key, p]));
 
   it("recovers the leaf column from the dbColumn annotation", () => {
     expect(byKey.name).toEqual({
@@ -380,10 +392,10 @@ describe("resourceAttributeProjections", () => {
   });
 
   it("flags the materialised-list attributes as arrays with no column", () => {
-    for (const key of ["externalIdentifiers", "mappings"] as const) {
+    Arr.forEach(["externalIdentifiers", "mappings"] as const, (key) => {
       expect(byKey[key]).toMatchObject({ array: true, date: false });
       expect(Option.isNone(byKey[key].column)).toBe(true);
-    }
+    });
   });
 
   it("leaves out an input-only attribute, which is not on the resource object", () => {

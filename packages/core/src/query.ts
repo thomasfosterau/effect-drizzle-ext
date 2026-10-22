@@ -25,16 +25,30 @@ export const TOTAL_COUNT_ALIAS = "__totalCount";
 
 /**
  * The selection entry adding the unpaged total to a list query. Spread into
- * a `.select({ … })` map alongside the columns the read already projects:
- *
- * ```ts
- * db.select({ ...columns, ...totalCountColumn }).from(view).where(where)
- * ```
+ * a `.select({ … })` map alongside the columns the read already projects.
  *
  * `COUNT(*) OVER ()` is evaluated after `WHERE` and before `LIMIT`/`OFFSET`,
  * so it rides back on every row of the page the query was already
  * fetching — one round trip instead of a separate sequential `count(*)`
  * query for data the first one can already carry.
+ *
+ * @example
+ * ```ts
+ * import { totalCountColumn } from "@thomasfosterau/effect-drizzle-ext/query";
+ * import { eq } from "drizzle-orm";
+ * import { integer, pgTable, QueryBuilder, text } from "drizzle-orm/pg-core";
+ *
+ * const article = pgTable("article", { id: integer().primaryKey(), title: text().notNull() });
+ *
+ * const page = new QueryBuilder()
+ *   .select({ id: article.id, title: article.title, ...totalCountColumn })
+ *   .from(article)
+ *   .where(eq(article.title, "Hello"))
+ *   .limit(20);
+ *
+ * console.log(page.toSQL().sql);
+ * // select "id", "title", (count(*) over ())::int from "article" where … limit $2
+ * ```
  */
 export const totalCountColumn = {
   [TOTAL_COUNT_ALIAS]: sql<number>`(count(*) over ())::int`,
@@ -160,6 +174,9 @@ export const executeRows = <T extends Record<string, unknown>>(
   query: SQLWrapper | string,
 ): Effect.Effect<readonly T[], EffectDrizzleQueryError> =>
   Effect.map(db.execute(query), (result) =>
+    // SAFETY: `T` is the row type the caller asserts its query selects (the
+    // driver hands rows back untyped); a non-array result is the driver's
+    // result object, whose `rows` holds those rows when present.
     Array.isArray(result)
       ? (result as readonly T[])
       : ((result as { rows?: readonly T[] }).rows ?? []),

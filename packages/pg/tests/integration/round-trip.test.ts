@@ -20,7 +20,7 @@ import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Redacted from "effect/Redacted";
 import * as Result from "effect/Result";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, onTestFinished } from "vite-plus/test";
 import { makePgDatabase, pgClientFromUrl } from "../../src/index.ts";
 import { makeTestTransaction } from "../../src/testing.ts";
 
@@ -60,7 +60,7 @@ const withTypes = () => {
 const database = makePgDatabase({ relations: {}, key: "Database" });
 const { Database } = database;
 
-const roundTrip = Effect.gen(function* () {
+const roundTrip = Effect.fn("roundTrip")(function* () {
   const db = yield* Database;
   yield* db.execute(sql`CREATE TYPE rt_mood AS ENUM ('sad', 'ok', 'happy')`);
   yield* db.execute(
@@ -80,26 +80,20 @@ const makeRuntime = (types?: PgTypes.Registry) =>
 describe("Drizzle round trip over the binary driver", () => {
   it("round-trips an enum, a string-mode bigint and a timestamptz with a forwarded types registry", async () => {
     const runtime = makeRuntime(withTypes());
+    onTestFinished(() => runtime.dispose());
     const { runInTestTransaction } = makeTestTransaction(database);
-    try {
-      const rows = await runInTestTransaction(runtime, roundTrip);
-      expect(rows).toEqual([{ id: 1, mood: "happy", big: BIG, at: AT }]);
-    } finally {
-      await runtime.dispose();
-    }
+    const rows = await runInTestTransaction(runtime, roundTrip());
+    expect(rows).toEqual([{ id: 1, mood: "happy", big: BIG, at: AT }]);
   });
 
   it("reads a plain bigint column back as a bigint without the registry (the mismatch the README documents)", async () => {
     const runtime = makeRuntime();
+    onTestFinished(() => runtime.dispose());
     const { runInTestTransaction } = makeTestTransaction(database);
-    try {
-      const rows = await runInTestTransaction(runtime, roundTrip);
-      expect(rows[0]?.mood).toBe("happy");
-      expect(rows[0]?.at).toEqual(AT);
-      // Typed `string` by drizzle, delivered as a JS bigint by the driver.
-      expect(typeof (rows[0]?.big as unknown)).toBe("bigint");
-    } finally {
-      await runtime.dispose();
-    }
+    const rows = await runInTestTransaction(runtime, roundTrip());
+    expect(rows[0]?.mood).toBe("happy");
+    expect(rows[0]?.at).toEqual(AT);
+    // Typed `string` by drizzle, delivered as a JS bigint by the driver.
+    expect(rows[0]?.big).toBeTypeOf("bigint");
   });
 });

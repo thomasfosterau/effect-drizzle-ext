@@ -16,7 +16,7 @@ Hooks are managed by Vite+; the editable [.vite-hooks/pre-commit](.vite-hooks/pr
 
 ## CI expectations
 
-[ci.yml](.github/workflows/ci.yml) runs one job: the gates listed in [AGENTS.md → Verification](AGENTS.md#verification), in that order, with `vp run test:integration` against the job's `pgvector/pgvector` service container. [release.yml](.github/workflows/release.yml) runs changesets/action (v2.1.2, SHA-pinned) on `trunk` inside the protected `release` environment: it opens the "Version Packages" PR while unreleased changesets exist (`pnpm run version`: `changeset version` with its auto-formatter disabled — `"format": false` in `.changeset/config.json`, because the `oxfmt` bin Vite+ installs is an IDE-only wrapper that exits 1 on `--write` — then `vp fmt` on the generated changelogs) and, once that PR merges, runs [`scripts/release.sh`](scripts/release.sh) — `pnpm pack` then `npm publish <tarball>` per package under npm OIDC trusted publishing (no `NPM_TOKEN`; provenance left to npm, never forced), then `changeset tag`. `RELEASE_DRY_RUN=1 pnpm run release` exercises the pack and publish steps locally without writing to the registry.
+[ci.yml](.github/workflows/ci.yml) runs one job: the gates listed in [AGENTS.md → Verification](AGENTS.md#verification), in that order, with `vp run test:integration` against the job's `pgvector/pgvector` service container. [release.yml](.github/workflows/release.yml) runs Changesets on `trunk` inside the protected `release` environment; the flow, its hardening and the owner's one-time setup are in [PUBLISHING.md](PUBLISHING.md). Vulnerability reports go through [SECURITY.md](SECURITY.md).
 
 ## Fallow baseline
 
@@ -30,13 +30,6 @@ vp exec fallow dead-code --format json --quiet --no-cache --save-baseline fallow
 ```
 
 The command exits 1 while any error-severity finding remains, and writes the file anyway. Never regenerate it to absorb a finding your change introduces: fix the finding instead.
-
-## Release setup (owner, one-time)
-
-1. **Allow Actions to open the Version Packages PR:** Settings → Actions → General → Workflow permissions → "Allow GitHub Actions to create and approve pull requests". (Done: the Release workflow opened #46 on 2026-10-04.)
-2. **Protect the `release` environment:** Settings → Environments → `release` → required reviewers, deployments restricted to `trunk`.
-3. **Bind the trusted publisher for each package** on npmjs.com (package → Settings → Trusted Publisher): GitHub Actions, repository `thomasfosterau/effect-drizzle-ext`, workflow `release.yml`, environment `release`. Both `@thomasfosterau/effect-drizzle-ext` and `@thomasfosterau/effect-drizzle-ext-pg` need their own binding. npm only offers the binding for a package that exists, so a package's very first publish may need a one-off manual `npm publish` of the `0.0.0` bootstrap (as effect-jsonapi's was) before the workflow can take over.
-4. Remove any classic automation token and the `NPM_TOKEN` secret once the bindings exist.
 
 ## Pre-PR checklist
 
@@ -52,9 +45,10 @@ vp fmt                                   # oxfmt (format only)
 vp run check                             # the whole type gate (includes building dist/)
 vp run --filter ./packages/core check    # one package's type check
 vp run -r test:unit                      # unit tests
+vp run test:coverage                     # both unit suites under one coverage map (coverage/coverage-final.json, read by fallow)
 vp test run tests/some.test.ts           # single file (from inside the package)
 vp run test:integration                  # integration tests (fresh local DB per run)
 vp run test:integration -- --project pg-integration
 vp run -r build                          # emit dist/
-vp run fallow:audit                      # change-set review (not a CI gate)
+vp run fallow:audit                      # change-set review (not a CI gate; run test:coverage first)
 ```

@@ -1,0 +1,30 @@
+{
+  "$schema": "../../node_modules/@effect/docgen/schema.json",
+  "runExamples": true,
+  "enforceVersion": false,
+  "parseCompilerOptions": {
+    "noEmit": true,
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "target": "esnext",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "strict": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "exactOptionalPropertyTypes": true
+  },
+  "examplesCompilerOptions": {
+    "noEmit": true,
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "target": "esnext",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "strict": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "exactOptionalPropertyTypes": true,
+    "types": ["node"]
+  }
+}

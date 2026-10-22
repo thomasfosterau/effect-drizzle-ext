@@ -63,8 +63,11 @@
 import { asc, desc, getColumns, SQL } from "drizzle-orm";
 import type { Table, View } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
+import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
+import * as HashSet from "effect/HashSet";
 import * as Predicate from "effect/Predicate";
+import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
 
 /**
@@ -117,9 +120,10 @@ export class UnsupportedSortError extends Schema.TaggedError<UnsupportedSortErro
   }
 
   override get message(): string {
-    return `unsupported.sort-field: ${this.field}. Sortable fields: ${
-      this.allowed.length === 0 ? "(none)" : this.allowed.join(", ")
-    }`;
+    return `unsupported.sort-field: ${this.field}. Sortable fields: ${Arr.match(this.allowed, {
+      onEmpty: () => "(none)",
+      onNonEmpty: (allowed) => allowed.join(", "),
+    })}`;
   }
 }
 
@@ -150,7 +154,7 @@ export interface SortableColumnsOptions {
 
 const DEFAULT_INTERNAL: ReadonlyArray<string> = ["action", "timestamp"];
 const DEFAULT_ALIASED: ReadonlyArray<string> = ["createdAt"];
-const DEFAULT_RENAMED: Readonly<Record<string, string>> = { updatedAt: "timestamp" };
+const DEFAULT_RENAMED = { updatedAt: "timestamp" } satisfies Readonly<Record<string, string>>;
 
 /**
  * Drizzle `dataType` base tokens that order usefully. The descriptor is
@@ -160,12 +164,17 @@ const DEFAULT_RENAMED: Readonly<Record<string, string>> = { updatedAt: "timestam
  * `custom` columns and `array vector` embeddings have no meaningful scalar
  * order.
  */
-const SORTABLE_BASE_TYPES: ReadonlySet<string> = new Set(["string", "number", "bigint", "boolean"]);
+const SORTABLE_BASE_TYPES: HashSet.HashSet<string> = HashSet.make(
+  "string",
+  "number",
+  "bigint",
+  "boolean",
+);
 
 const isSortableColumn = (term: OrderTerm): boolean => {
   if (!Predicate.hasProperty(term, "dataType") || !Predicate.isString(term.dataType)) return false;
   if (term.dataType === "object date") return true;
-  return SORTABLE_BASE_TYPES.has(term.dataType.split(" ")[0] ?? "");
+  return HashSet.has(SORTABLE_BASE_TYPES, term.dataType.split(" ")[0] ?? "");
 };
 
 /**
@@ -179,14 +188,14 @@ const derived = new WeakMap<object, SortableColumns>();
 
 /** {@link SortableColumnsOptions} with every default applied. */
 interface ResolvedNames {
-  readonly internal: ReadonlySet<string>;
-  readonly aliased: ReadonlySet<string>;
+  readonly internal: HashSet.HashSet<string>;
+  readonly aliased: HashSet.HashSet<string>;
   readonly renamed: Readonly<Record<string, string>>;
 }
 
 const resolveNames = (options: SortableColumnsOptions = {}): ResolvedNames => ({
-  internal: new Set(options.internal ?? DEFAULT_INTERNAL),
-  aliased: new Set(options.aliased ?? DEFAULT_ALIASED),
+  internal: HashSet.fromIterable(options.internal ?? DEFAULT_INTERNAL),
+  aliased: HashSet.fromIterable(options.aliased ?? DEFAULT_ALIASED),
   renamed: options.renamed ?? DEFAULT_RENAMED,
 });
 
@@ -197,8 +206,8 @@ const resolveNames = (options: SortableColumnsOptions = {}): ResolvedNames => ({
  * the outer query.
  */
 const admits = (names: ResolvedNames, key: string, term: OrderTerm): boolean => {
-  if (names.internal.has(key)) return false;
-  if (term instanceof SQL.Aliased) return names.aliased.has(key);
+  if (HashSet.has(names.internal, key)) return false;
+  if (term instanceof SQL.Aliased) return HashSet.has(names.aliased, key);
   return isSortableColumn(term);
 };
 
@@ -207,12 +216,12 @@ const deriveSortable = (relation: Table | View, names: ResolvedNames): SortableC
   // its conditional return type does not resolve for the `Table | View`
   // union, but every value is a column or a SQL expression.
   const columns = getColumns(relation) as Record<string, OrderTerm>;
-  const published = Object.entries(columns).filter(([key, term]) => admits(names, key, term));
-  const renamed = Object.entries(names.renamed).flatMap(([name, key]) => {
+  const published = Arr.filter(R.toEntries(columns), ([key, term]) => admits(names, key, term));
+  const renamed = Arr.flatMap(R.toEntries(names.renamed), ([name, key]) => {
     const term = columns[key];
     return term === undefined ? [] : [[name, term] as const];
   });
-  return Object.fromEntries([...published, ...renamed]);
+  return R.fromEntries([...published, ...renamed]);
 };
 
 /**
@@ -293,38 +302,37 @@ export const resolveSortOrder = (
 ): Effect.Effect<ReadonlyArray<OrderTerm>, UnsupportedSortError> =>
   Effect.suspend(() => {
     const idColumn = options.view.id;
-    const sort = options.sort ?? [];
+    return Arr.match(options.sort ?? [], {
+      onEmpty: (): Effect.Effect<ReadonlyArray<OrderTerm>, UnsupportedSortError> => {
+        const fallback = options.fallback ?? [];
+        if (endsInIdColumn(fallback, idColumn)) return Effect.succeed(fallback);
+        return Effect.succeed([
+          ...fallback,
+          options.tiebreak === undefined ? idColumn : directed(idColumn, options.tiebreak),
+        ]);
+      },
+      onNonEmpty: (sort) => {
+        const sortable = options.sortable ?? sortableColumnsFor(options.view);
+        const unsupported = sort.find(({ field }) => !Object.hasOwn(sortable, field));
+        if (unsupported !== undefined) {
+          return Effect.fail(
+            new UnsupportedSortError({
+              field: unsupported.field,
+              allowed: R.keys(sortable).toSorted(),
+            }),
+          );
+        }
 
-    if (sort.length === 0) {
-      const fallback = options.fallback ?? [];
-      if (endsInIdColumn(fallback, idColumn)) return Effect.succeed(fallback);
-      return Effect.succeed([
-        ...fallback,
-        options.tiebreak === undefined ? idColumn : directed(idColumn, options.tiebreak),
-      ]);
-    }
-
-    const sortable = options.sortable ?? sortableColumnsFor(options.view);
-    const unsupported = sort.find(({ field }) => !Object.hasOwn(sortable, field));
-    if (unsupported !== undefined) {
-      return Effect.fail(
-        new UnsupportedSortError({
-          field: unsupported.field,
-          allowed: Object.keys(sortable).toSorted(),
-        }),
-      );
-    }
-
-    // SAFETY: every field was checked as an own key of `sortable` above.
-    const terms = sort.map(({ field, direction }) =>
-      directed(sortable[field] as OrderTerm, direction),
-    );
-    // A caller who sorted by `id` has already asked for a total order; a
-    // second `id` term would be redundant SQL.
-    if (sort.some(({ field }) => field === "id")) return Effect.succeed(terms);
-    // SAFETY: `sort` is non-empty on this branch.
-    const last = sort.at(-1) as SortKey;
-    return Effect.succeed([...terms, directed(idColumn, last.direction)]);
+        // SAFETY: every field was checked as an own key of `sortable` above.
+        const terms = sort.map(({ field, direction }) =>
+          directed(sortable[field] as OrderTerm, direction),
+        );
+        // A caller who sorted by `id` has already asked for a total order; a
+        // second `id` term would be redundant SQL.
+        if (sort.some(({ field }) => field === "id")) return Effect.succeed(terms);
+        return Effect.succeed([...terms, directed(idColumn, Arr.lastNonEmpty(sort).direction)]);
+      },
+    });
   });
 
 /* oxlint-disable effect/prefer-option-over-null -- an options bag a caller forwards its own optionals into (a decoded `?sort=` is absent when the request carried none); `?: T | undefined` is what lets it pass `{ sort: query.sort }` under `exactOptionalPropertyTypes`, and an `Option` there would only be unwrapped on the next line. Same shape as the applications' signature. */

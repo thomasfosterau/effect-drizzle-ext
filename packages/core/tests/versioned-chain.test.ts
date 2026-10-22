@@ -9,6 +9,8 @@
 
 import { describe, expect, expectTypeOf, it } from "vite-plus/test";
 import { getTableConfig } from "drizzle-orm/pg-core";
+import * as Arr from "effect/Array";
+import * as Order from "effect/Order";
 import {
   bigint,
   type AnyPgColumn,
@@ -88,8 +90,18 @@ describe("makeSubtypeTables", () => {
     const versionCfg = getTableConfig(version);
     expect(stableCfg.name).toBe("widget");
     expect(versionCfg.name).toBe("widget_version");
-    expect(stableCfg.columns.map((c) => c.name).sort()).toEqual(["id", "type"]);
-    expect(versionCfg.columns.map((c) => c.name).sort()).toEqual(["id", "label", "version"]);
+    expect(
+      Arr.sort(
+        stableCfg.columns.map((c) => c.name),
+        Order.String,
+      ),
+    ).toEqual(["id", "type"]);
+    expect(
+      Arr.sort(
+        versionCfg.columns.map((c) => c.name),
+        Order.String,
+      ),
+    ).toEqual(["id", "label", "version"]);
     // stable `type` is nullable without a discriminator
     expect(stableCfg.columns.find((c) => c.name === "type")?.notNull).toBe(false);
     // primary key + parent-version FK
@@ -333,6 +345,7 @@ describe("version-chain read shapes", () => {
     type Snapshot = VersionSnapshot<"create" | "update", { readonly draft?: boolean }>;
     // oxlint-disable-next-line effect/prefer-option-over-null -- asserts the optional key's read type
     expectTypeOf<Snapshot["draft"]>().toEqualTypeOf<boolean | undefined>();
+    // oxlint-disable-next-line effect/no-unsafe-dictionary-type -- asserts the public `VersionSnapshot["columns"]` type, which is this open dictionary
     expectTypeOf<Snapshot["columns"]>().toEqualTypeOf<Readonly<Record<string, unknown>>>();
     expectTypeOf<Snapshot["version"]>().toEqualTypeOf<bigint>();
   });

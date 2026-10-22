@@ -41,14 +41,19 @@
  */
 
 import type { AnyRelations } from "drizzle-orm/relations";
+import * as Arr from "effect/Array";
 import * as Cause from "effect/Cause";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as HashSet from "effect/HashSet";
 import * as Layer from "effect/Layer";
 import type * as ManagedRuntime from "effect/ManagedRuntime";
+import * as Predicate from "effect/Predicate";
 import type * as Redacted from "effect/Redacted";
+import * as Record from "effect/Record";
 import * as Schedule from "effect/Schedule";
+import * as Schema from "effect/Schema";
 import { isSqlError, type SqlError } from "effect/sql/SqlError";
 import { type PgDatabase, pgClientFromUrl } from "./index.ts";
 
@@ -106,7 +111,7 @@ export {
  * `SqlError` reason. A failure carrying one of these happened while opening a
  * connection, i.e. before any transaction body ran.
  */
-const CONNECT_SEAM_OPERATIONS: ReadonlySet<string> = new Set(["acquireConnection", "connect"]);
+const CONNECT_SEAM_OPERATIONS = HashSet.make("acquireConnection", "connect");
 
 /**
  * Whether `error` is a `SqlError` that failed at the connect/acquire seam and
@@ -125,11 +130,12 @@ const CONNECT_SEAM_OPERATIONS: ReadonlySet<string> = new Set(["acquireConnection
  * `SqlSyntaxError` raised by a test's own query (`operation === "execute"`),
  * so genuine test failures are never retried.
  */
+// oxlint-disable-next-line effect/no-unknown-parameters -- published signature: the predicate classifies whatever failure value a retry's `while` hands it, and `isSqlError` is the parse; narrowing the parameter would break callers
 export const isRetryableConnectFailure = (error: unknown): boolean => {
   if (!isSqlError(error)) return false;
   if (error.isRetryable) return true;
   const operation = error.reason.operation;
-  return operation !== undefined && CONNECT_SEAM_OPERATIONS.has(operation);
+  return operation !== undefined && HashSet.has(CONNECT_SEAM_OPERATIONS, operation);
 };
 
 /**
@@ -166,7 +172,7 @@ interface RollbackSignal {
 const rollback: RollbackSignal = { _tag: ROLLBACK_TAG };
 
 const isRollback = (u: unknown): u is RollbackSignal =>
-  typeof u === "object" && u !== null && "_tag" in u && (u as RollbackSignal)._tag === ROLLBACK_TAG;
+  Predicate.isObjectOrArray(u) && Predicate.isTagged(u, ROLLBACK_TAG);
 
 /**
  * Whether a captured failure cause carries the rollback sentinel.
@@ -175,17 +181,18 @@ const isRollback = (u: unknown): u is RollbackSignal =>
  * rollback tag without depending on `Cause` internals.
  */
 const causeContainsRollback = (cause: unknown): boolean => {
+  // oxlint-disable-next-line effect/avoid-native-object-helpers -- the visited set must compare by REFERENCE (cycle detection over an opaque graph); `HashSet` compares by `Equal`, under which distinct but structurally equal `Cause` nodes collide
   const seen = new Set<unknown>();
   const stack: Array<unknown> = [cause];
   // oxlint-disable-next-line effect/imperative-loops -- an explicit stack walk over an opaque object graph; the ported mechanism, unchanged.
-  while (stack.length > 0) {
+  while (Arr.isReadonlyArrayNonEmpty(stack)) {
     const node = stack.pop();
-    if (!node || typeof node !== "object" || seen.has(node)) continue;
+    if (!Predicate.isObjectOrArray(node) || seen.has(node)) continue;
     seen.add(node);
     if (isRollback(node)) return true;
-    for (const value of Object.values(node as Record<string, unknown>)) {
+    Arr.forEach(Array.isArray(node) ? node : Record.values(node), (value) => {
       stack.push(value);
-    }
+    });
   }
   return false;
 };
@@ -209,16 +216,16 @@ const connectRetrySchedule = Schedule.max([
 ]).pipe(Schedule.jittered);
 
 /**
- * Project a captured `Cause` to something a test can assert on. Throwing the
- * raw `Cause` makes vitest serialise it as `{ _tag: 'Die', defect: [Object] }`
- * with an empty `.message`, so `.rejects.toThrow(/…/)` never matches and a
- * defect's real error is invisible. `Cause.squash` collapses the cause to its
- * underlying value — a typed `Fail`'s error (keeps `_tag` + message) or a
- * `Die`'s thrown defect (a real `Error` with a message + stack) — so the
- * actual failure surfaces in vitest output and `.rejects.toThrow(/…/)`
- * matches.
+ * A failure of the runner itself rather than of the spec it ran: the outer
+ * transaction failed before the spec's `Exit` was captured, or failed with
+ * something other than the rollback sentinel. Thrown (rejecting the runner's
+ * Promise), never put in an Effect error channel — the runner is the test
+ * harness's boundary.
  */
-const legibleFailure = (cause: Cause.Cause<unknown>): unknown => Cause.squash(cause);
+class TestTransactionError extends Schema.TaggedError<TestTransactionError>()(
+  "TestTransactionError",
+  { message: Schema.String },
+) {}
 
 /**
  * The always-rollback test transaction runner for one application's
@@ -303,14 +310,13 @@ export const makeTestTransaction = <Relations extends AnyRelations, Key extends 
     effect: Effect.Effect<A, E, R | `${Key}/CurrentTransaction`>,
   ): Promise<A> => {
     // oxlint-disable-next-line effect/prefer-option-over-null -- write-once slot assigned inside the nested `Effect.gen` closure; the `null` sentinel is what the "inner Exit was never captured" check below tests, and TS's control-flow analysis (see the note at the read site) already treats this declaration specially
-    let captured: Exit.Exit<A, E> | null = null;
+    let captured: Exit.Exit<A, E | SqlError> | null = null;
 
     const program = Effect.gen(function* () {
       const db = yield* database.Database;
       return yield* db.transaction(() =>
         Effect.gen(function* () {
-          const inner = yield* Effect.exit(database.transact(effect));
-          captured = inner as Exit.Exit<A, E>;
+          captured = yield* Effect.exit(database.transact(effect));
           return yield* Effect.fail(rollback);
         }),
       );
@@ -343,7 +349,11 @@ export const makeTestTransaction = <Relations extends AnyRelations, Key extends 
     );
 
     const outer = await runtime.runPromiseExit(
-      program as unknown as Effect.Effect<unknown, unknown, R>,
+      // SAFETY: the only requirement `program` adds beyond `R` is the
+      // `Database` key it yields, and `R` includes that key — the documented
+      // contract of `runInTestTransaction` (see `TestTransaction`), which a
+      // generic constraint cannot express.
+      program as Effect.Effect<Effect.Success<typeof program>, Effect.Error<typeof program>, R>,
     );
 
     // Snapshot to a local const: `captured` is only ever reassigned inside the
@@ -352,24 +362,40 @@ export const makeTestTransaction = <Relations extends AnyRelations, Key extends 
     // only textually-direct assignment), collapsing every read below to
     // `never`. The annotation restates the variable's real declared type,
     // which the runtime assignment inside the closure does in fact produce.
+    // SAFETY: restates `captured`'s declared type verbatim, undoing only the
+    // control-flow narrowing described above.
     // oxlint-disable-next-line effect/prefer-option-over-null -- restates `captured`'s declared type verbatim; see the comment above
-    const innerExit = captured as Exit.Exit<A, E> | null;
+    const innerExit = captured as Exit.Exit<A, E | SqlError> | null;
     if (!innerExit) {
       if (Exit.isFailure(outer)) {
-        throw new Error(`runInTestTransaction: outer transaction failed: ${String(outer.cause)}`);
+        throw new TestTransactionError({
+          message: `runInTestTransaction: outer transaction failed: ${String(outer.cause)}`,
+        });
       }
-      throw new Error("runInTestTransaction: inner Exit was never captured");
+      throw new TestTransactionError({
+        message: "runInTestTransaction: inner Exit was never captured",
+      });
     }
 
     // The outer Exit should be the rollback failure we forced. Anything
     // else is a transaction-level failure we didn't expect (e.g. the
     // connection dropped between the inner result and the rollback raise).
     if (Exit.isFailure(outer) && !causeContainsRollback(outer.cause)) {
-      throw new Error(`runInTestTransaction: unexpected outer failure: ${String(outer.cause)}`);
+      throw new TestTransactionError({
+        message: `runInTestTransaction: unexpected outer failure: ${String(outer.cause)}`,
+      });
     }
 
     if (Exit.isSuccess(innerExit)) return innerExit.value;
-    throw legibleFailure(innerExit.cause);
+    // Project the captured `Cause` to something a test can assert on.
+    // Throwing the raw `Cause` makes vitest serialise it as `{ _tag: 'Die',
+    // defect: [Object] }` with an empty `.message`, so `.rejects.toThrow(/…/)`
+    // never matches and a defect's real error is invisible. `Cause.squash`
+    // collapses the cause to its underlying value — a typed `Fail`'s error
+    // (keeps `_tag` + message) or a `Die`'s thrown defect (a real `Error` with
+    // a message + stack) — so the actual failure surfaces in vitest output
+    // and `.rejects.toThrow(/…/)` matches.
+    throw Cause.squash(innerExit.cause);
   };
 
   return {

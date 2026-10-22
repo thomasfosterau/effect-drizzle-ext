@@ -12,6 +12,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { eq } from "drizzle-orm";
 import { PgDialect, pgTable, text } from "drizzle-orm/pg-core";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import {
   boundedPagination,
@@ -21,6 +22,7 @@ import {
   pageWithTotal,
   TOTAL_COUNT_ALIAS,
 } from "../src/query.ts";
+import { runPromise } from "./harness.ts";
 
 describe("pageOf", () => {
   it("maps rows to resources and reads the total off the alias", () => {
@@ -33,7 +35,7 @@ describe("pageOf", () => {
   });
 
   it("reports totalCount 0 for an empty page — the documented ambiguity", () => {
-    const page = pageOf([] as ReadonlyArray<{ id: string }>, (row) => row.id);
+    const page = pageOf<{ id: string }, string>([], (row) => row.id);
     expect(page).toEqual({ items: [], totalCount: 0 });
   });
 
@@ -59,6 +61,12 @@ describe("combineFilters", () => {
   const table = pgTable("widget", { name: text("name") });
   const dialect = new PgDialect();
 
+  /** The combined condition, failing the test when there is none. */
+  const defined = (combined: ReturnType<typeof combineFilters>) =>
+    Option.getOrElse(Option.fromNullishOr(combined), () =>
+      expect.unreachable("expected a combined condition"),
+    );
+
   it("returns undefined with no filters", () => {
     expect(combineFilters()).toBeUndefined();
   });
@@ -71,8 +79,7 @@ describe("combineFilters", () => {
     const filter = eq(table.name, "a");
     const combined = combineFilters(filter);
     expect(combined).toBeDefined();
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- checked above
-    expect(dialect.sqlToQuery(combined!)).toEqual(dialect.sqlToQuery(filter));
+    expect(dialect.sqlToQuery(defined(combined))).toEqual(dialect.sqlToQuery(filter));
   });
 
   it("ANDs several defined filters and drops the undefined ones", () => {
@@ -80,8 +87,7 @@ describe("combineFilters", () => {
     const b = eq(table.name, "b");
     const combined = combineFilters(a, undefined, b);
     expect(combined).toBeDefined();
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- checked above
-    const rendered = dialect.sqlToQuery(combined!);
+    const rendered = dialect.sqlToQuery(defined(combined));
     expect(rendered.sql).toContain(" and ");
     expect(rendered.params).toEqual(["a", "b"]);
   });
@@ -129,28 +135,41 @@ describe("boundedPagination", () => {
 });
 
 describe("executeRows", () => {
-  /** Stub client whose `execute` resolves with an arbitrary runtime shape. */
-  const clientResolving = (value: unknown) =>
-    ({ execute: () => Effect.succeed(value) }) as unknown as Parameters<typeof executeRows>[0];
+  interface Row {
+    readonly id: string;
+  }
+  interface PgResult {
+    readonly rows: ReadonlyArray<Row>;
+    readonly rowCount: number;
+  }
+  /** What `pg` can resolve `execute` with: a Result, rows, several Results, or a rows-less object. */
+  type ExecuteResult =
+    | PgResult
+    | ReadonlyArray<Row>
+    | ReadonlyArray<PgResult>
+    | { readonly command: string };
+
+  /** Stub client whose `execute` resolves with one of those runtime results. */
+  const clientResolving = (value: ExecuteResult): Parameters<typeof executeRows>[0] => ({
+    execute: () => Effect.succeed(value),
+  });
 
   const ROWS = [{ id: "a" }, { id: "b" }];
 
   it("unwraps a pg.Result-shaped object to its rows (today's raw-mode runtime shape)", async () => {
-    const rows = await Effect.runPromise(
+    const rows = await runPromise(
       executeRows<{ id: string }>(clientResolving({ rows: ROWS, rowCount: 2 }), "SELECT 1"),
     );
     expect(rows).toEqual(ROWS);
   });
 
   it("passes a bare rows array through unchanged (the typed shape)", async () => {
-    const rows = await Effect.runPromise(
-      executeRows<{ id: string }>(clientResolving(ROWS), "SELECT 1"),
-    );
+    const rows = await runPromise(executeRows<{ id: string }>(clientResolving(ROWS), "SELECT 1"));
     expect(rows).toEqual(ROWS);
   });
 
   it("degrades a rows-less object to an empty array", async () => {
-    const rows = await Effect.runPromise(
+    const rows = await runPromise(
       executeRows<{ id: string }>(clientResolving({ command: "SELECT" }), "SELECT 1"),
     );
     expect(rows).toEqual([]);
@@ -165,7 +184,7 @@ describe("executeRows", () => {
       { rows: [ROWS[0]], rowCount: 1 },
       { rows: [ROWS[1]], rowCount: 1 },
     ];
-    const rows = await Effect.runPromise(
+    const rows = await runPromise(
       executeRows<{ id: string }>(clientResolving(multi), "SELECT 1; SELECT 2"),
     );
     expect(rows).toBe(multi);

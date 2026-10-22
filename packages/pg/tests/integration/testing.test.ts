@@ -25,6 +25,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Redacted from "effect/Redacted";
+import * as Schema from "effect/Schema";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { makePgDatabase } from "../../src/index.ts";
 import { makeTestTransaction, testDatabaseLayer } from "../../src/testing.ts";
@@ -32,6 +33,11 @@ import { makeTestTransaction, testDatabaseLayer } from "../../src/testing.ts";
 const relations = {};
 const database = makePgDatabase({ relations, key: "Database" });
 const { Database, CurrentTransaction, transact } = database;
+
+/** The spec's own, deliberate failure. */
+class SpecFailure extends Schema.TaggedError<SpecFailure>()("SpecFailure", {
+  message: Schema.String,
+}) {}
 
 const url = Redacted.make(process.env.DATABASE_URL_TEST ?? process.env.DATABASE_URL ?? "");
 const runtime = ManagedRuntime.make(testDatabaseLayer(database, { url }));
@@ -89,7 +95,9 @@ describe("runInTestTransaction against a live database", () => {
         Effect.gen(function* () {
           const tx = yield* CurrentTransaction;
           yield* tx.execute(sql`INSERT INTO rollback_probe (n) VALUES (2)`);
-          return yield* Effect.fail(new Error("the spec decided this run fails"));
+          return yield* Effect.fail(
+            new SpecFailure({ message: "the spec decided this run fails" }),
+          );
         }),
       ),
     ).rejects.toThrow(/the spec decided this run fails/);

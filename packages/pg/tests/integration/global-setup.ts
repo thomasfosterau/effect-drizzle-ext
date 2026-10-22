@@ -14,8 +14,8 @@
  */
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Redacted from "effect/Redacted";
 import * as Scope from "effect/Scope";
 import { existsSync } from "node:fs";
@@ -29,15 +29,19 @@ const CONTAINER_IMAGE = "pgvector/pgvector:pg17";
 
 export default async function setup(): Promise<() => Promise<void>> {
   if (existsSync(".env")) process.loadEnvFile(".env");
-  const scope = Effect.runSync(Scope.make());
-  const database = await Effect.runPromise(
+  const runtime = ManagedRuntime.make(NodeServices.layer);
+  const scope = await runtime.runPromise(Scope.make());
+  const database = await runtime.runPromise(
     provisionTestDatabase({
       env: process.env,
       migrationsDir: MIGRATIONS_DIR,
       dbNamePrefix: "effect_drizzle_ext",
       image: CONTAINER_IMAGE,
-    }).pipe(Scope.provide(scope), Effect.provide(NodeServices.layer)),
+    }).pipe(Scope.provide(scope)),
   );
   process.env.DATABASE_URL_TEST = Redacted.value(database.url);
-  return () => Effect.runPromise(Scope.close(scope, Exit.void));
+  return async () => {
+    await runtime.runPromise(Scope.close(scope, Exit.void));
+    await runtime.dispose();
+  };
 }

@@ -10,8 +10,11 @@
  */
 
 import { describe, expect, it } from "vite-plus/test";
+import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
+import * as Schema from "effect/Schema";
 import { SqlError, UniqueViolation as SqlUniqueViolation } from "effect/sql/SqlError";
 import {
   catchConstraintViolation,
@@ -30,6 +33,7 @@ import {
   UniqueViolation,
 } from "../src/errors.ts";
 import type { ClassifiedError } from "../src/errors.ts";
+import { runPromise } from "./harness.ts";
 
 /**
  * Classifies `error`, asserts which tag came back, and narrows to that member
@@ -37,13 +41,27 @@ import type { ClassifiedError } from "../src/errors.ts";
  * keeps every case below free of its own cast.
  */
 const classifiedAs = <T extends ClassifiedError["_tag"]>(
-  error: unknown,
+  error: Parameters<typeof classifyError>[0],
   tag: T,
-): Extract<ClassifiedError, { readonly _tag: T }> => {
-  const classified = Option.getOrThrow(classifyError(error));
-  expect(classified._tag).toBe(tag);
-  return classified as Extract<ClassifiedError, { readonly _tag: T }>;
+): ClassifiedError & { readonly _tag: T } => {
+  const classified = classifyError(error);
+  expect(Option.map(classified, (violation) => violation._tag)).toStrictEqual(Option.some(tag));
+  const isRequested = (
+    violation: ClassifiedError,
+  ): violation is ClassifiedError & { readonly _tag: T } => Predicate.isTagged(violation, tag);
+  return Option.getOrElse(Option.filter(classified, isRequested), () =>
+    expect.unreachable(`classifyError did not return a ${tag}`),
+  );
 };
+
+/** Recovers the driver error's facts, failing the test when there are none. */
+const factsOf = (error: Parameters<typeof findPgError>[0]) =>
+  Option.getOrElse(findPgError(error), () =>
+    expect.unreachable("findPgError found no driver error"),
+  );
+
+/** A non-driver failure: an `Error` with a message but no SQLSTATE anywhere. */
+class Boom extends Schema.TaggedError<Boom>()("Boom", { message: Schema.String }) {}
 
 // ── Fixtures ───────────────────────────────────────────────────────
 
@@ -51,11 +69,14 @@ const classifiedAs = <T extends ClassifiedError["_tag"]>(
  * A node-postgres `DatabaseError` as the driver builds it: the SQLSTATE under
  * `code`, and whichever of the other fields Postgres populates for that class.
  */
-const pgError = (fields: Record<string, unknown>): Record<string, unknown> => ({
+const pgError = <Fields extends { readonly code: string }>(fields: Fields) => ({
   name: "error",
   severity: "ERROR",
   ...fields,
 });
+
+/** Any fixture {@link pgError} builds. */
+type PgDriverError = ReturnType<typeof pgError>;
 
 /** Hides `cause` behind a non-enumerable property, as the real wrappers do. */
 const withHiddenCause = <T extends object>(error: T, cause: unknown): T => {
@@ -69,7 +90,7 @@ const withHiddenCause = <T extends object>(error: T, cause: unknown): T => {
  * holding an Effect `Cause` whose `reasons` array holds the `SqlError`, whose
  * own `cause` is the driver error.
  */
-const drizzleWrapped = (driverError: Record<string, unknown>): object =>
+const drizzleWrapped = (driverError: PgDriverError): object =>
   withHiddenCause(
     {
       _tag: "EffectDrizzleQueryError",
@@ -138,7 +159,7 @@ const deadlockFixture = pgError({
 
 describe("findPgError", () => {
   it("reads every fact off a bare driver error", () => {
-    const facts = Option.getOrThrow(findPgError(uniqueFixture));
+    const facts = factsOf(uniqueFixture);
     expect(facts.code).toBe("23505");
     expect(facts.message).toContain("duplicate key value");
     expect(facts.constraint).toStrictEqual(Option.some("widget_slug_unique"));
@@ -149,7 +170,7 @@ describe("findPgError", () => {
   });
 
   it("defaults `message` to the empty string when the node carries none", () => {
-    const facts = Option.getOrThrow(findPgError({ code: "23505" }));
+    const facts = factsOf({ code: "23505" });
     expect(facts.message).toBe("");
     expect(facts.constraint).toStrictEqual(Option.none());
   });
@@ -170,7 +191,7 @@ describe("findPgError", () => {
   });
 
   it("finds the driver error inside the captured drizzle / Cause shape", () => {
-    const facts = Option.getOrThrow(findPgError(drizzleWrapped(foreignKeyFixture)));
+    const facts = factsOf(drizzleWrapped(foreignKeyFixture));
     expect(facts.code).toBe("23503");
     expect(facts.constraint).toStrictEqual(Option.some("widget_kind_fk"));
     expect(facts.table).toStrictEqual(Option.some("widget"));
@@ -185,7 +206,7 @@ describe("findPgError", () => {
         operation: "insert",
       }),
     });
-    const facts = Option.getOrThrow(findPgError(sqlError));
+    const facts = factsOf(sqlError);
     expect(facts.code).toBe("23505");
     // `SqlError.reason` keeps `constraint` but drops table / detail; the walk
     // reaches the driver error underneath, which still has both.
@@ -194,23 +215,20 @@ describe("findPgError", () => {
   });
 
   it("terminates on a cyclic graph, and still finds the driver error in it", () => {
-    const outer: Record<string, unknown> = { _tag: "Wrapper" };
-    const inner: Record<string, unknown> = { _tag: "Inner", cause: outer };
-    outer["cause"] = inner;
+    const outer = { _tag: "Wrapper" };
+    const inner = { _tag: "Inner", cause: outer };
+    Object.assign(outer, { cause: inner });
     expect(findPgError(outer)).toStrictEqual(Option.none());
 
-    outer["sibling"] = checkFixture;
+    Object.assign(outer, { sibling: checkFixture });
     expect(Option.map(findPgError(outer), (facts) => facts.code)).toStrictEqual(
       Option.some("23514"),
     );
   });
 
   it("stops at the depth cap", () => {
-    const nest = (depth: number): unknown => {
-      let node: unknown = uniqueFixture;
-      for (let index = 0; index < depth; index += 1) node = { cause: node };
-      return node;
-    };
+    const nest = (depth: number): object =>
+      Arr.reduce<number, object>(Arr.range(1, depth), uniqueFixture, (node) => ({ cause: node }));
     // The driver error at depth 7 is inside the bound; at depth 8 it is not.
     expect(Option.isSome(findPgError(nest(7)))).toBe(true);
     expect(findPgError(nest(8))).toStrictEqual(Option.none());
@@ -218,7 +236,7 @@ describe("findPgError", () => {
 
   it("is none for a graph with no SQLSTATE and for non-object input", () => {
     expect(findPgError({ cause: { message: "boom" } })).toStrictEqual(Option.none());
-    expect(findPgError(new Error("boom"))).toStrictEqual(Option.none());
+    expect(findPgError(new Boom({ message: "boom" }))).toStrictEqual(Option.none());
     expect(findPgError(null)).toStrictEqual(Option.none());
     expect(findPgError("23505")).toStrictEqual(Option.none());
     expect(findPgError(undefined)).toStrictEqual(Option.none());
@@ -315,7 +333,7 @@ describe("isUniqueViolation", () => {
   it("is false for another SQLSTATE, a missing code, or a non-object", () => {
     expect(isUniqueViolation(foreignKeyFixture)).toBe(false);
     expect(isUniqueViolation({ cause: {} })).toBe(false);
-    expect(isUniqueViolation(new Error("boom"))).toBe(false);
+    expect(isUniqueViolation(new Boom({ message: "boom" }))).toBe(false);
     expect(isUniqueViolation(null)).toBe(false);
     expect(isUniqueViolation("23505")).toBe(false);
   });
@@ -323,15 +341,12 @@ describe("isUniqueViolation", () => {
 
 describe("isConstraintViolation", () => {
   it("is true for each of the five integrity classes", () => {
-    for (const fixture of [
-      uniqueFixture,
-      foreignKeyFixture,
-      notNullFixture,
-      checkFixture,
-      exclusionFixture,
-    ]) {
-      expect(isConstraintViolation(fixture)).toBe(true);
-    }
+    Arr.forEach(
+      [uniqueFixture, foreignKeyFixture, notNullFixture, checkFixture, exclusionFixture],
+      (fixture) => {
+        expect(isConstraintViolation(fixture)).toBe(true);
+      },
+    );
   });
 
   it("is false for a transaction failure, an unclassified SQLSTATE and a non-error", () => {
@@ -354,7 +369,7 @@ describe("isRetryableTransactionFailure", () => {
 
 describe("catchConstraintViolation", () => {
   it("recovers a matching failure with the classified violation", async () => {
-    const recovered = await Effect.runPromise(
+    const recovered = await runPromise(
       Effect.fail(drizzleWrapped(notNullFixture)).pipe(
         catchConstraintViolation((violation) =>
           Effect.succeed(`${violation._tag}:${Option.getOrElse(violation.table, () => "?")}`),
@@ -365,7 +380,7 @@ describe("catchConstraintViolation", () => {
   });
 
   it("leaves an unrelated failure untouched", async () => {
-    const failure = await Effect.runPromise(
+    const failure = await runPromise(
       Effect.flip(
         Effect.fail("unrelated").pipe(catchConstraintViolation(() => Effect.succeed("recovered"))),
       ),
@@ -374,7 +389,7 @@ describe("catchConstraintViolation", () => {
   });
 
   it("leaves a retryable transaction failure untouched", async () => {
-    const failure = await Effect.runPromise(
+    const failure = await runPromise(
       Effect.flip(
         Effect.fail(serializationFixture).pipe(
           catchConstraintViolation(() => Effect.succeed("recovered")),
@@ -385,7 +400,7 @@ describe("catchConstraintViolation", () => {
   });
 
   it("does not touch a success", async () => {
-    const value = await Effect.runPromise(
+    const value = await runPromise(
       Effect.succeed("ok").pipe(catchConstraintViolation(() => Effect.succeed("recovered"))),
     );
     expect(value).toBe("ok");
@@ -394,7 +409,7 @@ describe("catchConstraintViolation", () => {
 
 describe("catchUniqueViolation", () => {
   it("recovers a 23505 with the constraint name", async () => {
-    const recovered = await Effect.runPromise(
+    const recovered = await runPromise(
       Effect.fail(drizzleWrapped(uniqueFixture)).pipe(
         catchUniqueViolation((violation) =>
           Effect.succeed(Option.getOrElse(violation.constraint, () => "?")),
@@ -405,7 +420,7 @@ describe("catchUniqueViolation", () => {
   });
 
   it("passes another constraint violation through unchanged", async () => {
-    const failure = await Effect.runPromise(
+    const failure = await runPromise(
       Effect.flip(
         Effect.fail(foreignKeyFixture).pipe(
           catchUniqueViolation(() => Effect.succeed("recovered")),

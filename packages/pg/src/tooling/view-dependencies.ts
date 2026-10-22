@@ -135,11 +135,20 @@ export class ViewDependencyError extends Schema.TaggedError<ViewDependencyError>
  *
  * @example
  * ```ts
- * // packages/database/scripts/check-view-dependencies.ts
- * import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
- * import * as schema from "../src/schema.ts";
+ * // An application's `db:view-dependencies` task passes its own schema module.
+ * import { checkViewDependencies } from "@thomasfosterau/effect-drizzle-ext-pg/tooling";
+ * import { integer, pgTable, pgView, text } from "drizzle-orm/pg-core";
+ * import * as Effect from "effect/Effect";
  *
- * checkViewDependencies({ schema }).pipe(NodeRuntime.runMain);
+ * const article = pgTable("article", { id: integer().primaryKey(), title: text().notNull() });
+ * const articleTitles = pgView("article_titles").as((qb) =>
+ *   qb.select({ title: article.title }).from(article),
+ * );
+ *
+ * const { viewCount } = await Effect.runPromise(
+ *   checkViewDependencies({ schema: { article, articleTitles } }),
+ * );
+ * console.log(viewCount); // 1
  * ```
  */
 export const checkViewDependencies = (options: {

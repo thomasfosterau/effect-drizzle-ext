@@ -9,9 +9,9 @@ The `@effect/sql-pg` binding for `@thomasfosterau/effect-drizzle-ext`: `Database
 ## Install
 
 ```bash
-npm install @thomasfosterau/effect-drizzle-ext-pg @thomasfosterau/effect-drizzle-ext effect drizzle-orm @effect/sql-pg
+pnpm add @thomasfosterau/effect-drizzle-ext-pg @thomasfosterau/effect-drizzle-ext effect drizzle-orm @effect/sql-pg
 # optional: ./tooling's schema guards, ./testing's container fallback
-npm install --save-dev drizzle-kit @testcontainers/postgresql
+pnpm add --save-dev drizzle-kit @testcontainers/postgresql
 ```
 
 `effect` (`>=4.0.0-rc.118`), `drizzle-orm` (`>=1.0.0-rc.5`) and `@effect/sql-pg` (`>=4.0.0-rc.118`) are peer dependencies, built against `effect@4.0.0-rc.118`, `drizzle-orm@1.0.0-rc.5-ab785fc` and `@effect/sql-pg@4.0.0-rc.118`. Both floors are rc.118 because that release moved `effect/unstable/*` to `effect/*`; the client constructors below are written against `@effect/sql-pg`'s own wire protocol, and `pg` is no longer a peer. `drizzle-kit` (`>=1.0.0-rc.5`, for `./tooling`) and `@testcontainers/postgresql` (`>=12`, for `./testing`'s container fallback) are **optional** peers. `@thomasfosterau/effect-drizzle-ext` is a regular dependency, not a peer — it supplies the driver-agnostic `makeDatabaseServices` factory this package specialises. Node.js 22 or newer is required.
@@ -34,7 +34,7 @@ export const { Database, CurrentTransaction, transact, readHandle } = database;
 export type Database = typeof database.Database.Identifier; // "Database"
 ```
 
-`Database`/`CurrentTransaction`/`transact`/`readHandle` are otherwise identical to the driver-agnostic surface documented in [the core package's `./database`](../core/README.md#database) — this package adds nothing to their semantics, only the driver behind them.
+`Database`/`CurrentTransaction`/`transact`/`readHandle` are otherwise identical to the driver-agnostic surface documented in [the core package's `./database`](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/packages/core/README.md#database) — this package adds nothing to their semantics, only the driver behind them.
 
 Both `make` and `layer` carry `PgClient` in their requirement channel and nothing else: **where the pool comes from is the consuming application's decision**, made by providing one of:
 
@@ -352,7 +352,7 @@ await expect(runInTestTransaction(runtime, Effect.fail(new Error("boom")))).reje
 
 ## Errors against a live database
 
-`classifyError` from [`@thomasfosterau/effect-drizzle-ext/errors`](../core/README.md#errors) recovers a tagged, fact-carrying error from the drizzle / `@effect/sql-pg` error graph a real query raises — `constraint`, `table` and `column` are populated the same way against this driver as they are documented in the core package. `catchUniqueViolation` is the combinator most operations reach for, typically wrapping a `transact`ed write:
+`classifyError` from [`@thomasfosterau/effect-drizzle-ext/errors`](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/packages/core/README.md#errors) recovers a tagged, fact-carrying error from the drizzle / `@effect/sql-pg` error graph a real query raises — `constraint`, `table` and `column` are populated the same way against this driver as they are documented in the core package. `catchUniqueViolation` is the combinator most operations reach for, typically wrapping a `transact`ed write:
 
 ```ts
 import { catchUniqueViolation } from "@thomasfosterau/effect-drizzle-ext/errors";
@@ -440,4 +440,4 @@ This repository proves both guards against a committed fixture chain, `packages/
 
 ## License
 
-MIT © Thomas Foster. Repository: [github.com/thomasfosterau/effect-drizzle-ext](https://github.com/thomasfosterau/effect-drizzle-ext), package directory `packages/pg`. Extracted from the `thomasfosterau/website`, `thomasfosterau/gardeneria` and `thomasfosterau/preferenceflow` applications. See [`@thomasfosterau/effect-drizzle-ext`](../core/README.md) for the driver-agnostic half.
+MIT © Thomas Foster. Repository: [github.com/thomasfosterau/effect-drizzle-ext](https://github.com/thomasfosterau/effect-drizzle-ext), package directory `packages/pg`. Extracted from the `thomasfosterau/website`, `thomasfosterau/gardeneria` and `thomasfosterau/preferenceflow` applications. See [`@thomasfosterau/effect-drizzle-ext`](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/packages/core/README.md) for the driver-agnostic half.

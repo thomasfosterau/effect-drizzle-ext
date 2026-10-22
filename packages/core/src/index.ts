@@ -40,11 +40,18 @@
  * field straight to a reader with no cast. `Schema.Top` is strictly narrower, so
  * this widening accepts everything a `Schema.Top` parameter would.
  *
- * @module .
+ * @module index
  */
 
+import * as Arr from "effect/Array";
+import type * as JsonSchema from "effect/JsonSchema";
 import * as Option from "effect/Option";
+import * as Predicate from "effect/Predicate";
+import * as R from "effect/Record";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
+import * as SchemaAST from "effect/SchemaAST";
+import type * as SchemaRepresentation from "effect/SchemaRepresentation";
 
 /**
  * A referential action for a derived foreign-key column — the Drizzle
@@ -153,7 +160,10 @@ export type DbColumnOf<S> = S extends { readonly [DbColumnTypeId]: infer M exten
 export const dbColumn = <S extends Schema.Top, const M extends DbColumn>(
   schema: S,
   meta: M,
-): Annotated<S, M> => schema.annotate({ [DB_COLUMN_KEY]: meta }) as Annotated<S, M>;
+): Annotated<S, M> =>
+  // SAFETY: the phantom is type-only (never present at runtime), and the
+  // annotation just attached under DB_COLUMN_KEY is exactly `meta`.
+  schema.annotate({ [DB_COLUMN_KEY]: meta }) as Annotated<S, M>;
 
 /**
  * A {@link dbColumn} constrained to a specific column-kind union `Kind`. A
@@ -164,6 +174,8 @@ export const dbColumn = <S extends Schema.Top, const M extends DbColumn>(
 export const dbColumnFor =
   <Kind extends string>() =>
   <S extends Schema.Top, const M extends DbColumn<Kind>>(schema: S, meta: M): Annotated<S, M> =>
+    // SAFETY: as in `dbColumn` — the phantom is type-only and the annotation
+    // just attached under DB_COLUMN_KEY is exactly `meta`.
     schema.annotate({ [DB_COLUMN_KEY]: meta }) as Annotated<S, M>;
 
 /**
@@ -183,6 +195,8 @@ export const dbColumnFor =
  * next expression, which is where the boundary is.
  */
 /* oxlint-disable effect/prefer-option-over-null -- names effect's own runtime shape at a cast, converted on the same line */
+// SAFETY: DB_COLUMN_KEY is namespaced to this package and only `dbColumn` /
+// `dbColumnFor` write it, always with a `DbColumn` value.
 export const readDbColumn = (schema: Schema.Constraint): Option.Option<DbColumn> =>
   Option.fromNullishOr(Schema.resolveAnnotations(schema)?.[DB_COLUMN_KEY] as DbColumn | undefined);
 /* oxlint-enable effect/prefer-option-over-null */
@@ -265,6 +279,8 @@ export const dbTable = <T extends object, const M extends TableMeta>(
   meta: M,
 ): TableAnnotated<T, M> => {
   Object.defineProperty(target, DB_TABLE_KEY, { value: meta, enumerable: false });
+  // SAFETY: the phantom is type-only; the runtime metadata was just attached
+  // under DB_TABLE_KEY on this same object.
   return target as TableAnnotated<T, M>;
 };
 
@@ -288,8 +304,12 @@ export const dbTableFor =
  * {@link DbTable} recovers its `level` through the {@link DbTableOf} phantom,
  * which is where the level is statically known.
  */
-export const readDbTable = (target: object): Option.Option<TableMeta> =>
-  Option.fromNullishOr((target as Partial<Record<typeof DB_TABLE_KEY, TableMeta>>)[DB_TABLE_KEY]);
+export const readDbTable = <T extends object>(target: T): Option.Option<TableMeta> =>
+  Option.fromNullishOr(
+    // SAFETY: DB_TABLE_KEY is a module-private symbol that only `dbTable`
+    // writes, always with a `TableMeta`; an unannotated target lacks it.
+    (target as T & Partial<Record<typeof DB_TABLE_KEY, TableMeta>>)[DB_TABLE_KEY],
+  );
 
 // ── Numeric bounds (schema checks → CHECK-constraint metadata) ────────
 
@@ -318,68 +338,68 @@ export interface ColumnBounds extends NumericBounds {
 const BOUND_KEYS = ["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum"] as const;
 
 /**
- * A check node as the walker sees it: a filter group or an annotated filter.
- * `toJsonSchema` is effect's `SchemaRepresentation.ToJsonSchema.Check` — it
- * takes a `CheckInput`; the walker hands it a neutral one (no outer type, no
- * member schemas), which the bound filters ignore.
+ * The neutral `CheckInput` the walker hands a check's `toJsonSchema`: no outer
+ * type, no member schemas, which the bound filters ignore.
  */
-interface CheckNode {
-  readonly checks?: ReadonlyArray<CheckNode>;
-  readonly annotations?: {
-    readonly toJsonSchema?: (input: { type: undefined; schemas: readonly never[] }) => unknown;
-  };
-}
-
-/** The JSON-Schema fragment a check's `toJsonSchema` annotation exposes, if any. */
-const checkFragment = (node: CheckNode): Option.Option<Record<string, unknown>> => {
-  let fragment: unknown;
-  try {
-    fragment = node.annotations?.toJsonSchema?.({ type: undefined, schemas: [] });
-  } catch {
-    // A filter whose toJsonSchema needs context it wasn't given — no bounds.
-    return Option.none();
-  }
-  return typeof fragment === "object" && fragment !== null
-    ? Option.some(fragment as Record<string, unknown>)
-    : Option.none();
-};
-
-/** Merge a fragment's numeric bound keys into `acc`. */
-const mergeBounds = (
-  fragment: Option.Option<Record<string, unknown>>,
-  acc: Record<string, number>,
-): void => {
-  if (Option.isNone(fragment)) return;
-  for (const key of BOUND_KEYS) {
-    const value = fragment.value[key];
-    if (typeof value === "number") acc[key] = value;
-  }
+const NEUTRAL_CHECK_INPUT: SchemaRepresentation.ToJsonSchema.CheckInput = {
+  type: undefined,
+  schemas: [],
 };
 
 /**
- * Merge the numeric-bound fragments of a check list into `acc`.
+ * Whether a `toJsonSchema` output is a plain fragment. The approximate
+ * `[fragment, true]` form is an array, whose bound keys read as absent, so the
+ * walker reads no bounds from it.
+ */
+const isFragment = (
+  output: SchemaRepresentation.ToJsonSchema.CheckOutput,
+): output is JsonSchema.JsonSchema => Predicate.isObject(output);
+
+/** The JSON-Schema fragment a check's `toJsonSchema` annotation exposes, if any. */
+const checkFragment = (check: SchemaAST.Check<never>): Option.Option<JsonSchema.JsonSchema> =>
+  Option.flatMap(Option.fromNullishOr(check.annotations?.toJsonSchema), (toJsonSchema) =>
+    Option.filter(
+      // A filter whose toJsonSchema needs context it wasn't given throws — no bounds.
+      Option.flatMap(
+        Result.getSuccess(Result.try(() => toJsonSchema(NEUTRAL_CHECK_INPUT))),
+        Option.fromNullishOr,
+      ),
+      isFragment,
+    ),
+  );
+
+/** Merge a fragment's numeric bound keys over `bounds` (the later check wins a key). */
+const mergeBounds = (fragment: JsonSchema.JsonSchema, bounds: NumericBounds): NumericBounds =>
+  Arr.reduce(BOUND_KEYS, bounds, (acc, key) => {
+    const value = fragment[key];
+    return Predicate.isNumber(value) ? { ...acc, [key]: value } : acc;
+  });
+
+/**
+ * Merge the numeric-bound fragments of a check list over `bounds`.
  *
  * `checks` is an `Option` because effect's own AST leaves the field absent; the
  * callers convert that foreign `undefined` at the boundary with
  * `Option.fromNullishOr`.
  */
 const collectCheckBounds = (
-  checks: Option.Option<ReadonlyArray<CheckNode>>,
-  acc: Record<string, number>,
-): void => {
-  if (Option.isNone(checks)) return;
-  for (const node of checks.value) {
-    // A FilterGroup nests its members under `checks`; recurse into them.
-    collectCheckBounds(Option.fromNullishOr(node.checks), acc);
-    mergeBounds(checkFragment(node), acc);
-  }
-};
-
-/** The AST surface the bounds walker reads: own checks plus one union level. */
-interface BoundsAst {
-  readonly checks?: ReadonlyArray<CheckNode>;
-  readonly types?: ReadonlyArray<{ readonly checks?: ReadonlyArray<CheckNode> }>;
-}
+  checks: Option.Option<ReadonlyArray<SchemaAST.Check<never>>>,
+  bounds: NumericBounds,
+): NumericBounds =>
+  Arr.reduce(
+    Option.getOrElse(checks, () => []),
+    bounds,
+    (acc, check) => {
+      // A FilterGroup nests its members under `checks`; recurse into them.
+      const nested = Predicate.isTagged(check, "FilterGroup")
+        ? collectCheckBounds(Option.some(check.checks), acc)
+        : acc;
+      return Option.match(checkFragment(check), {
+        onNone: () => nested,
+        onSome: (fragment) => mergeBounds(fragment, nested),
+      });
+    },
+  );
 
 /**
  * Recover the {@link NumericBounds} a single attribute schema declares, or
@@ -393,15 +413,15 @@ interface BoundsAst {
  * same walk over a different field source.
  */
 export const numericBounds = (schema: Schema.Constraint): Option.Option<NumericBounds> => {
-  const acc: Record<string, number> = {};
-  // The walker's structural view of the AST (own checks + one union level) is
-  // deliberately narrower than effect's `AST` union — hence through `unknown`.
-  const ast = schema.ast as unknown as BoundsAst;
-  collectCheckBounds(Option.fromNullishOr(ast.checks), acc);
-  for (const member of ast.types ?? []) {
-    collectCheckBounds(Option.fromNullishOr(member.checks), acc);
-  }
-  return Object.keys(acc).length > 0 ? Option.some(acc as NumericBounds) : Option.none();
+  const { ast } = schema;
+  const bounds = Arr.reduce(
+    SchemaAST.isUnion(ast) ? ast.types : [],
+    collectCheckBounds(Option.fromNullishOr(ast.checks), {}),
+    (acc, member) => collectCheckBounds(Option.fromNullishOr(member.checks), acc),
+  );
+  return Arr.some(BOUND_KEYS, (key) => bounds[key] !== undefined)
+    ? Option.some(bounds)
+    : Option.none();
 };
 
 // ── Struct-field projection ───────────────────────────────────────────
@@ -457,24 +477,25 @@ const underlyingSchema = (schema: Schema.Constraint): Option.Option<Schema.Const
    * absence *is* `undefined`. The function converts it at its return.
    */
   /* oxlint-disable effect/prefer-option-over-null -- names effect's own runtime shape at a cast, converted at the return */
+  // SAFETY: both members are optional and checked before use; a schema that
+  // is neither wrapper simply lacks both properties.
   const wrapper = schema as {
     readonly schema?: Schema.Constraint | undefined;
     readonly members?: ReadonlyArray<Schema.Constraint> | undefined;
   };
   /* oxlint-enable effect/prefer-option-over-null */
   if (wrapper.schema !== undefined) return Option.some(wrapper.schema);
-  for (const member of wrapper.members ?? []) {
+  return Arr.findFirst(wrapper.members ?? [], (member) => {
     const tag = member.ast._tag;
-    if (tag !== "Null" && tag !== "Undefined") return Option.some(member);
-  }
-  return Option.none();
+    return tag !== "Null" && tag !== "Undefined";
+  });
 };
 
 /**
  * How many wrappers deep the peel walks before giving up. The deepest shape the
  * projection supports is `optional(NullOr(annotated))`, which is three peels
  * (`optionalKey` → `UndefinedOr` → `NullOr`); the cap is slack above that, and
- * it is what keeps a self-referential schema from spinning the loop forever.
+ * it is what keeps a self-referential schema from recursing forever.
  */
 const MAX_WRAPPER_DEPTH = 8;
 
@@ -490,15 +511,10 @@ const MAX_WRAPPER_DEPTH = 8;
  * level below the annotated node, which is exactly what {@link numericBounds}
  * walks.
  */
-const columnSchema = (field: Schema.Constraint): Option.Option<Schema.Constraint> => {
-  let current = field;
-  for (let depth = 0; depth <= MAX_WRAPPER_DEPTH; depth += 1) {
-    if (Option.isSome(readDbColumn(current))) return Option.some(current);
-    const inner = underlyingSchema(current);
-    if (Option.isNone(inner)) return Option.none();
-    current = inner.value;
-  }
-  return Option.none();
+const columnSchema = (field: Schema.Constraint, depth = 0): Option.Option<Schema.Constraint> => {
+  if (depth > MAX_WRAPPER_DEPTH) return Option.none();
+  if (Option.isSome(readDbColumn(field))) return Option.some(field);
+  return Option.flatMap(underlyingSchema(field), (inner) => columnSchema(inner, depth + 1));
 };
 
 /**
@@ -507,14 +523,8 @@ const columnSchema = (field: Schema.Constraint): Option.Option<Schema.Constraint
  * `optional` / `NullOr` wrappers a field may apply. The type-level counterpart
  * is {@link FieldColumnsMetaOf}.
  */
-export const fieldColumns = (fields: Schema.Struct.Fields): Record<string, DbColumn> => {
-  const out: Record<string, DbColumn> = {};
-  for (const name in fields) {
-    const meta = Option.flatMap(columnSchema(fields[name]), readDbColumn);
-    if (Option.isSome(meta)) out[name] = meta.value;
-  }
-  return out;
-};
+export const fieldColumns = (fields: Schema.Struct.Fields): Record<string, DbColumn> =>
+  R.getSomes(R.map(fields, (field) => Option.flatMap(columnSchema(field), readDbColumn)));
 
 /**
  * Project a `Schema.Struct`'s per-field numeric bounds into plain data a
@@ -524,16 +534,15 @@ export const fieldColumns = (fields: Schema.Struct.Fields): Record<string, DbCol
  * Drizzle-emitting counterpart is the `./derive` entry's
  * `deriveFieldCheckConstraints`.
  */
-export const fieldColumnBounds = (fields: Schema.Struct.Fields): Record<string, ColumnBounds> => {
-  const out: Record<string, ColumnBounds> = {};
-  for (const name in fields) {
-    const schema = columnSchema(fields[name]);
-    if (Option.isNone(schema)) continue;
-    const column = readDbColumn(schema.value);
-    const bounds = numericBounds(schema.value);
-    if (Option.isSome(column) && Option.isSome(bounds)) {
-      out[name] = { column: column.value, ...bounds.value };
-    }
-  }
-  return out;
-};
+export const fieldColumnBounds = (fields: Schema.Struct.Fields): Record<string, ColumnBounds> =>
+  R.getSomes(
+    R.map(fields, (field) =>
+      Option.flatMap(columnSchema(field), (schema) =>
+        Option.zipWith(
+          readDbColumn(schema),
+          numericBounds(schema),
+          (column, bounds): ColumnBounds => ({ column, ...bounds }),
+        ),
+      ),
+    ),
+  );

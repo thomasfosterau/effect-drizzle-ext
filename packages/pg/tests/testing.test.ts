@@ -30,7 +30,9 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
+import * as Predicate from "effect/Predicate";
 import * as Redacted from "effect/Redacted";
+import * as Schema from "effect/Schema";
 import {
   ConnectionError,
   ConstraintError,
@@ -47,13 +49,24 @@ import {
   testDatabaseLayer,
 } from "../src/testing.ts";
 
+/** A stand-in for the plain driver / spec error a cause or failure carries (no `.code`). */
+class TestFault extends Schema.TaggedError<TestFault>()("TestFault", {
+  message: Schema.String,
+}) {}
+
+/** A stand-in for a Node socket error: a message plus a Node `code`, which is not a SQLSTATE. */
+class SocketFault extends Schema.TaggedError<SocketFault>()("SocketFault", {
+  message: Schema.String,
+  code: Schema.String,
+}) {}
+
 // ── isRetryableConnectFailure (ported) ─────────────────────────────────
 
 /** The pool-acquisition timeout node-pg raises (a plain Error, no `.code`). */
 const acquisitionTimeout = () =>
   new SqlError({
     reason: new UnknownError({
-      cause: new Error("timeout exceeded when trying to connect"),
+      cause: new TestFault({ message: "timeout exceeded when trying to connect" }),
       message: "Failed to acquire connection for transaction",
       operation: "acquireConnection",
     }),
@@ -61,7 +74,7 @@ const acquisitionTimeout = () =>
 
 /** A socket `ECONNRESET` surfacing at the acquire seam (Node `code`, not a SQLSTATE). */
 const econnresetOnAcquire = () => {
-  const cause = Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" });
+  const cause = new SocketFault({ message: "read ECONNRESET", code: "ECONNRESET" });
   return new SqlError({
     reason: new UnknownError({
       cause,
@@ -87,7 +100,7 @@ describe("isRetryableConnectFailure", () => {
   it("retries a driver-flagged retryable ConnectionError (connect seam)", () => {
     const error = new SqlError({
       reason: new ConnectionError({
-        cause: new Error("Connection timed out"),
+        cause: new TestFault({ message: "Connection timed out" }),
         message: "PgClient: Connection timed out",
         operation: "connect",
       }),
@@ -99,7 +112,7 @@ describe("isRetryableConnectFailure", () => {
   it("does NOT retry a UniqueViolation from a test's own query", () => {
     const error = new SqlError({
       reason: new UniqueViolation({
-        cause: new Error("duplicate key"),
+        cause: new TestFault({ message: "duplicate key" }),
         message: "insert failed",
         operation: "execute",
         constraint: "widgets_slug_key",
@@ -113,7 +126,7 @@ describe("isRetryableConnectFailure", () => {
     // query fault, not a connect-seam transient. Must not be retried.
     const error = new SqlError({
       reason: new UnknownError({
-        cause: new Error("something went wrong mid-query"),
+        cause: new TestFault({ message: "something went wrong mid-query" }),
         message: "Failed to execute statement",
         operation: "execute",
       }),
@@ -124,7 +137,7 @@ describe("isRetryableConnectFailure", () => {
   it("does NOT retry a non-retryable ConstraintError", () => {
     const error = new SqlError({
       reason: new ConstraintError({
-        cause: new Error("check violation"),
+        cause: new TestFault({ message: "check violation" }),
         message: "insert failed",
         operation: "execute",
       }),
@@ -133,7 +146,7 @@ describe("isRetryableConnectFailure", () => {
   });
 
   it("ignores non-SqlError values (plain errors, the rollback sentinel, nullish)", () => {
-    expect(isRetryableConnectFailure(new Error("boom"))).toBe(false);
+    expect(isRetryableConnectFailure(new TestFault({ message: "boom" }))).toBe(false);
     expect(isRetryableConnectFailure({ _tag: "__effect_test_rollback__" })).toBe(false);
     expect(isRetryableConnectFailure(undefined)).toBe(false);
     // oxlint-disable-next-line effect/prefer-option-over-null -- the predicate's contract is "any unknown value"; `null` is one of the values it must tolerate
@@ -243,6 +256,10 @@ const makeFake = (options: {
     attempts: () => attempts,
     // The runner only reads `Database`, `CurrentTransaction` and `transact`;
     // `make` / `layer` exist so the value satisfies the published interface.
+    // SAFETY: a test double — the runner touches only `Database`,
+    // `CurrentTransaction` and `transact`, all built over `FakeHandle`, which
+    // carries every member of the handle the runner calls.
+    // oxlint-disable-next-line effect/avoid-any, effect/no-chained-type-assertions -- a structural fake of the driver handle is deliberately not Drizzle's `PgDatabaseClient`, so TypeScript requires the conversion through `unknown`; nothing here is untrusted input to parse
     database: {
       ...services,
       make: Effect.succeed(handle),
@@ -255,7 +272,7 @@ const makeFake = (options: {
 const connectSeamFailure = (): SqlError =>
   new SqlError({
     reason: new UnknownError({
-      cause: new Error("timeout exceeded when trying to connect"),
+      cause: new TestFault({ message: "timeout exceeded when trying to connect" }),
       message: "Failed to acquire connection for transaction",
       operation: "acquireConnection",
     }),
@@ -264,7 +281,7 @@ const connectSeamFailure = (): SqlError =>
 const queryFailure = (): SqlError =>
   new SqlError({
     reason: new ConstraintError({
-      cause: new Error("check violation"),
+      cause: new TestFault({ message: "check violation" }),
       message: "insert failed",
       operation: "execute",
     }),
@@ -287,12 +304,12 @@ describe("runInTestTransaction", () => {
     const fake = makeFake({});
     const { runInTestTransaction } = makeTestTransaction(fake.database);
 
-    const handle = await runInTestTransaction(
+    const opensTransactions = await runInTestTransaction(
       fake.runtime,
-      Effect.map(services.CurrentTransaction, (tx) => typeof tx.transaction),
+      Effect.map(services.CurrentTransaction, (tx) => Predicate.isFunction(tx.transaction)),
     );
 
-    expect(handle).toBe("function");
+    expect(opensTransactions).toBe(true);
   });
 
   it("rolls back and rejects with a legible failure when the body fails", async () => {
@@ -300,7 +317,10 @@ describe("runInTestTransaction", () => {
     const { runInTestTransaction } = makeTestTransaction(fake.database);
 
     await expect(
-      runInTestTransaction(fake.runtime, Effect.fail(new Error("the spec's own failure"))),
+      runInTestTransaction(
+        fake.runtime,
+        Effect.fail(new TestFault({ message: "the spec's own failure" })),
+      ),
     ).rejects.toThrow(/the spec's own failure/);
 
     expect(fake.events).toEqual(["open:1", "open:2", "rollback:2", "rollback:1"]);
@@ -313,7 +333,7 @@ describe("runInTestTransaction", () => {
     // Without `Cause.squash` this serialises as `{ _tag: 'Die', defect: … }`
     // with an empty `.message` and the regex never matches.
     await expect(
-      runInTestTransaction(fake.runtime, Effect.die(new Error("a thrown defect"))),
+      runInTestTransaction(fake.runtime, Effect.die(new TestFault({ message: "a thrown defect" }))),
     ).rejects.toThrow(/a thrown defect/);
   });
 
@@ -382,7 +402,9 @@ describe("attemptInSavepoint", () => {
     const outcome = await runInTestTransaction(
       fake.runtime,
       Effect.gen(function* () {
-        const rejected = yield* attemptInSavepoint(Effect.fail(new Error("constraint rejected")));
+        const rejected = yield* attemptInSavepoint(
+          Effect.fail(new TestFault({ message: "constraint rejected" })),
+        );
         // The enclosing transaction is still usable — that is the point.
         const accepted = yield* attemptInSavepoint(Effect.succeed("ok"));
         return { rejected: rejected._tag, accepted: accepted._tag };

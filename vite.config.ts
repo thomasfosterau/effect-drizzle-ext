@@ -67,54 +67,6 @@ export default defineConfig({
       // "effect/Option"`) this library shares with its consumers.
       "effect/prefer-namespace-imports": "off",
 
-      // ---- Effect preset: ported-code allowances ---------------------------
-      // The modules under packages/*/src are ports of code the applications
-      // carry today, which predates the Effect oxlint preset. The rules below
-      // sit at `warn` so the verbatim ports stay committable while each site
-      // stays reported; a new site is a defect, not headroom. `prefer-option-
-      // over-null` is NOT here: it stays at `error`, because every deliberate
-      // `undefined` on a Drizzle-facing member carries a written justification
-      // (the Drizzle-reads-undefined-as-not-supplied hazard) in an
-      // `oxlint-disable` block, and that discipline is the point.
-      "effect/imperative-loops": "warn",
-      "effect/avoid-native-object-helpers": "warn",
-      "effect/avoid-non-null-assertion": "warn",
-      "effect/avoid-any": "warn",
-      "effect/avoid-untagged-errors": "warn",
-      "effect/avoid-direct-json": "warn",
-      "effect/prefer-arr-match": "warn",
-      "effect/no-length-comparison": "warn",
-      "effect/prefer-arr-sort": "warn",
-      "effect/avoid-try-catch": "warn",
-      "effect/yield-in-for-loop": "warn",
-      "effect/prefer-effect-is": "warn",
-      "effect/avoid-expect-in-if": "warn",
-      "effect/effect-run-in-body": "warn",
-      "effect/prefer-effect-fn": "warn",
-      "effect/avoid-direct-tag-checks": "warn",
-      "effect/avoid-option-getorthrow": "warn",
-      "effect/no-barrel-imports": "warn",
-      "effect/throw-in-effect-gen": "warn",
-      // Added to `effect.configs.recommended` (at `error`) by
-      // @mpsuesser/oxlint-plugin-effect 0.5; staged the same way, as
-      // effect-jsonapi staged them. Counted at the bump (`vp lint`,
-      // 2026-09-25): 69 `require-safety-comment-for-type-assertion`, 20
-      // `no-unknown-parameters`, 12 `no-unsafe-dictionary-type`, 12
-      // `no-known-value-widening`, 10 `no-unknown-returns`, 9
-      // `no-runtime-typeof`, 9 `no-chained-type-assertions`, 3
-      // `no-shape-in-symbol-names`, 2 `no-conditional-empty-object-spread`,
-      // 1 `no-object-parameters`. Flip each back to `error` (and delete its
-      // line) when its count reaches zero.
-      "effect/require-safety-comment-for-type-assertion": "warn",
-      "effect/no-unknown-parameters": "warn",
-      "effect/no-unsafe-dictionary-type": "warn",
-      "effect/no-known-value-widening": "warn",
-      "effect/no-unknown-returns": "warn",
-      "effect/no-runtime-typeof": "warn",
-      "effect/no-chained-type-assertions": "warn",
-      "effect/no-conditional-empty-object-spread": "warn",
-      "effect/no-object-parameters": "warn",
-      "effect/no-shape-in-symbol-names": "warn",
       "typescript/no-explicit-any": "off",
       "typescript/no-empty-object-type": "off",
       "typescript/ban-ts-comment": "off",
@@ -172,6 +124,26 @@ export default defineConfig({
           "@thomasfosterau/effect-drizzle-ext#check",
           "@thomasfosterau/effect-drizzle-ext-pg#check",
           "@effect-drizzle-ext/dist-consumer#check",
+        ],
+        cache: false,
+      },
+      // Both packages' unit suites under one Istanbul map at
+      // `coverage/coverage-final.json`, the map `fallow audit` reads
+      // (`.fallowrc.json` → `health.coverage`); see vitest.coverage.config.ts.
+      // Not a CI step: run it before the fallow gate (AGENTS.md →
+      // Verification). cache: false — the map on disk is the point, and a
+      // stale one would score the audit against old code.
+      "test:coverage": {
+        command: "vp test run --config vitest.coverage.config.ts --coverage",
+        cache: false,
+      },
+      // Every package's docgen: compiles AND RUNS each JSDoc `@example`
+      // (see vite.package.ts). A pure graph node, like `check`.
+      docgen: {
+        command: "echo 'docgen: every example compiled and ran'",
+        dependsOn: [
+          "@thomasfosterau/effect-drizzle-ext#docgen",
+          "@thomasfosterau/effect-drizzle-ext-pg#docgen",
         ],
         cache: false,
       },
