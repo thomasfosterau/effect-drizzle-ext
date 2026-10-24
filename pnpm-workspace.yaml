@@ -110,6 +110,12 @@ catalogs:
     "@testcontainers/postgresql": ">=12"
 
 overrides:
+  # undici <8.12.2 — GHSA-xjj6-f33q-929c (high): an unhandled error on a
+  # response with excessive content-encodings is a denial of service
+  # (#96). Reached transitively (@effect/platform-node > undici), whose
+  # range admits the fix but whose lockfile resolution stayed below it.
+  # Drop once that resolution reaches >=8.12.2 on its own.
+  undici: ^8.12.2
   vite: "catalog:"
   vitest: "catalog:"
   # `effect` MUST be a singleton (see the header): force every resolution to
