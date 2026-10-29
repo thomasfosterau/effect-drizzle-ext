@@ -4,7 +4,10 @@
  * back through Drizzle's `effect-postgres` driver on a real PostgreSQL
  * server. Two runtimes: the plain `pgClientFromUrl` layer, and one that
  * forwards a `types` registry (an int8 -> decimal-string codec) through the
- * helper, the documented fix for `bigint({ mode: "string" })` (website#2027).
+ * helper. The registry was the fix for `bigint({ mode: "string" })` under the
+ * `1.0.0-rc.5-ab785fc` commit build (website#2027); the published
+ * drizzle-orm `1.0.0-rc.5` decodes it itself, so both runtimes now agree
+ * (effect-drizzle-ext#95).
  *
  * Both tables live in a rolled-back transaction, so nothing is left behind.
  *
@@ -86,14 +89,13 @@ describe("Drizzle round trip over the binary driver", () => {
     expect(rows).toEqual([{ id: 1, mood: "happy", big: BIG, at: AT }]);
   });
 
-  it("reads a plain bigint column back as a bigint without the registry (the mismatch the README documents)", async () => {
+  it("round-trips the same row without a registry (drizzle-orm 1.0.0-rc.5's own codecs)", async () => {
     const runtime = makeRuntime();
     onTestFinished(() => runtime.dispose());
     const { runInTestTransaction } = makeTestTransaction(database);
     const rows = await runInTestTransaction(runtime, roundTrip());
-    expect(rows[0]?.mood).toBe("happy");
-    expect(rows[0]?.at).toEqual(AT);
-    // Typed `string` by drizzle, delivered as a JS bigint by the driver.
-    expect(rows[0]?.big).toBeTypeOf("bigint");
+    // The commit build handed `big` back as a JS bigint here, against
+    // drizzle's `string` type; the published rc.5 returns the decimal string.
+    expect(rows).toEqual([{ id: 1, mood: "happy", big: BIG, at: AT }]);
   });
 });

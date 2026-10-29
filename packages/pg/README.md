@@ -64,9 +64,9 @@ Both output `PgClient | SqlClient` — that is what `@effect/sql-pg`'s own `PgCl
 
 ### Binary codecs and Drizzle (read this before upgrading the driver)
 
-`@effect/sql-pg` rc.113 and later talks to PostgreSQL in the **binary** protocol only, and decodes each column by OID. Drizzle's `effect-postgres` driver was written for the text protocol, so under it some column types break or are silently corrupted: user enums and enum arrays, `vector`, `interval`, `tsvector`, `time`, `macaddr`, and `bigint({ mode: "string" })` (the driver hands back a JS `bigint` where Drizzle's type says `string`). `timestamptz` and the other columns Drizzle casts to text itself are fine. The measured table and a tested codec shim are in [website#2027](https://github.com/thomasfosterau/website/issues/2027).
+`@effect/sql-pg` rc.113 and later talks to PostgreSQL in the **binary** protocol only, and decodes each column by OID. Drizzle's `effect-postgres` driver was written for the text protocol, so under the `1.0.0-rc.5-ab785fc` commit build some column types broke or were silently corrupted: user enums and enum arrays, `vector`, `interval`, `tsvector`, `time`, `macaddr`, and `bigint({ mode: "string" })` (the driver handed back a JS `bigint` where Drizzle's type says `string`). The measured table and a tested codec shim are in [website#2027](https://github.com/thomasfosterau/website/issues/2027). The published `drizzle-orm@1.0.0-rc.5`, which this package is built against, reads most of them itself: it selects enums and their arrays, `vector`, `interval`, `tsvector` and `regconfig` as `::text`, and returns a string-mode `bigint` as a string.
 
-The fix is a per-client codec registry. Both helpers forward two optional `@effect/sql-pg` options for it:
+For a column type it still doesn't cover, use a per-client codec registry. Both helpers forward two optional `@effect/sql-pg` options for it:
 
 - `types` — a `PgTypes.Registry` (`PgTypes.makeRegistry()` plus `register(oid, codec, { arrayOid })` calls), for example an `int8` codec that returns a decimal string.
 - `prepare` — `false` to use unnamed statements. Set it behind a pooler that cannot keep named prepared statements across queries, such as Cloudflare Hyperdrive.
@@ -77,7 +77,7 @@ types.register(20, int8StringCodec, { arrayOid: 1016 });
 const client = pgClientFromUrl({ url, types, prepare: false });
 ```
 
-`tests/integration/round-trip.test.ts` pins an enum, a string-mode `bigint` and a `timestamptz` through Drizzle against a live server, with and without the registry. This package ships no codecs of its own: which types need one depends on the application's schema.
+`tests/integration/round-trip.test.ts` pins an enum, a string-mode `bigint` and a `timestamptz` through Drizzle against a live server, with and without the registry, and checks both read back the same row. This package ships no codecs of its own: which types need one depends on the application's schema.
 
 Deployment topology stays with the consuming application: resolving a connection string from a platform binding (a Cloudflare Hyperdrive binding, an environment variable), degrading a failed binding to a proxy client, and any wrapper around the concrete client are all things only the application knows about. This package has no Hyperdrive binding and no Cloudflare/Alchemy integration.
 
