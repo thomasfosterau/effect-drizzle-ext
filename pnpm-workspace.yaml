@@ -57,13 +57,16 @@ catalog:
   "@types/node": ^26.6.5
   # Must equal the vitest that vite-plus bundles (see `vitest` below).
   "@vitest/coverage-istanbul": 5.0.5
-  # A commit-suffixed prerelease: the first drizzle line to ship the Effect
+  # The published `rc` build: the first drizzle line to ship the Effect
   # integration (`drizzle-orm/effect-postgres`, `effect-core`, `effect-schema`)
-  # this library extends. Same pin as the three applications.
-  drizzle-orm: 1.0.0-rc.5-ab785fc
+  # this library extends. Same pin as the three applications. Its
+  # `TableConfig.isAlias` and single-`ViewConfig` `PgViewWithSelection` are what
+  # the emitted `versioned-chain` declarations name (effect-drizzle-ext#95); the
+  # earlier `1.0.0-rc.5-ab785fc` commit build has the older shapes.
+  drizzle-orm: 1.0.0-rc.5
   # The optional peer `@thomasfosterau/effect-drizzle-ext-pg/tooling` diffs
   # schemas with (`drizzle-kit/api-postgres`); always the drizzle-orm pin.
-  drizzle-kit: 1.0.0-rc.5-5935859
+  drizzle-kit: 1.0.0-rc.5
   effect: 4.0.6
   fallow: 3.34.1
   # Runs docgen's compiled examples.
