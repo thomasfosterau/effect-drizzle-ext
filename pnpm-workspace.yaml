@@ -41,7 +41,7 @@ catalog:
   # `pnpm install` itself. Read the `components` table in
   # node_modules/@effect/tsgo/dist/effect-tsgo.cjs before bumping any of the
   # three.
-  "@effect/tsgo": 0.55.0
+  "@effect/tsgo": 0.62.0
   "@effect/sql-pg": 4.0.6
   # The Node `FileSystem` / `Path` / `ChildProcessSpawner` layer the pg
   # package's tests provide to `./migrations`, `./testing`'s provisioning and
@@ -89,7 +89,7 @@ catalog:
   # singleton; `@vitest/coverage-istanbul` above must equal it too, or
   # vite-plus refuses to run coverage. 1.x moved a task's `env` / `input` /
   # `output` under `cache: { … }` (see the package vite.config.ts files).
-  vite-plus: 1.3.0
+  vite-plus: 1.4.0
   vite: npm:@voidzero-dev/vite-plus-core@1.3.0
   vitest: 5.0.5
 
