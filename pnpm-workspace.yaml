@@ -68,7 +68,7 @@ catalog:
   # schemas with (`drizzle-kit/api-postgres`); always the drizzle-orm pin.
   drizzle-kit: 1.0.0-rc.5
   effect: 4.0.6
-  fallow: 3.34.1
+  fallow: 3.37.0
   # Runs docgen's compiled examples.
   tsx: ^4.23.15
   # TypeScript 6/7 side-by-side: TS7 (the native Go compiler) ships no JS API
