@@ -225,12 +225,14 @@ export interface SubtypeTables<TColumns extends Record<string, ColumnBuilderBase
     schema: string;
     columns: PgBuildColumns<string, SubtypeStableColumnBuilders>;
     dialect: "pg";
+    isAlias: false;
   }>;
   version: PgTableWithColumns<{
     name: `${string}_version`;
     schema: string;
     columns: PgBuildColumns<`${string}_version`, SubtypeVersionColumnBuilders<TColumns>>;
     dialect: "pg";
+    isAlias: false;
   }>;
 }
 
@@ -374,7 +376,13 @@ type ViewRow<TColumns extends ViewColumns> = { [K in keyof TColumns]: ViewField<
  * untyped.
  */
 type CurrentVersionViewResult<TColumns extends ViewColumns, TMerge extends ViewColumns> = Omit<
-  PgViewWithSelection<string, false, TColumns & TMerge>,
+  PgViewWithSelection<{
+    name: string;
+    schema: string;
+    existing: false;
+    selectedFields: TColumns & TMerge;
+    isAlias: false;
+  }>,
   "$inferSelect"
 > & {
   $inferSelect: ViewRow<TColumns & TMerge>;
