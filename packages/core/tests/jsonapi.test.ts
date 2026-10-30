@@ -170,6 +170,17 @@ describe("dbTable on a resource", () => {
   });
 });
 
+/** The DDL-relevant facts of each column a derivation produces. */
+const ddlOf = (columns: Readonly<Record<string, ColumnBuilderBase>>) =>
+  // SAFETY: both derivations build from the pg-core `builders`, so every
+  // column is a pg column builder at runtime behind the dialect-neutral type.
+  getTableConfig(pgTable("widget", columns as never)).columns.map((c) => ({
+    name: c.name,
+    type: c.getSQLType(),
+    notNull: c.notNull,
+    hasDefault: c.hasDefault,
+  }));
+
 describe("makeDeriveResourceColumns", () => {
   it("derives one builder per annotated attribute, applying notNull and default", () => {
     const derive = makeDeriveResourceColumns(builders, {
@@ -198,15 +209,6 @@ describe("makeDeriveResourceColumns", () => {
       note: Schema.String,
     };
     const options = { resolveReference: () => () => owner.id };
-    const ddlOf = (columns: Readonly<Record<string, ColumnBuilderBase>>) =>
-      // SAFETY: both derivations build from the pg-core `builders`, so every
-      // column is a pg column builder at runtime behind the dialect-neutral type.
-      getTableConfig(pgTable("widget", columns as never)).columns.map((c) => ({
-        name: c.name,
-        type: c.getSQLType(),
-        notNull: c.notNull,
-        hasDefault: c.hasDefault,
-      }));
     expect(ddlOf(makeDeriveResourceColumns(builders, options)(WidgetResource))).toEqual(
       ddlOf(makeDeriveColumns(builders, options).fromFields(fields)),
     );
@@ -330,13 +332,13 @@ describe("type-level precision", () => {
       },
     });
     type Meta = ResourceColumnsMetaOf<typeof Descriptored>;
-    const _slug: Meta["slug"]["pg"] = "text";
-    const _size: Meta["size"]["pg"] = "integer";
-    const _absent: "note" extends keyof Meta ? false : true = true;
+    const slug: Meta["slug"]["pg"] = "text";
+    const size: Meta["size"]["pg"] = "integer";
+    const absent: "note" extends keyof Meta ? false : true = true;
 
     const derived = makeDeriveResourceColumns(builders)(Descriptored);
-    const _notNull: (typeof derived)["slug"]["_"]["notNull"] = true;
-    expect([_slug, _size, _absent, _notNull]).toEqual(["text", "integer", true, true]);
+    const notNull: (typeof derived)["slug"]["_"]["notNull"] = true;
+    expect([slug, size, absent, notNull]).toEqual(["text", "integer", true, true]);
   });
 });
 

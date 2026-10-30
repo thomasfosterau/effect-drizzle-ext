@@ -119,8 +119,8 @@ const orderClause = (order: ReadonlyArray<OrderTerm>): string => {
     .orderBy(...order)
     .limit(10)
     .offset(0);
-  const text = dialect.sqlToQuery(query.getSQL()).sql;
-  return text.slice(text.indexOf("order by"), text.indexOf(" limit"));
+  const statement = dialect.sqlToQuery(query.getSQL()).sql;
+  return statement.slice(statement.indexOf("order by"), statement.indexOf(" limit"));
 };
 
 /** Resolve then render, the way a list operation does. */
@@ -324,10 +324,11 @@ describe("resolveSortOrder rejects what a resource does not expose", () => {
 
 // ── chronologicalOrder ───────────────────────────────────────────────────
 
-describe("chronologicalOrder", () => {
-  const render = (options: Omit<Parameters<typeof chronologicalOrder>[0], "view">): string =>
-    orderClause(runSync(chronologicalOrder({ view: postView, ...options })));
+/** The `order by …` clause `chronologicalOrder` resolves to over `postView`. */
+const render = (options: Omit<Parameters<typeof chronologicalOrder>[0], "view">): string =>
+  orderClause(runSync(chronologicalOrder({ view: postView, ...options })));
 
+describe("chronologicalOrder", () => {
   it("defaults to newest first with a mirrored tiebreak", () => {
     expect(render({})).toBe(`order by "post_view"."timestamp" desc, "post_view"."id" desc`);
   });

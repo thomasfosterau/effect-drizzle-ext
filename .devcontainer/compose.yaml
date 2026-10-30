@@ -1,5 +1,5 @@
 # The dev container's services, started by devcontainer.json. Reproduces CI's
-# one job (.github/workflows/ci.yml): Node at the major CI's `latest` resolves
+# one job (.github/workflows/ci.yml): Node at the major CI's newest released Node resolves
 # to, plus the same `pgvector/pgvector:pg17` server as CI's `postgres` service
 # container, so `vp run test:integration` provisions its database on that
 # server with no Docker daemon inside the container.

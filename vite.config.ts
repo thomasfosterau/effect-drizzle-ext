@@ -13,7 +13,7 @@
 
 import { defineConfig } from "vite-plus";
 import { recommended } from "@effect/tsgo/oxlint-presets";
-import effect from "@mpsuesser/oxlint-plugin-effect";
+import effect from "@enfect/oxlint";
 
 export default defineConfig({
   // Staged-file checks run by `vp staged` (pre-commit).
@@ -32,8 +32,15 @@ export default defineConfig({
   },
   lint: {
     extends: [recommended, effect.configs.recommended],
+    // oxlint's built-in plugins beyond its defaults: `import`, `promise`,
+    // `vitest` and `jsdoc` cover what the Effect presets don't (module
+    // hygiene, promise misuse, test shape, doc-comment tags). Listing
+    // `plugins` replaces the default set, so the defaults are named too.
+    plugins: ["eslint", "typescript", "unicorn", "oxc", "import", "promise", "vitest", "jsdoc"],
     categories: {
       correctness: "error",
+      suspicious: "error",
+      perf: "error",
     },
     rules: {
       "eslint/no-unused-vars": [
@@ -44,6 +51,15 @@ export default defineConfig({
         },
       ],
       "eslint/prefer-const": "warn",
+      // `_tag` is the discriminant of every Effect tagged union and error
+      // class (and of Drizzle's `_` type carrier); reading it is the point.
+      "eslint/no-underscore-dangle": ["error", { allow: ["_tag"] }],
+      // Reads any two-argument `.catch(…)` as `Promise.prototype.catch`, so it
+      // reports the data-first `Effect.catch(self, handler)` calls that
+      // `catchConstraintViolation` / `catchUniqueViolation` are built from
+      // (packages/core/src/errors.ts). This library has no promise `.catch`
+      // chains for it to check; the rule cannot apply.
+      "promise/valid-params": "off",
       // The `Buffer` global is typed `any` wherever a consumer loads
       // @cloudflare/workers-types next to @types/node (every application this
       // library serves), so every call on it is unchecked there. The library
@@ -100,8 +116,10 @@ export default defineConfig({
         },
       },
     ],
-    // Type-aware linting is intentionally disabled: type checking stays the
-    // `check` tasks' job (native tsc, Effect-patched).
+    // Type-aware linting is off for now: type checking stays the `check`
+    // tasks' job (native tsc, Effect-patched), and turning the type-aware
+    // rules on reports ~70 error-level sites still to fix
+    // (effect-drizzle-ext#104).
     options: {
       typeAware: false,
       typeCheck: false,

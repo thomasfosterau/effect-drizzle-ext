@@ -82,7 +82,7 @@ describe("dbColumn annotation", () => {
   it("does not change the schema's decode behaviour", () => {
     const annotated = dbColumn(Schema.String, { column: "name", pg: "text", notNull: true });
     expect(Schema.decodeSync(annotated)("hello")).toBe("hello");
-    expect(() => Schema.decodeUnknownSync(annotated)(42)).toThrow();
+    expect(() => Schema.decodeUnknownSync(annotated)(42)).toThrow("Expected string");
   });
 
   it("returns none for an un-annotated schema", () => {

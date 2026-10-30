@@ -70,7 +70,6 @@ const classifyRejection = Effect.fn("errors.classifyRejection")(function* (state
   const attempt = yield* attemptInSavepoint(
     Effect.flatMap(CurrentTransaction, (tx) => tx.execute(sql.raw(statement))),
   );
-  expect(Exit.isFailure(attempt)).toBe(true);
   assert(Exit.isFailure(attempt), "unreachable: the statement should have failed");
   return classifyError(attempt.cause);
 });

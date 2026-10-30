@@ -10,13 +10,16 @@
 #   hard-errors on a pairing it has no artifact for, failing `pnpm install`;
 #   vite-plus pins its own oxlint, oxfmt and vitest exactly, the `vite` /
 #   `vitest` catalog entries and `@vitest/coverage-istanbul` must equal those
-#   pins, and the Effect lint plugin runs inside that oxlint. A group PR can
+#   pins, and the Effect lint preset (`@enfect/oxlint`) runs inside that oxlint. A group PR can
 #   still go red when no @effect/tsgo release supports the new oxlint yet:
 #   read the `components` table in node_modules/@effect/tsgo/dist/effect-tsgo.cjs
 #   (pnpm-workspace.yaml's comments say how).
 # - `effect`: the Effect 4 line is a lockstep-versioned singleton set
 #   (`effect`, `@effect/sql-pg`, `@effect/platform-node`, the language
-#   service); `@effect/tsgo` belongs to the toolchain set instead.
+#   service); `@effect/tsgo` belongs to the toolchain set and
+#   `@effect/docgen` to the `docgen` set instead.
+# - `docgen`: `@effect/docgen` compiles the JSDoc examples and runs them
+#   with `tsx`, so the two move together.
 # - `drizzle`: drizzle-kit is always the drizzle-orm pin. Both are
 #   commit-suffixed prereleases with no meaningful semver bump to compute, so
 #   their *version* updates are ignored below and the group carries only
@@ -25,16 +28,25 @@
 # - `minor-and-patch`: every other minor / patch update in one PR, so PR
 #   volume stays low; a major outside the sets above stays its own PR.
 #
-# Not bumpable by Dependabot: the `@grpc/grpc-js` security override in
-# pnpm-workspace.yaml's `overrides` (a transitive pin of @testcontainers).
-# Revisit it by hand whenever the `testcontainers` group moves (AGENTS.md →
-# Commands).
+# Not bumpable by Dependabot, so moved by hand (AGENTS.md → Commands):
+# - the npm-alias catalog entries: `vite` (`npm:@voidzero-dev/vite-plus-core`,
+#   always the vite-plus version; `vp migrate` re-pins it), `typescript`
+#   (`npm:@typescript/typescript6`) and `@typescript/native`
+#   (`npm:typescript`, a version `@effect/tsgo`'s `components` table lists).
+#   Set them on the `toolchain` group's PR branch;
+# - the `overrides` literals in pnpm-workspace.yaml: the `@grpc/grpc-js`
+#   security pin (a transitive pin of @testcontainers; revisit it whenever the
+#   `testcontainers` group moves) and the `undici` / `launch-editor` security
+#   floors, each dropped once its comment's condition holds.
 #
-# `cooldown` mirrors pnpm-workspace.yaml's `minimumReleaseAge` (1 day), with
-# first-party `@thomasfosterau/*` exempt as `minimumReleaseAgeExclude` is.
+# `cooldown` is 1 day, Dependabot's smallest unit (it takes whole days only).
+# pnpm-workspace.yaml's `minimumReleaseAge` holds a new version for 8 hours,
+# so the cooldown is the longer wait and a Dependabot PR never proposes a
+# version pnpm would still refuse. First-party `@thomasfosterau/*` is exempt,
+# as `minimumReleaseAgeExclude` exempts it.
 #
 # `docker-compose` watches the dev container's images (.devcontainer/compose.yaml).
-# The workspace image's Node major tracks CI's `latest` and pgvector's `pg17`
+# The workspace image's Node major tracks CI's newest released Node and pgvector's `pg17`
 # tracks CI's service container, so a PR that moves either major lands only
 # together with the matching CI change.
 version: 2
@@ -68,7 +80,7 @@ updates:
           - "@typescript/native"
           - "typescript"
           - "@typescript/typescript6"
-          - "@mpsuesser/oxlint-plugin-effect"
+          - "@enfect/oxlint"
         update-types: ["major", "minor", "patch"]
       effect:
         applies-to: version-updates
@@ -77,6 +89,13 @@ updates:
           - "@effect/*"
         exclude-patterns:
           - "@effect/tsgo"
+          - "@effect/docgen"
+        update-types: ["major", "minor", "patch"]
+      docgen:
+        applies-to: version-updates
+        patterns:
+          - "@effect/docgen"
+          - "tsx"
         update-types: ["major", "minor", "patch"]
       drizzle:
         applies-to: version-updates
@@ -132,6 +151,8 @@ updates:
       - "dependencies"
     commit-message:
       prefix: "chore"
+    cooldown:
+      default-days: 1
     groups:
       github-actions:
         patterns:

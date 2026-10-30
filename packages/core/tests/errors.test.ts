@@ -157,6 +157,10 @@ const deadlockFixture = pgError({
 
 // ── findPgError ────────────────────────────────────────────────────
 
+/** `uniqueFixture` wrapped in `depth` layers of `{ cause }`. */
+const nest = (depth: number): object =>
+  Arr.reduce<number, object>(Arr.range(1, depth), uniqueFixture, (node) => ({ cause: node }));
+
 describe("findPgError", () => {
   it("reads every fact off a bare driver error", () => {
     const facts = factsOf(uniqueFixture);
@@ -227,8 +231,6 @@ describe("findPgError", () => {
   });
 
   it("stops at the depth cap", () => {
-    const nest = (depth: number): object =>
-      Arr.reduce<number, object>(Arr.range(1, depth), uniqueFixture, (node) => ({ cause: node }));
     // The driver error at depth 7 is inside the bound; at depth 8 it is not.
     expect(Option.isSome(findPgError(nest(7)))).toBe(true);
     expect(findPgError(nest(8))).toStrictEqual(Option.none());
