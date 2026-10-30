@@ -323,10 +323,8 @@ export const resolveSortOrder = (
           );
         }
 
-        // SAFETY: every field was checked as an own key of `sortable` above.
-        const terms = sort.map(({ field, direction }) =>
-          directed(sortable[field] as OrderTerm, direction),
-        );
+        // Every field was checked as an own key of `sortable` above.
+        const terms = sort.map(({ field, direction }) => directed(sortable[field], direction));
         // A caller who sorted by `id` has already asked for a total order; a
         // second `id` term would be redundant SQL.
         if (sort.some(({ field }) => field === "id")) return Effect.succeed(terms);

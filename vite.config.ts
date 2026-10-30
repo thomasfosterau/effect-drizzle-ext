@@ -88,6 +88,31 @@ export default defineConfig({
       "typescript/ban-ts-comment": "off",
       "unicorn/no-empty-file": "off",
       "vite-plus/prefer-vite-plus-imports": "error",
+
+      // ---- type-aware rules (oxlint-tsgolint) -------------------------------
+      // Allowance (effect-drizzle-ext#104): 35 sites when type-aware linting
+      // was turned on, every one a `// SAFETY:`-commented narrowing at a
+      // Drizzle builder or schema-annotation boundary in src/, or a
+      // deliberately ill-typed `as never` fixture in a test. A new site is a
+      // defect; lower the count as sites are fixed and return the rule to
+      // `error` at zero.
+      "typescript/no-unsafe-type-assertion": "warn",
+      // Allowance (effect-drizzle-ext#104): 1 site, the `Effect` channel
+      // narrowing in runInTestTransaction (packages/pg/src/testing.ts).
+      "effecttsgo/unsafe-effect-type-assertion": "warn",
+      // Explicit default type arguments are deliberate on the public surface:
+      // `Redacted.Redacted<string>` says the secret is a connection string and
+      // `Schema.Codec<unknown, unknown, never, never>` says the codec needs no
+      // services, in the hover and in the emitted declarations alike.
+      "typescript/no-unnecessary-type-arguments": "off",
+      // Reports the standard exact-type-identity idiom
+      // (`<X>() => X extends A ? 1 : 2`) the type-level tests are built on,
+      // and `readDbTable`'s deliberate generic target (it replaced an
+      // `unknown` parameter, which `effect/no-unknown-parameters` forbids).
+      "typescript/no-unnecessary-type-parameters": "off",
+      // `Record<never, never>` is the deliberate neutral default of
+      // `VersionSnapshot`'s `Extra` intersection: it adds no keys.
+      "typescript/no-generated-empty-object-type": "off",
     },
     overrides: [
       // Build/test configs and the integration global setup are evaluated by
@@ -115,14 +140,46 @@ export default defineConfig({
           "effect/effect-promise-vs-trypromise": "off",
         },
       },
+      // The integration specs' raw `sql<…>` rows are typed by the statement's
+      // type argument, but the driver hands back what Postgres sends (a
+      // `count(*)` is a string), so the `Number(…)` the rule calls redundant
+      // is the conversion the assertion depends on.
+      {
+        files: ["**/tests/integration/**"],
+        rules: {
+          "typescript/no-unnecessary-type-conversion": "off",
+        },
+      },
+      // The dist-consumer fixture spreads a Drizzle table into a plain object
+      // on purpose, to hand `chronologicalOrder` a view-shaped literal.
+      {
+        files: ["tests/dist-consumer/**"],
+        rules: {
+          "typescript/no-misused-spread": "off",
+        },
+      },
+      // These helpers own a short-lived, self-contained connection (the
+      // provisioning admin client, the Drizzle services a `PgDrizzle` client
+      // needs), so providing its layer at the call site is the entry point
+      // `effecttsgo/strict-effect-provide` asks for; the layer never leaks
+      // into the caller's requirements.
+      {
+        files: ["packages/pg/src/index.ts", "packages/pg/src/provisioning.ts"],
+        rules: {
+          "effecttsgo/strict-effect-provide": "off",
+        },
+      },
     ],
-    // Type-aware linting is off for now: type checking stays the `check`
-    // tasks' job (native tsc, Effect-patched), and turning the type-aware
-    // rules on reports ~70 error-level sites still to fix
-    // (effect-drizzle-ext#104).
+    // Type-aware linting through oxlint-tsgolint (the binary vite-plus
+    // carries, patched by `effect-tsgo patch --oxlint`), so `vp check` also
+    // runs the `typescript/*` type-aware rules and `@effect/tsgo`'s
+    // `effecttsgo/*` rules. `typeCheck` reports TypeScript errors too; it
+    // overlaps the `check` tasks (native tsc, Effect-patched) on the package
+    // sources but also covers the root configs (vite.config.ts,
+    // vite.package.ts) that no tsconfig includes, so it stays on.
     options: {
-      typeAware: false,
-      typeCheck: false,
+      typeAware: true,
+      typeCheck: true,
     },
     jsPlugins: [
       {
