@@ -53,8 +53,8 @@ catalog:
   # local PostgreSQL is reachable — see packages/pg/tests/integration/global-setup.ts.
   "@testcontainers/postgresql": ^12.2.1
   # Optional peer of the core package: only the `./jsonapi*` subpaths import it.
-  "@thomasfosterau/effect-jsonapi": ^0.17.0
-  "@types/node": ^26.6.5
+  "@thomasfosterau/effect-jsonapi": ^0.19.0
+  "@types/node": ^26.6.6
   # Must equal the vitest that vite-plus bundles (see `vitest` below).
   "@vitest/coverage-istanbul": 5.0.5
   # The published `rc` build: the first drizzle line to ship the Effect
