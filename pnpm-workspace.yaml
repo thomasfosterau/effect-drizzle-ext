@@ -35,20 +35,20 @@ catalog:
   # of the 6/7 split. `effect-tsgo patch` overwrites the native `tsc` binary
   # with an Effect-patched build matched by gitHead, so this pins in lockstep
   # with `@typescript/native` below and with the `oxlint` that `vite-plus`
-  # pulls in: 0.55.0 supports typescript 7.0.2 / 7.1.0-dev.20261019.1, oxlint
-  # 1.87.0 – 1.89.0 and oxlint-tsgolint 7.0.2003 / 7.0.2004, and hard-errors
+  # pulls in: 0.63.0 supports typescript 7.0.2 / 7.1.0-beta /
+  # 7.1.0-dev.20261028.1, oxlint 1.88.0 – 1.90.0 and oxlint-tsgolint
+  # 7.0.2004 / 7.0.2005, and hard-errors
   # (UnsupportedTargetPackageVersionError) on anything else — failing
   # `pnpm install` itself. Read the `components` table in
   # node_modules/@effect/tsgo/dist/effect-tsgo.cjs before bumping any of the
   # three.
-  "@effect/tsgo": 0.55.0
+  "@effect/tsgo": 0.63.0
   "@effect/sql-pg": 4.0.6
   # The Node `FileSystem` / `Path` / `ChildProcessSpawner` layer the pg
   # package's tests provide to `./migrations`, `./testing`'s provisioning and
   # `./tooling` — a consumer provides its own (these modules only require the
   # services).
   "@effect/platform-node": 4.0.6
-  "@mpsuesser/oxlint-plugin-effect": ^0.6.0
   # Starts the integration suite's ephemeral `pgvector/pgvector` server when no
   # local PostgreSQL is reachable — see packages/pg/tests/integration/global-setup.ts.
   "@testcontainers/postgresql": ^12.2.1
@@ -67,8 +67,14 @@ catalog:
   # The optional peer `@thomasfosterau/effect-drizzle-ext-pg/tooling` diffs
   # schemas with (`drizzle-kit/api-postgres`); always the drizzle-orm pin.
   drizzle-kit: 1.0.0-rc.5
+  # The Effect lint preset (`effect/*` rules, anti-slop included) that
+  # vite.config.ts extends with `configs.recommended`; it runs inside the
+  # oxlint vite-plus carries, so it moves with the `toolchain` set. It depends
+  # on `effect` 4.1.0 exactly, but the `effect: "catalog:"` override below
+  # resolves it to this workspace's singleton, which it lints fine against.
+  "@enfect/oxlint": 0.9.0
   effect: 4.0.6
-  fallow: 3.34.1
+  fallow: 3.37.0
   # Runs docgen's compiled examples.
   tsx: ^4.23.15
   # TypeScript 6/7 side-by-side: TS7 (the native Go compiler) ships no JS API
@@ -82,15 +88,15 @@ catalog:
   "@typescript/native": "npm:typescript@7.0.2"
   # vite-plus pins `oxlint`, `oxfmt` and `vitest` to exact versions, so this
   # entry decides the oxlint `effect-tsgo patch --oxlint` has to support (see
-  # the @effect/tsgo note above): 1.3.0 carries oxlint 1.88.0, oxlint-tsgolint
-  # 7.0.2004 and vitest 5.0.5. `vite` is the same release under its aliased
-  # core package, and `vitest` must match vite-plus's exact pin because the
+  # the @effect/tsgo note above): 1.4.0 carries oxlint 1.89.0, oxfmt 0.74.0,
+  # oxlint-tsgolint 7.0.2004 and vitest 5.0.5. `vite` is the same release
+  # under its aliased core package, and `vitest` must match vite-plus's exact pin because the
   # `vitest: "catalog:"` override forces every resolution to the catalog
   # singleton; `@vitest/coverage-istanbul` above must equal it too, or
   # vite-plus refuses to run coverage. 1.x moved a task's `env` / `input` /
   # `output` under `cache: { … }` (see the package vite.config.ts files).
-  vite-plus: 1.3.0
-  vite: npm:@voidzero-dev/vite-plus-core@1.3.0
+  vite-plus: 1.4.0
+  vite: npm:@voidzero-dev/vite-plus-core@1.4.0
   vitest: 5.0.5
 
 # Peer ranges the PUBLISHED packages declare. Kept as a named catalog so the
@@ -119,8 +125,10 @@ overrides:
   # range admits the fix but whose lockfile resolution stayed below it.
   # Drop once that resolution reaches >=8.12.2 on its own.
   undici: ^8.12.2
-  vite: "catalog:"
-  vitest: "catalog:"
+  # vite-plus's managed overrides (`vp migrate` writes the `@*` keys under
+  # pnpm): every `vite` / `vitest` resolution is the catalog singleton.
+  vite@*: "catalog:"
+  vitest@*: "catalog:"
   # `effect` MUST be a singleton (see the header): force every resolution to
   # the catalog version so a hoisting reshuffle cannot introduce a second copy.
   effect: "catalog:"
@@ -149,9 +157,11 @@ peerDependencyRules:
     vite: "*"
     vitest: "*"
 
-# Supply-chain delay (owner's policy, gardeneria #1149): hold newly published
-# versions for 1 day (unit: MINUTES) before pnpm will install them.
-minimumReleaseAge: 1440
+# Supply-chain delay (owner's policy, gardeneria #1149; relaxed to 8 hours on
+# 2026-10-30): hold newly published versions for 8 hours (unit: MINUTES) before
+# pnpm will install them. Dependabot's `cooldown` (whole days only) is 1 day,
+# longer than this, so it never proposes a version pnpm would still refuse.
+minimumReleaseAge: 480
 minimumReleaseAgeExclude:
   # @thomasfosterau/* is first-party — exempt so our own releases install immediately.
   - "@thomasfosterau/*"

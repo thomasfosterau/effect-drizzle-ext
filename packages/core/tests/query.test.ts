@@ -57,15 +57,15 @@ describe("pageWithTotal", () => {
   });
 });
 
+/** The combined condition, failing the test when there is none. */
+const defined = (combined: ReturnType<typeof combineFilters>) =>
+  Option.getOrElse(Option.fromNullishOr(combined), () =>
+    expect.unreachable("expected a combined condition"),
+  );
+
 describe("combineFilters", () => {
   const table = pgTable("widget", { name: text("name") });
   const dialect = new PgDialect();
-
-  /** The combined condition, failing the test when there is none. */
-  const defined = (combined: ReturnType<typeof combineFilters>) =>
-    Option.getOrElse(Option.fromNullishOr(combined), () =>
-      expect.unreachable("expected a combined condition"),
-    );
 
   it("returns undefined with no filters", () => {
     expect(combineFilters()).toBeUndefined();
@@ -105,17 +105,17 @@ describe("boundedPagination", () => {
   });
 
   it("rejects a limit of 0 and of maxLimit + 1", () => {
-    expect(() => decodeLimit(0)).toThrow();
-    expect(() => decodeLimit(101)).toThrow();
+    expect(() => decodeLimit(0)).toThrow("Expected a value between 0 (excluded) and 100");
+    expect(() => decodeLimit(101)).toThrow("Expected a value between 0 (excluded) and 100");
   });
 
   it("rejects a non-integer limit", () => {
-    expect(() => decodeLimit(1.5)).toThrow();
+    expect(() => decodeLimit(1.5)).toThrow("Expected an integer");
   });
 
   it("accepts an offset of 0 and rejects a negative offset", () => {
     expect(decodeOffset(0)).toBe(0);
-    expect(() => decodeOffset(-1)).toThrow();
+    expect(() => decodeOffset(-1)).toThrow("Expected a value greater than or equal to 0");
   });
 
   it("applies limit/offset defaults when both are omitted", () => {
@@ -129,8 +129,12 @@ describe("boundedPagination", () => {
   });
 
   it("still enforces the bound on a limit supplied through Input", () => {
-    expect(() => decodeInput({ limit: 0 })).toThrow();
-    expect(() => decodeInput({ limit: 101 })).toThrow();
+    expect(() => decodeInput({ limit: 0 })).toThrow(
+      "Expected a value between 0 (excluded) and 100",
+    );
+    expect(() => decodeInput({ limit: 101 })).toThrow(
+      "Expected a value between 0 (excluded) and 100",
+    );
   });
 });
 

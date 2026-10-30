@@ -112,21 +112,21 @@ describe("jsonbSchema", () => {
 
     // Not valid JSON, and not a Fixture either — both the JSON.parse and the
     // schema decode fail, so this exercises the `onNone` fallback path.
-    expect(() => fromDriver(column, "{not valid json")).toThrow();
+    expect(() => fromDriver(column, "{not valid json")).toThrow("Expected object");
   });
 
   it("throws on a value the schema rejects", () => {
     const table = pgTable("widget", { data: jsonbSchema(Fixture)("data") });
     const column = columnNamed(table, "data");
 
-    expect(() => fromDriver(column, { id: "d" /* missing count */ })).toThrow();
+    expect(() => fromDriver(column, { id: "d" /* missing count */ })).toThrow("Missing key");
   });
 
   it("throws encoding a value the schema rejects", () => {
     const table = pgTable("widget", { data: jsonbSchema(Fixture)("data") });
     const column = columnNamed(table, "data");
 
-    expect(() => toDriver(column, { id: "e", count: "not a number" })).toThrow();
+    expect(() => toDriver(column, { id: "e", count: "not a number" })).toThrow("Expected number");
   });
 });
 

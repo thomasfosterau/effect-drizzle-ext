@@ -68,7 +68,8 @@
     "@vitest/coverage-istanbul": "catalog:",
     "drizzle-kit": "catalog:",
     "drizzle-orm": "catalog:",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@effect/sql-pg": "catalog:peers",

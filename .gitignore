@@ -31,3 +31,4 @@ dist/
 # Generated API reference (`vp run docgen`), per package. Never committed;
 # the README is the reference consumers read.
 packages/*/docs/
+.vitest/

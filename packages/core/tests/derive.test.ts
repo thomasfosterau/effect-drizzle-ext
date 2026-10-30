@@ -270,9 +270,9 @@ describe("type-level precision", () => {
     // `name` is notNull, so its builder is the `.notNull()` form; `note` is not
     // a column at all and must not appear in the map.
     type Derived = typeof derived;
-    const _notNull: Derived["name"]["_"]["notNull"] = true;
-    const _nullable: "notNull" extends keyof Derived["size"]["_"] ? false : true = true;
-    const _absent: "note" extends keyof Derived ? false : true = true;
-    expect([_notNull, _nullable, _absent]).toEqual([true, true, true]);
+    const notNull: Derived["name"]["_"]["notNull"] = true;
+    const nullable: "notNull" extends keyof Derived["size"]["_"] ? false : true = true;
+    const absent: "note" extends keyof Derived ? false : true = true;
+    expect([notNull, nullable, absent]).toEqual([true, true, true]);
   });
 });

@@ -16,7 +16,7 @@ Both packages are published by an automated pipeline built to resist supply-chai
 - **Pinned actions.** Every GitHub Action is pinned to a full commit SHA, so a hijacked tag can't inject workflow code.
 - **Least privilege.** Workflows default to `permissions: {}`; each job opts into only the scopes it needs. CI checks out with `persist-credentials: false`.
 - **Manual approval gate.** Publishing runs in a protected `release` environment that requires manual approval.
-- **Locked dependencies with a cooling-off period.** Installs use `pnpm install --frozen-lockfile` against the committed `pnpm-lock.yaml`; `minimumReleaseAge` holds newly published third-party versions for a day before pnpm installs them; Dependabot proposes updates for review with the same cooldown. CI runs `pnpm audit --audit-level high` on every PR.
+- **Locked dependencies with a cooling-off period.** Installs use `pnpm install --frozen-lockfile` against the committed `pnpm-lock.yaml`; `minimumReleaseAge` holds newly published third-party versions for 8 hours before pnpm installs them; Dependabot proposes updates for review after a 1-day cooldown (its smallest unit, so never a version pnpm would still refuse). CI runs `pnpm audit --audit-level high` on every PR.
 
 ## Release pipeline
 

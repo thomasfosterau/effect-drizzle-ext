@@ -306,8 +306,8 @@ describe("dist-consumer-style type checks", () => {
     // exactly `string` — an unbound `TTableName` widening `Id` to `any` would
     // still satisfy a plain `extends` check one-directionally, so this pins
     // both directions.
-    const _check: [Id] extends [string] ? ([string] extends [Id] ? true : never) : never = true;
-    expect(_check).toBe(true);
+    const check: [Id] extends [string] ? ([string] extends [Id] ? true : never) : never = true;
+    expect(check).toBe(true);
     expectTypeOf<Id>().toEqualTypeOf<string>();
   });
 
@@ -325,9 +325,9 @@ describe("dist-consumer-style type checks", () => {
       columns: { id: version.id, action: nodeVersion.action },
     });
     type Action = (typeof view.$inferSelect)["action"];
-    const _check: [Action] extends [string] ? ([string] extends [Action] ? true : never) : never =
+    const check: [Action] extends [string] ? ([string] extends [Action] ? true : never) : never =
       true;
-    expect(_check).toBe(true);
+    expect(check).toBe(true);
     expectTypeOf<Action>().toEqualTypeOf<string>();
     // the injected `merge` column (`slug`, nullable on `node`) rides along too.
     /* oxlint-disable-next-line effect/prefer-option-over-null -- exact-identity assertion against Drizzle's own inferred row type */

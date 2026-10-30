@@ -21,7 +21,7 @@
     "@effect/docgen": "catalog:",
     "@effect/language-service": "catalog:",
     "@effect/tsgo": "catalog:",
-    "@mpsuesser/oxlint-plugin-effect": "catalog:",
+    "@enfect/oxlint": "catalog:",
     "@testcontainers/postgresql": "catalog:",
     "@thomasfosterau/effect-drizzle-ext": "workspace:*",
     "@thomasfosterau/effect-drizzle-ext-pg": "workspace:*",
@@ -32,8 +32,7 @@
     "tsx": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-plus": "catalog:",
-    "vitest": "catalog:"
+    "vite-plus": "catalog:"
   },
   "engines": {
     "node": ">=22",
