@@ -43,12 +43,12 @@ catalog:
   # node_modules/@effect/tsgo/dist/effect-tsgo.cjs before bumping any of the
   # three.
   "@effect/tsgo": 0.63.0
-  "@effect/sql-pg": 4.0.6
+  "@effect/sql-pg": 4.1.0
   # The Node `FileSystem` / `Path` / `ChildProcessSpawner` layer the pg
   # package's tests provide to `./migrations`, `./testing`'s provisioning and
   # `./tooling` — a consumer provides its own (these modules only require the
   # services).
-  "@effect/platform-node": 4.0.6
+  "@effect/platform-node": 4.1.0
   # Starts the integration suite's ephemeral `pgvector/pgvector` server when no
   # local PostgreSQL is reachable — see packages/pg/tests/integration/global-setup.ts.
   "@testcontainers/postgresql": ^12.2.1
@@ -73,7 +73,7 @@ catalog:
   # on `effect` 4.1.0 exactly, but the `effect: "catalog:"` override below
   # resolves it to this workspace's singleton, which it lints fine against.
   "@enfect/oxlint": 0.9.0
-  effect: 4.0.6
+  effect: 4.1.0
   fallow: 3.37.0
   # Runs docgen's compiled examples.
   tsx: ^4.23.15
