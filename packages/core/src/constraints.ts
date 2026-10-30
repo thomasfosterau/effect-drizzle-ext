@@ -121,7 +121,7 @@ export interface DiscriminatorToolkit<Level extends string> {
     level: Level,
     stable: TypedStable,
     parent: TypedStable,
-    onUpdate?: "cascade" | undefined,
+    onUpdate?: "cascade",
   ) => PgTableExtraConfigValue;
   /**
    * The per-level `type` CHECK. A leaf admits only its own type; an
@@ -151,7 +151,7 @@ export interface DiscriminatorToolkit<Level extends string> {
     level: Level,
     stable: TypedStable,
     parent: TypedStable,
-    options?: { readonly refinable?: boolean | undefined } | undefined,
+    options?: { readonly refinable?: boolean | undefined },
   ) => PgTableExtraConfigValue[];
 }
 
@@ -185,7 +185,7 @@ export const makeDiscriminatorConstraints = <Level extends string>(options: {
     level: Level,
     stable: TypedStable,
     parent: TypedStable,
-    onUpdate?: "cascade" | undefined,
+    onUpdate?: "cascade",
   ): PgTableExtraConfigValue => {
     const fk = foreignKey({
       name: parentFkName(level),

@@ -10,10 +10,10 @@
 
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
-import type { defineConfig, ViteUserConfig } from "vite-plus";
+import type { ViteUserConfig } from "vite-plus";
 import type { PackUserConfig } from "vite-plus/pack";
 
-type RunTasks = NonNullable<NonNullable<Parameters<typeof defineConfig>[0]["run"]>["tasks"]>;
+type RunTasks = NonNullable<NonNullable<ViteUserConfig["run"]>["tasks"]>;
 type CacheInputs = ReadonlyArray<
   | string
   | { readonly pattern: string; readonly base: "workspace" | "package" }

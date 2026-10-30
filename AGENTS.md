@@ -25,7 +25,7 @@ Package-local invariants, terms and import boundaries live only in each package'
 ## Commands
 
 - `vp install` — dependencies plus the Vite+ git hooks (pre-commit runs `vp staged`: format + lint on staged files). There is no pre-push hook.
-- `vp check` — format + lint (Oxfmt + Oxlint); `vp check --fix` to autofix. `vp run check` — the type gate: both packages' `check` plus the dist-consumer declaration check (which builds `dist/` and asserts the emitted types). They are different commands.
+- `vp check` — format + lint (Oxfmt + Oxlint, type-aware through oxlint-tsgolint with `typeCheck` on, so it also reports TypeScript errors in the root configs no tsconfig covers); `vp check --fix` to autofix. `vp run check` — the type gate: both packages' `check` plus the dist-consumer declaration check (which builds `dist/` and asserts the emitted types). They are different commands.
 - `vp run -r test:unit` — unit tests (pure code; no database).
 - `vp run test:integration` (Docker or PostgreSQL) — one root task over `packages/pg`'s vitest project; provisions a fresh database per run through the pg package's own `provisionTestDatabase`: an explicit `DATABASE_URL_TEST` / `DATABASE_URL` (from the environment, then `.env`) is used as-is and must already hold the fixture chain; otherwise a reachable local PostgreSQL (`PG*` env), else a `pgvector/pgvector:pg17` container via Testcontainers, migrated with the committed fixture chain in `packages/pg/tests/fixtures/`. Filter with `--project pg-integration`.
 - `vp run -r build` — emit `dist/` for both packages.
