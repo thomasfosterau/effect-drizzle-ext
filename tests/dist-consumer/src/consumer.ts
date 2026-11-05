@@ -351,8 +351,7 @@ export interface ForwardedOptionals {
   readonly probe?: PgTesting.ServerProbe | undefined;
   readonly applyMigrations?: PgTesting.MigrationRunner<never, never> | undefined;
   readonly base?: Option.Option<PgTooling.GitBase> | undefined;
-  readonly pk?: string | undefined;
-  readonly parentFk?: string | undefined;
+  readonly versionDefault?: bigint | undefined;
 }
 /* oxlint-enable effect/prefer-option-over-null */
 export const forwardOptionals = (forwarded: ForwardedOptionals) =>
@@ -381,7 +380,7 @@ export const forwardOptionals = (forwarded: ForwardedOptionals) =>
       parentId: node.id,
       parentVersion: nodeVersion,
       columns: {},
-      constraintNames: { pk: forwarded.pk, parentFk: forwarded.parentFk },
+      versionDefault: forwarded.versionDefault,
     }),
   ] as const;
 

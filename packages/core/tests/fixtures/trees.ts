@@ -9,9 +9,11 @@ import * as Schema from "effect/Schema";
 import { dbColumn, defineTree } from "../../src/index.ts";
 import { defineResourceTree } from "../../src/jsonapi/index.ts";
 
-const text = (column: string, notNull = false) =>
-  dbColumn(Schema.String, { column, pg: "text", notNull });
-const integer = (column: string) =>
+const text = <const C extends string>(column: C) =>
+  dbColumn(Schema.String, { column, pg: "text", notNull: false });
+const requiredText = <const C extends string>(column: C) =>
+  dbColumn(Schema.String, { column, pg: "text", notNull: true });
+const integer = <const C extends string>(column: C) =>
   dbColumn(Schema.Finite, { column, pg: "integer", notNull: false });
 
 /**
@@ -20,7 +22,7 @@ const integer = (column: string) =>
  * branch.
  */
 export const frbrTree = defineTree({
-  work: { columns: { title: text("title", true), url: text("url") } },
+  work: { columns: { title: requiredText("title"), url: text("url") } },
   book: { parent: "work", leaf: { pages: integer("pages") } },
   essay: { parent: "work", leaf: { abstract: text("abstract") } },
   manifestation: {
@@ -28,7 +30,7 @@ export const frbrTree = defineTree({
     columns: { format: text("format"), isbn: text("isbn") },
   },
   edition: { parent: "manifestation", leaf: { printRun: integer("print_run") } },
-  agent: { columns: { name: text("name", true) } },
+  agent: { columns: { name: requiredText("name") } },
   person: { parent: "agent", leaf: { born: integer("born") } },
   organisation: { parent: "agent", leaf: {} },
 });
@@ -38,13 +40,13 @@ export const frbrTree = defineTree({
  * levels nested two deep before the concrete leaves.
  */
 export const bfoTree = defineTree({
-  continuant: { columns: { label: text("label", true) } },
-  independentContinuant: { parent: "continuant" },
-  materialEntity: { parent: "independentContinuant", columns: { mass: integer("mass") } },
-  plant: { parent: "materialEntity", leaf: { species: text("species") } },
-  bed: { parent: "materialEntity", leaf: { area: integer("area") } },
-  dependentContinuant: { parent: "continuant" },
-  document: { parent: "dependentContinuant", leaf: { body: text("body") } },
+  continuant: { columns: { label: requiredText("label") } },
+  independent_continuant: { parent: "continuant" },
+  material_entity: { parent: "independent_continuant", columns: { mass: integer("mass") } },
+  plant: { parent: "material_entity", leaf: { species: text("species") } },
+  bed: { parent: "material_entity", leaf: { area: integer("area") } },
+  dependent_continuant: { parent: "continuant" },
+  document: { parent: "dependent_continuant", leaf: { body: text("body") } },
   occurrent: { columns: { startsAt: text("starts_at") } },
   process: { parent: "occurrent" },
   sowing: { parent: "process", leaf: { depth: integer("depth") } },
@@ -63,7 +65,7 @@ const Author = Resource.make("author", { attributes: { penName: text("pen_name")
  * resource leaves, and an `agents` family beside it.
  */
 export const flatTree = defineResourceTree({
-  works: { columns: { title: text("title", true) } },
+  works: { columns: { title: requiredText("title") } },
   novel: { parent: "works", leaf: Novel },
   story: { parent: "works", leaf: Story },
   poem: { parent: "works", leaf: Poem },

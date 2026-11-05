@@ -59,18 +59,18 @@ describe("defineTree: the application-shaped fixtures", () => {
   it("derives the BFO branches two marker levels deep", () => {
     expect(bfoTree.branchRoots).toEqual(["continuant", "occurrent"]);
     const plant = bfoTree.level("plant");
-    expect(plant.ancestors).toEqual(["continuant", "independentContinuant", "materialEntity"]);
+    expect(plant.ancestors).toEqual(["continuant", "independent_continuant", "material_entity"]);
     expect(plant.branch).toBe("continuant");
     expect(bfoTree.level("continuant").descendants).toEqual([
-      "independentContinuant",
-      "materialEntity",
+      "independent_continuant",
+      "material_entity",
       "plant",
       "bed",
-      "dependentContinuant",
+      "dependent_continuant",
       "document",
     ]);
     expect(bfoTree.level("continuant").subtreeLeaves).toEqual(["plant", "bed", "document"]);
-    expect(bfoTree.level("independentContinuant").isLeaf).toBe(false);
+    expect(bfoTree.level("independent_continuant").isLeaf).toBe(false);
   });
 
   it("derives the flat resource family, with the resource's columns as the leaf's", () => {

@@ -40,6 +40,7 @@ import {
   foreignKey,
   primaryKey,
   text,
+  timestamp,
   uuid,
   type AnyPgColumn,
   type ExtraConfigColumn,
@@ -50,13 +51,33 @@ import {
   type PgTableExtraConfigValue,
   type PgTableWithColumns,
   type PgTextBuilder,
+  type PgTimestampBuilder,
   type PgUUIDBuilder,
   type PgViewWithSelection,
+  type SetHasDefault,
   type SetIsPrimaryKey,
   type SetNotNull,
 } from "drizzle-orm/pg-core";
 import * as Arr from "effect/Array";
+import * as Option from "effect/Option";
+import * as Order from "effect/Order";
 import * as Predicate from "effect/Predicate";
+import * as R from "effect/Record";
+import {
+  enumCheck,
+  // oxlint-disable-next-line effect/no-service-constructor-imports -- `makeDiscriminatorConstraints` is a plain DDL factory over a leaf-set callback, not an Effect service constructor; the rule keys on the `make*` name.
+  makeDiscriminatorConstraints,
+  type TypedStable,
+} from "./constraints.ts";
+import {
+  // oxlint-disable-next-line effect/no-service-constructor-imports -- `makeDeriveColumns` is a plain factory over a builder registry, not an Effect service constructor; the rule keys on the `make*` name.
+  makeDeriveColumns,
+  type ColumnBuilders,
+  type DerivedColumns,
+  type DeriveOptions,
+} from "./derive.ts";
+import type { DbColumn } from "./index.ts";
+import { treeError, type Tree } from "./tree.ts";
 
 // ── Subtype table pair ────────────────────────────────────────────────
 
@@ -80,13 +101,18 @@ export interface DiscriminatorColumns {
  *    handed on unchanged to a consuming application's database package — a
  *    signature change here is a signature change for every consumer.
  * 2. Every one of them is threaded straight into a Drizzle builder call
- *    (`bigint().default(versionDefault)`, `primaryKey({ name: constraintNames.pk })`,
- *    `uuid(versionIdColumn)`, …). Drizzle reads plain `undefined` as "not
- *    supplied"; an `Option` would be an object it would try to emit as a value,
- *    producing wrong DDL that no type error and no unit test would catch.
+ *    (`bigint().default(versionDefault)`, `discriminator`, …). Drizzle reads
+ *    plain `undefined` as "not supplied"; an `Option` would be an object it
+ *    would try to emit as a value, producing wrong DDL that no type error and
+ *    no unit test would catch.
  *
- * The explicit `| undefined` on each is likewise deliberate — see the note on
- * `parentUpdateCascade` about `exactOptionalPropertyTypes`.
+ * The explicit `| undefined` on each is likewise deliberate: a configuring
+ * layer can thread its own optional overrides through without per-property
+ * conditional spreads (`exactOptionalPropertyTypes`).
+ *
+ * Constraint and column names are canonical (`${name}_version_pkey`,
+ * `${name}_version_${parentVersion}_fk`, an `id` column): no deployed schema
+ * needs the historical overrides (effect-drizzle-ext#112, decision 4).
  */
 export interface SubtypeTablesConfig<
   TColumns extends Record<string, ColumnBuilderBase>,
@@ -108,34 +134,11 @@ export interface SubtypeTablesConfig<
   /** The leaf's own domain columns (beyond the generated id/version). */
   columns: TColumns;
   /**
-   * Cascade updates of the parent stable id into the leaf's stable row (the
-   * stable → parent FK gains `onUpdate: "cascade"` alongside the cascade
-   * delete). Defaults to delete-only.
-   *
-   * The optional members here and below admit explicit `undefined` so a
-   * configuring layer can thread its own optional overrides through without
-   * per-property conditional spreads (`exactOptionalPropertyTypes`).
-   */
-  parentUpdateCascade?: boolean | undefined;
-  /**
    * Default for the `version` column — e.g. `0n` for branch-extending leaves
    * whose first version row is written with an explicit `0`. Omitted leaves get
    * a plain `NOT NULL` version.
    */
   versionDefault?: bigint | undefined;
-  /**
-   * Constraint-name overrides for the version table's primary key and its
-   * `(id, version)` → parent-version foreign key. Each defaults to the canonical
-   * `${name}_version_pkey` / `${name}_version_${parentVersion}_fk` when absent
-   * or `undefined`.
-   */
-  constraintNames?: { pk?: string | undefined; parentFk?: string | undefined } | undefined;
-  /**
-   * Physical name for the version table's id column, when a historical table
-   * diverges from the canonical `id` (e.g. `organisation_version.organisation_id`).
-   * The TypeScript key stays `id`; only the emitted column name changes.
-   */
-  versionIdColumn?: string | undefined;
   /**
    * Extra version-table constraints/indexes appended after the generated primary
    * key and parent-version foreign key. The callback receives the version
@@ -261,10 +264,7 @@ export const makeSubtypeTables =
       parentId,
       parentVersion,
       columns,
-      parentUpdateCascade,
       versionDefault,
-      constraintNames,
-      versionIdColumn,
       extraConstraints,
       discriminator,
     }: SubtypeTablesConfig<TColumns, TDiscriminator>,
@@ -272,12 +272,7 @@ export const makeSubtypeTables =
     const stableColumns = {
       id: uuid("id")
         .primaryKey()
-        .references(
-          (): AnyPgColumn => parentId,
-          parentUpdateCascade
-            ? { onUpdate: "cascade", onDelete: "cascade" }
-            : { onDelete: "cascade" },
-        ),
+        .references((): AnyPgColumn => parentId, { onDelete: "cascade" }),
       // The threaded leaf-`type` discriminator, denormalised down every stable
       // level. Nullable until a hierarchy applies its discriminator; the
       // injected hook makes it NOT NULL and adds its constraints. `type` lives on
@@ -308,7 +303,7 @@ export const makeSubtypeTables =
     const version = schema.table<`${string}_version`, SubtypeVersionColumnBuilders<TColumns>>(
       `${name}_version`,
       {
-        id: uuid(versionIdColumn ?? "id")
+        id: uuid("id")
           .notNull()
           .references((): AnyPgColumn => stable.id, { onUpdate: "cascade", onDelete: "cascade" }),
         version:
@@ -320,11 +315,11 @@ export const makeSubtypeTables =
       (table) => {
         const constraints: PgTableExtraConfigValue[] = [
           primaryKey({
-            name: constraintNames?.pk ?? `${name}_version_pkey`,
+            name: `${name}_version_pkey`,
             columns: [table.id, table.version],
           }),
           foreignKey({
-            name: constraintNames?.parentFk ?? `${name}_version_${getTableName(parentVersion)}_fk`,
+            name: `${name}_version_${getTableName(parentVersion)}_fk`,
             columns: [table.id, table.version],
             foreignColumns: [parentVersion.id, parentVersion.version],
           }),
@@ -627,3 +622,406 @@ export const versionTimestamps = (row: {
   updatedAt: row.timestamp,
 });
 /* oxlint-enable effect/prefer-option-over-null */
+
+// ── Tree → tables ─────────────────────────────────────────────────────
+
+/** A builder map a table's `columns` takes. */
+type ColumnMap = Record<string, ColumnBuilderBase>;
+
+/** `T` as a {@link ColumnMap}, so a mapped column type satisfies the table constraint. */
+type AsColumns<T> = T extends ColumnMap ? T : never;
+
+/** The metadata map member `P` of level `K` in tree metadata `M`; `{}` when absent. */
+type MetaOf<M, K, P extends "level" | "leaf"> = K extends keyof M
+  ? M[K] extends { readonly [Q in P]: infer X }
+    ? X
+    : Record<never, never>
+  : Record<never, never>;
+
+/** The hand-authored columns the hooks `H` give level `K`; `{}` when none. */
+type HookColumnsOf<H, K> = K extends keyof H
+  ? H[K] extends { readonly columns?: infer C }
+    ? Exclude<C, undefined> extends ColumnMap
+      ? Exclude<C, undefined>
+      : Record<never, never>
+    : Record<never, never>
+  : Record<never, never>;
+
+/** Whether an entry declares the `"fact-scoped"` level kind. */
+type IsFactScoped<E> = E extends { readonly kind?: infer Kind }
+  ? [Exclude<Kind, undefined>] extends ["fact-scoped"]
+    ? true
+    : false
+  : false;
+
+/** Level `K`'s own derived columns: its level columns, then its leaf's. */
+type OwnColumns<M, K, B extends ColumnBuilders> = DerivedColumns<MetaOf<M, K, "level">, B> &
+  DerivedColumns<MetaOf<M, K, "leaf">, B>;
+
+/**
+ * The columns level `K`'s version table carries beyond `(id, version)`: its own
+ * derived columns (a fact-scoped level keeps them in fact tables instead), then
+ * the hand-authored hook columns.
+ */
+export type TreeVersionColumns<S, M, B extends ColumnBuilders, H, K extends keyof S> = AsColumns<
+  (IsFactScoped<S[K]> extends true ? Record<never, never> : OwnColumns<M, K, B>) &
+    HookColumnsOf<H, K>
+>;
+
+/** A fact table's column builders: the `(id, version)` key plus one fact. */
+type FactColumnBuilders<TColumns extends ColumnMap> = {
+  id: SetNotNull<PgUUIDBuilder>;
+  version: SetNotNull<PgBigInt64Builder>;
+} & TColumns;
+
+/**
+ * One fact table of a fact-scoped level: `(id, version)` keyed, carrying one
+ * column, foreign-keyed to the level's version spine. Written out for the
+ * declaration printer, as {@link SubtypeTables} is.
+ */
+export type FactTable<TColumns extends ColumnMap> = PgTableWithColumns<{
+  name: string;
+  schema: string;
+  columns: PgBuildColumns<string, FactColumnBuilders<TColumns>>;
+  dialect: "pg";
+  isAlias: false;
+}>;
+
+/** Every level's `{ stable, version }` pair, keyed by level name. */
+export type TreeLevelTables<S, M, B extends ColumnBuilders, H> = {
+  readonly [K in keyof S & string]: SubtypeTables<TreeVersionColumns<S, M, B, H, K>>;
+};
+
+/** Every fact-scoped level's fact tables, keyed by level then field; `{}` for a plain level. */
+export type TreeFactTables<S, M, B extends ColumnBuilders> = {
+  readonly [K in keyof S & string]: IsFactScoped<S[K]> extends true
+    ? {
+        readonly [F in keyof OwnColumns<M, K, B>]: FactTable<
+          AsColumns<Pick<OwnColumns<M, K, B>, F>>
+        >;
+      }
+    : Record<never, never>;
+};
+
+/** The root identity table's column builders: `id`, the leaf `type`, then the injected extras. */
+type RootIdentityColumnBuilders<IE extends ColumnMap> = {
+  id: SetIsPrimaryKey<PgUUIDBuilder>;
+  type: SetNotNull<PgTextBuilder<[string, ...string[]]>>;
+} & IE;
+
+/**
+ * The root version table's column builders: the `(id, version)` key, `action`
+ * (the chain's only currency and tombstone state), `timestamp`, the actor,
+ * then the injected extras.
+ */
+type RootVersionColumnBuilders<VE extends ColumnMap> = {
+  id: SetNotNull<PgUUIDBuilder>;
+  version: SetNotNull<PgBigInt64Builder>;
+  action: SetNotNull<PgTextBuilder<[string, ...string[]]>>;
+  timestamp: SetHasDefault<SetNotNull<PgTimestampBuilder>>;
+  actor: PgTextBuilder<[string, ...string[]]>;
+} & VE;
+
+/** The root `{ identity, version }` pair. Written out for the declaration printer. */
+export interface TreeRootTables<IE extends ColumnMap, VE extends ColumnMap> {
+  identity: PgTableWithColumns<{
+    name: string;
+    schema: string;
+    columns: PgBuildColumns<string, RootIdentityColumnBuilders<IE>>;
+    dialect: "pg";
+    isAlias: false;
+  }>;
+  version: PgTableWithColumns<{
+    name: string;
+    schema: string;
+    columns: PgBuildColumns<string, RootVersionColumnBuilders<VE>>;
+    dialect: "pg";
+    isAlias: false;
+  }>;
+}
+
+/** Everything {@link makeTreeTables} derives from a tree. */
+export interface TreeTables<
+  S,
+  M,
+  B extends ColumnBuilders,
+  H,
+  IE extends ColumnMap,
+  VE extends ColumnMap,
+> {
+  /** The root identity and version tables. */
+  readonly root: TreeRootTables<IE, VE>;
+  /** Every level's stable + version pair, keyed by level name. */
+  readonly levels: TreeLevelTables<S, M, B, H>;
+  /** Every fact-scoped level's fact tables, keyed by level then field. */
+  readonly facts: TreeFactTables<S, M, B>;
+}
+
+/* oxlint-disable effect/prefer-option-over-null -- Drizzle builder inputs: this library's rule (packages/core/CLAUDE.md) is that any config threaded straight into a Drizzle builder call stays `?: T | undefined`, never `Option` */
+/**
+ * Per-level hooks for what a model can't carry. Every member is threaded into
+ * a Drizzle builder call, so each is `?: T | undefined` (see
+ * {@link SubtypeTablesConfig}).
+ */
+export interface TreeLevelHooks {
+  /** Hand-authored version-table columns (an FK backing a relationship, a generated column). */
+  readonly columns?: ColumnMap | undefined;
+  /** Extra version-table constraints and indexes, after the generated key and FK. */
+  readonly extraConstraints?:
+    | ((table: Record<string, ExtraConfigColumn>) => PgTableExtraConfigValue[])
+    | undefined;
+  /**
+   * A refinable branch: the `(id, type)` arc of this level and of every level
+   * below it gets `ON UPDATE CASCADE`, so flipping the root's `type` from a
+   * bare value to a concrete leaf cascades down the existing chain (website's
+   * entity refinement).
+   */
+  readonly refinable?: boolean | undefined;
+}
+
+/** The root tables' names and injected columns. */
+export interface TreeRootConfig<IE extends ColumnMap, VE extends ColumnMap> {
+  /** The identity table's name; `node` when absent. */
+  readonly identity?: string | undefined;
+  /** The root version table's name; `${identity}_version` when absent. */
+  readonly version?: string | undefined;
+  /** Extra identity columns (website's `slug`). */
+  readonly identityColumns?: IE | undefined;
+  /** Extra root-version columns (pulpit's `proposed_by`). */
+  readonly versionColumns?: VE | undefined;
+  /** The actor column's name; `actor` when absent. */
+  readonly actorColumn?: string | undefined;
+}
+
+/** The configuration {@link makeTreeTables} takes. */
+export interface TreeTablesConfig<
+  B extends ColumnBuilders,
+  H,
+  IE extends ColumnMap,
+  VE extends ColumnMap,
+> {
+  /** The schema every table is created in. */
+  readonly schema: PgSchema;
+  /** The builder registry the `dbColumn` kinds resolve against. */
+  readonly builders: B;
+  /** Resolves a `references` annotation to its target column (see `./derive`). */
+  readonly resolveReference?: DeriveOptions["resolveReference"];
+  /** The root tables' names and injected columns. */
+  readonly root?: TreeRootConfig<IE, VE> | undefined;
+  /** Per-level hooks, keyed by level name. */
+  readonly levels?: H | undefined;
+}
+
+/**
+ * An injected extras map, or `{}` when the member is absent.
+ *
+ * SAFETY: `T` is inferred from this very member, so it is a real map when the
+ * member is present and defaults to `{}` (the `IE` / `VE` defaults of
+ * {@link makeTreeTables}) exactly when it is absent.
+ */
+const columnsOrEmpty = <T extends ColumnMap>(columns: T | undefined): T => columns ?? ({} as T);
+/* oxlint-enable effect/prefer-option-over-null */
+
+/** The `action` values the root version table admits. */
+const VERSION_ACTIONS: ReadonlyArray<VersionAction> = ["create", "update", "delete"];
+
+/**
+ * Derive every table and constraint of a tree in one call: the root identity
+ * table (`id`, `type`, extras; `UNIQUE (id, type)`) and root version table
+ * (`(id, version)` key, `action` checked to `create` / `update` / `delete`,
+ * `timestamp`, the actor, extras); then per level a stable table (`id` →
+ * parent `id`, cascade delete; `type` NOT NULL with `UNIQUE (id, type)`,
+ * `(id, type)` → parent `(id, type)`, and a CHECK narrowing `type` to the
+ * level's subtree leaves) and a version table (`(id, version)` key and
+ * `(id, version)` → parent version FK) carrying the level's level columns,
+ * its leaf's columns (both derived through `builders`) and its hook columns.
+ * A fact-scoped level's version table is a spine, with one
+ * `${level}_${column}` fact table per own column, keyed and foreign-keyed on
+ * `(id, version)` (cascade delete).
+ *
+ * Constraint names are canonical (`${table}_pkey`, `${table}_${parent}_fk`,
+ * `${level}_id_type_unique` / `_fk` / `_type_valid`); no version table carries
+ * `action`. Column, constraint and CHECK value order follow declaration order,
+ * so the same tree always generates the same migration. Throws
+ * `DerivationError` at module load for a column kind `builders` lacks or an
+ * unresolvable reference.
+ *
+ * Every table is typed from the tree's column phantom. The one type-erasure
+ * seam is inside: the level and fact records are assembled from the runtime
+ * tree, then named by {@link TreeTables}.
+ *
+ * @example
+ * ```ts
+ * import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext";
+ * import { makeTreeTables } from "@thomasfosterau/effect-drizzle-ext/versioned-chain";
+ * import { getTableConfig, integer, pgSchema, text } from "drizzle-orm/pg-core";
+ * import * as Schema from "effect/Schema";
+ *
+ * const tree = defineTree({
+ *   work: {
+ *     columns: { title: dbColumn(Schema.String, { column: "title", pg: "text", notNull: true }) },
+ *   },
+ *   book: {
+ *     parent: "work",
+ *     leaf: { pages: dbColumn(Schema.Finite, { column: "pages", pg: "integer", notNull: false }) },
+ *   },
+ * });
+ *
+ * const tables = makeTreeTables(tree, {
+ *   schema: pgSchema("catalogue"),
+ *   builders: { text: (c: string) => text(c), integer: (c: string) => integer(c) },
+ * });
+ *
+ * console.log(getTableConfig(tables.levels.book.version).columns.map((c) => c.name));
+ * // ["id", "version", "pages"]
+ * ```
+ */
+export const makeTreeTables = <
+  S,
+  M,
+  B extends ColumnBuilders,
+  const H extends { readonly [K in keyof S]?: TreeLevelHooks } = Record<never, never>,
+  IE extends ColumnMap = Record<never, never>,
+  VE extends ColumnMap = Record<never, never>,
+>(
+  tree: Tree<S, M>,
+  config: TreeTablesConfig<B, H, IE, VE>,
+): TreeTables<S, M, B, H, IE, VE> => {
+  const { schema } = config;
+  const derive = makeDeriveColumns(config.builders, { resolveReference: config.resolveReference });
+  const identityName = config.root?.identity ?? "node";
+  const versionName = config.root?.version ?? `${identityName}_version`;
+  const toolkit = makeDiscriminatorConstraints<string>({
+    leaves: (level) =>
+      Option.getOrElse(
+        Option.map(
+          Arr.findFirst(tree.levels, (candidate) => candidate.name === level),
+          (found) => found.subtreeLeaves,
+        ),
+        () => [],
+      ),
+  });
+
+  const identity = schema.table<string, RootIdentityColumnBuilders<IE>>(
+    identityName,
+    {
+      id: uuid("id").primaryKey(),
+      type: text("type").notNull(),
+      ...columnsOrEmpty(config.root?.identityColumns),
+    },
+    (table) => [toolkit.typeUnique(identityName, { id: table.id, type: table.type })],
+  );
+  const version = schema.table<string, RootVersionColumnBuilders<VE>>(
+    versionName,
+    {
+      id: uuid("id")
+        .notNull()
+        .references((): AnyPgColumn => identity.id, { onDelete: "cascade" }),
+      version: bigint("version", { mode: "bigint" }).notNull(),
+      action: text("action").notNull(),
+      timestamp: timestamp("timestamp", { withTimezone: true }).notNull().defaultNow(),
+      actor: text(config.root?.actorColumn ?? "actor"),
+      ...columnsOrEmpty(config.root?.versionColumns),
+    },
+    (table) => [
+      primaryKey({ name: `${versionName}_pkey`, columns: [table.id, table.version] }),
+      enumCheck(`${versionName}_action_valid`, table.action, VERSION_ACTIONS),
+    ],
+  );
+
+  const hooksOf = (name: keyof S & string): TreeLevelHooks => config.levels?.[name] ?? {};
+
+  /** One built level: its pair, plus a fact-scoped level's fact tables. */
+  interface BuiltLevel {
+    readonly tables: SubtypeTables<ColumnMap>;
+    readonly facts: Readonly<Record<string, PgTable>>;
+  }
+  const subtype = makeSubtypeTables(
+    (level, stable, parent: { readonly stable: TypedStable; readonly refinable: boolean }) =>
+      toolkit.typeConstraints(level, stable, parent.stable, { refinable: parent.refinable }),
+  );
+  const builtLevel = (built: Readonly<Record<string, BuiltLevel>>, name: string): BuiltLevel =>
+    Option.getOrElse(R.get(built, name), () =>
+      treeError(`level "${name}" was read before it was built`),
+    );
+  const buildLevel = (
+    built: Readonly<Record<string, BuiltLevel>>,
+    level: Tree<S, M>["levels"][number],
+  ): BuiltLevel => {
+    const parent: { readonly stable: TypedStable; readonly version: ParentVersionTable } =
+      Option.match(level.parent, {
+        onNone: () => ({ stable: identity, version }),
+        onSome: (name) => builtLevel(built, name).tables,
+      });
+    const hooks = hooksOf(level.name);
+    const metas = { ...level.levelColumns, ...level.leafColumns };
+    const own: ColumnMap = derive.fromMeta(metas);
+    const factScoped = level.kind === "fact-scoped";
+    const tables = subtype(schema, {
+      name: level.name,
+      parentId: parent.stable.id,
+      parentVersion: parent.version,
+      columns: factScoped ? { ...hooks.columns } : { ...own, ...hooks.columns },
+      extraConstraints: hooks.extraConstraints,
+      discriminator: {
+        stable: parent.stable,
+        // A refinable level's whole subtree cascades: a flipped root `type`
+        // must travel down every arc below it, not just the first.
+        refinable: Arr.some(
+          [...level.ancestors, level.name],
+          (name) => hooksOf(name).refinable === true,
+        ),
+      },
+    });
+    const factOf = ([key, meta]: readonly [string, DbColumn], builder: ColumnBuilderBase) => {
+      const name = `${level.name}_${meta.column}`;
+      const fact: PgTable = schema.table(
+        name,
+        {
+          id: uuid("id").notNull(),
+          version: bigint("version", { mode: "bigint" }).notNull(),
+          [key]: builder,
+        },
+        (table) => [
+          primaryKey({ name: `${name}_pkey`, columns: [table.id, table.version] }),
+          foreignKey({
+            name: `${name}_${getTableName(tables.version)}_fk`,
+            columns: [table.id, table.version],
+            foreignColumns: [tables.version.id, tables.version.version],
+          }).onDelete("cascade"),
+        ],
+      );
+      return [key, fact] as const;
+    };
+    const facts = factScoped
+      ? R.fromEntries(
+          Arr.map(Arr.zip(R.toEntries(metas), R.values(own)), ([entry, builder]) =>
+            factOf(entry, builder),
+          ),
+        )
+      : {};
+    return { tables, facts };
+  };
+
+  // Parents first (by depth, declaration order within a depth), so every
+  // level's parent tables exist when it is built.
+  const built = Arr.reduce(
+    Arr.sort(
+      tree.levels,
+      Order.mapInput(Order.Number, (level: Tree<S, M>["levels"][number]) => level.ancestors.length),
+    ),
+    R.empty<string, BuiltLevel>(),
+    (acc, level) => ({ ...acc, [level.name]: buildLevel(acc, level) }),
+  );
+  const derived = {
+    root: { identity, version },
+    levels: R.fromEntries(Arr.map(tree.names, (name) => [name, builtLevel(built, name).tables])),
+    facts: R.fromEntries(Arr.map(tree.names, (name) => [name, builtLevel(built, name).facts])),
+  };
+  // SAFETY: the type-erasure seam. Every level's tables were built above from
+  // the same runtime column maps the tree's phantom `M` types (the level's
+  // level and leaf `DbColumn` maps through `builders`, plus its hook columns),
+  // in the record shape `TreeTables` names; only the per-level precision was
+  // erased by assembling them from the runtime tree.
+  return derived as TreeTables<S, M, B, H, IE, VE>;
+};

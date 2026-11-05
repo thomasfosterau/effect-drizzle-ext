@@ -45,6 +45,7 @@ import {
   type DbTable,
   type TableMeta,
   type UnwrapColumn,
+  type FieldColumnsMetaOf,
   fieldColumns,
 } from "../index.ts";
 import { buildTree, treeError, type LevelSpec, type Tree } from "../tree.ts";
@@ -256,6 +257,34 @@ export const readDbTable = (resource: AnyResource): Option.Option<TableMeta> =>
 
 // ── Tree ──────────────────────────────────────────────────────────────
 
+/** The resource an entry's `leaf` holds, when it holds one. */
+type EntryResource<E> = E extends { readonly leaf?: infer L }
+  ? Exclude<L, undefined> extends AnyResource
+    ? Exclude<L, undefined>
+    : never
+  : never;
+
+/** The fields an entry's `columns` declares; `{}` when absent. */
+type EntryLevelFields<E> = E extends { readonly columns?: infer F }
+  ? Exclude<F, undefined> extends Schema.Struct.Fields
+    ? Exclude<F, undefined>
+    : Record<never, never>
+  : Record<never, never>;
+
+/**
+ * The typed column metadata of a {@link defineResourceTree} declaration `S`:
+ * per level, its level columns' `DbColumn` map and its leaf resource's
+ * attribute columns. The phantom the table derivation reads.
+ */
+export type ResourceTreeMeta<S> = {
+  readonly [K in keyof S]: {
+    readonly level: FieldColumnsMetaOf<EntryLevelFields<S[K]>>;
+    readonly leaf: [EntryResource<S[K]>] extends [never]
+      ? Record<never, never>
+      : ResourceColumnsMetaOf<EntryResource<S[K]>>;
+  };
+};
+
 /**
  * The constraint a resource tree declaration `S` is checked against: the
  * core `CheckedTreeSpec`, with each leaf a `Resource.make` definition whose
@@ -279,8 +308,8 @@ export type CheckedResourceTreeSpec<S, Ext> = {
  */
 export const defineResourceTreeFor =
   <Ext extends object>() =>
-  <const S extends CheckedResourceTreeSpec<S, Ext>>(spec: S): Tree<S> =>
-    buildTree<S, AnyResource>(spec, {
+  <const S extends CheckedResourceTreeSpec<S, Ext>>(spec: S): Tree<S, ResourceTreeMeta<S>> =>
+    buildTree<S, AnyResource, ResourceTreeMeta<S>>(spec, {
       levelColumns: fieldColumns,
       leafColumns: (resource, name) =>
         resource.type === name
@@ -323,4 +352,4 @@ export const defineResourceTreeFor =
  */
 export const defineResourceTree: <const S extends CheckedResourceTreeSpec<S, Record<never, never>>>(
   spec: S,
-) => Tree<S> = defineResourceTreeFor<Record<never, never>>();
+) => Tree<S, ResourceTreeMeta<S>> = defineResourceTreeFor<Record<never, never>>();

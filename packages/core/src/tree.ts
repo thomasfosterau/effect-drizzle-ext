@@ -117,8 +117,29 @@ export interface TreeLevel<S> {
   readonly leafColumns: Readonly<Record<string, DbColumn>>;
 }
 
-/** A checked tree: the declaration plus every level's derived facts. */
-export interface Tree<S> {
+/**
+ * The type-level column metadata of one level: its level columns' and its
+ * leaf's `DbColumn` maps, recovered from the declaration's phantoms. What a
+ * table derivation reads to type the tables it builds.
+ */
+export interface LevelColumnsMeta {
+  readonly level: object;
+  readonly leaf: object;
+}
+
+/** The default column metadata of a declaration `S`: untyped maps per level. */
+export type AnyTreeColumnsMeta<S> = { readonly [K in keyof S]: LevelColumnsMeta };
+
+declare const TreeColumnsTypeId: unique symbol;
+
+/**
+ * A checked tree: the declaration plus every level's derived facts. `M` is a
+ * type-only phantom (never present at runtime) carrying each level's typed
+ * column metadata, so the table derivation types every table it builds.
+ */
+export interface Tree<S, M = AnyTreeColumnsMeta<S>> {
+  /** Type-only: each level's typed column metadata. */
+  readonly [TreeColumnsTypeId]?: M;
   /** The declaration exactly as written, for type-level consumers. */
   readonly spec: S;
   /** Every level name, in declaration order. */
@@ -197,10 +218,14 @@ const firstClash = (
  * path sharing a field key or a column name. The entries' own payload checks
  * come from `reader`.
  */
-export const buildTree = <S extends Readonly<Record<string, LevelSpec<string, Leaf>>>, Leaf>(
+export const buildTree = <
+  S extends Readonly<Record<string, LevelSpec<string, Leaf>>>,
+  Leaf,
+  M = AnyTreeColumnsMeta<S>,
+>(
   spec: S,
   reader: TreeReader<Leaf>,
-): Tree<S> => {
+): Tree<S, M> => {
   const names: ReadonlyArray<LevelName<S>> = R.keys(spec);
   if (!Arr.isReadonlyArrayNonEmpty(names)) treeError("a tree needs at least one level");
   Arr.forEach(names, (name) => {

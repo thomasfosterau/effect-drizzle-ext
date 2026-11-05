@@ -115,14 +115,12 @@ describe("makeSubtypeTables", () => {
     expect(stableCfg.foreignKeys[0]?.getName()).toBe("widget_id_entity_id_fk");
   });
 
-  it("applies the injected discriminator, versionDefault, and constraint-name overrides", () => {
+  it("applies the injected discriminator and versionDefault, in canonical names", () => {
     const { stable, version } = defineSubtypeTables(app, {
       name: "gadget",
       parentId: entity.id,
       parentVersion: entityVersion,
-      parentUpdateCascade: true,
       versionDefault: 0n,
-      constraintNames: { pk: "gadget_version_pk", parentFk: "gadget_version_parent_fk" },
       columns: { label: text("label") },
       discriminator: { parent: { id: entity.id, type: entity.type }, refinable: true },
       extraConstraints: (t) => [unique("gadget_version_label_unique").on(t.label)],
@@ -134,29 +132,14 @@ describe("makeSubtypeTables", () => {
     expect(stableCfg.uniqueConstraints.some((u) => u.getName() === "gadget_id_type_unique")).toBe(
       true,
     );
-    // version default + overridden constraint names + extra constraint
+    // version default + canonical constraint names + extra constraint
     expect(versionCfg.columns.find((c) => c.name === "version")?.hasDefault).toBe(true);
-    expect(versionCfg.primaryKeys[0]?.getName()).toBe("gadget_version_pk");
-    expect(versionCfg.foreignKeys.some((fk) => fk.getName() === "gadget_version_parent_fk")).toBe(
-      true,
-    );
+    expect(versionCfg.primaryKeys[0]?.getName()).toBe("gadget_version_pkey");
+    expect(
+      versionCfg.foreignKeys.some((fk) => fk.getName() === "gadget_version_entity_version_fk"),
+    ).toBe(true);
     expect(
       versionCfg.uniqueConstraints.some((u) => u.getName() === "gadget_version_label_unique"),
-    ).toBe(true);
-  });
-
-  it("treats explicit `undefined` constraint-name overrides as absent", () => {
-    const { version } = defineSubtypeTables(app, {
-      name: "gizmo",
-      parentId: entity.id,
-      parentVersion: entityVersion,
-      constraintNames: { pk: undefined, parentFk: undefined },
-      columns: { label: text("label") },
-    });
-    const versionCfg = getTableConfig(version);
-    expect(versionCfg.primaryKeys[0]?.getName()).toBe("gizmo_version_pkey");
-    expect(
-      versionCfg.foreignKeys.some((fk) => fk.getName() === "gizmo_version_entity_version_fk"),
     ).toBe(true);
   });
 

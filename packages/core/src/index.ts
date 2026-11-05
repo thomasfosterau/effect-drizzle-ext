@@ -63,7 +63,9 @@ import { buildTree, type CheckedTreeSpec, type Tree } from "./tree.ts";
 export { DerivationError };
 
 export type {
+  AnyTreeColumnsMeta,
   CheckedTreeSpec,
+  LevelColumnsMeta,
   LeafName,
   LevelKind,
   LevelName,
@@ -569,6 +571,25 @@ export const fieldColumnBounds = (fields: Schema.Struct.Fields): Record<string, 
 
 // ── Tree ──────────────────────────────────────────────────────────────
 
+/** The fields an entry's member `K` (`columns` or `leaf`) declares; `{}` when absent. */
+type EntryFields<E, K extends "columns" | "leaf"> = E extends { readonly [P in K]?: infer F }
+  ? Exclude<F, undefined> extends Schema.Struct.Fields
+    ? Exclude<F, undefined>
+    : Record<never, never>
+  : Record<never, never>;
+
+/**
+ * The typed column metadata of a {@link defineTree} declaration `S`: per level,
+ * the `DbColumn` maps its level columns and its leaf fields carry. The phantom
+ * a `Tree` built by `defineTree` holds for the table derivation.
+ */
+export type FieldsTreeMeta<S> = {
+  readonly [K in keyof S]: {
+    readonly level: FieldColumnsMetaOf<EntryFields<S[K], "columns">>;
+    readonly leaf: FieldColumnsMetaOf<EntryFields<S[K], "leaf">>;
+  };
+};
+
 /**
  * A {@link defineTree} whose every entry also carries the consumer's
  * extension record `Ext` (pulpit's `owned` / `pageable` flags, say); the
@@ -579,8 +600,13 @@ export const fieldColumnBounds = (fields: Schema.Struct.Fields): Record<string, 
  */
 export const defineTreeFor =
   <Ext extends object>() =>
-  <const S extends CheckedTreeSpec<S, Schema.Struct.Fields, Ext>>(spec: S): Tree<S> =>
-    buildTree(spec, { levelColumns: fieldColumns, leafColumns: fieldColumns });
+  <const S extends CheckedTreeSpec<S, Schema.Struct.Fields, Ext>>(
+    spec: S,
+  ): Tree<S, FieldsTreeMeta<S>> =>
+    buildTree<S, Schema.Struct.Fields, FieldsTreeMeta<S>>(spec, {
+      levelColumns: fieldColumns,
+      leafColumns: fieldColumns,
+    });
 
 /**
  * Declare an ontology's level tree once, Drizzle-free, so a models package can
@@ -624,4 +650,4 @@ export const defineTree: <
   const S extends CheckedTreeSpec<S, Schema.Struct.Fields, Record<never, never>>,
 >(
   spec: S,
-) => Tree<S> = defineTreeFor<Record<never, never>>();
+) => Tree<S, FieldsTreeMeta<S>> = defineTreeFor<Record<never, never>>();
