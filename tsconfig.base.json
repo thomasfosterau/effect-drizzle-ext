@@ -59,7 +59,17 @@
           "preferSchemaOverJson": "warning",
           "processEnv": "warning",
           "processEnvInEffect": "warning",
-          "unsafeEffectTypeAssertion": "warning"
+          "unsafeEffectTypeAssertion": "warning",
+          // Off: this library is the binding of `effect/sql/*`, `@effect/sql-pg`
+          // and the platform services drizzle-kit's tooling needs (FileSystem,
+          // Path, ChildProcessSpawner); those modules are its subject, so every
+          // import of them is unavoidable (effect-drizzle-ext#104).
+          "unstableApiUsage": "off",
+          // Off: every class it reports is a `Schema.TaggedError`, whose literal
+          // `_tag` already keeps two errors from being structurally confused;
+          // a brand would only add a phantom member to the published
+          // declarations (effect-drizzle-ext#104).
+          "schemaClassMissingBrand": "off"
         }
       }
     ]

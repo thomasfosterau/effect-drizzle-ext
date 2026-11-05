@@ -105,7 +105,7 @@ const table = dbTableFor<"work" | "agent">();
 
 const fields = {
   title: column(Schema.String, { column: "title", pg: "text", notNull: true }),
-  pages: column(Schema.Number.check(Schema.isGreaterThanOrEqualTo(0)), {
+  pages: column(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)), {
     column: "pages",
     pg: "integer",
     notNull: false,
@@ -160,7 +160,7 @@ export const branch = pgTable(
 
 // ── columns ───────────────────────────────────────────────────────────────
 
-const Payload = Schema.Struct({ a: Schema.Number });
+const Payload = Schema.Struct({ a: Schema.Finite });
 export const blob = pgTable("blob", {
   hash: bytea("hash").notNull(),
   search: tsvector("search"),
@@ -173,9 +173,10 @@ export const roundTrip: Uint8Array = hexToBytea(byteaToHex(new Uint8Array([1, 2]
 
 // oxlint-disable-next-line effect/prefer-option-over-null -- `combineFilters` yields the `SQL | undefined` Drizzle's `.where()` reads
 export const where: SQL | undefined = combineFilters(sql`1 = 1`, undefined);
-// SAFETY: a type-level fixture — only the `Page` type `pageOf` infers from a
-// `BookRow` is asserted; no member of the row is read for its value.
-export const page = pageOf([{ ...({} as BookRow), [`__totalCount`]: 3 }], (row) => row.title);
+// A type-level fixture: only the `Page` type `pageOf` infers from a `BookRow`
+// is asserted, so the row is declared, never built.
+declare const bookRow: BookRow;
+export const page = pageOf([{ ...bookRow, [`__totalCount`]: 3 }], (row) => row.title);
 export const total = totalCountColumn;
 const pagination = boundedPagination({ maxLimit: 100, defaultLimit: 20 });
 export const rows = executeRows<{ readonly one: number }>(
@@ -217,7 +218,7 @@ interface FakeTx {
 }
 const services = makeDatabaseServices<FakeTx, FakeTx>()({ key: "Database" });
 export type Database = typeof services.Database.Identifier;
-export const inTx = services.transact(Effect.map(services.readHandle, () => 1));
+export const inTx = services.transact(Effect.as(services.readHandle, 1));
 
 // ── versioned-chain ───────────────────────────────────────────────────────
 
@@ -300,7 +301,7 @@ export const person = pgTable("person", {
 
 const appDatabase = Pg.makePgDatabase({ relations: {}, key: "AppDb" });
 export type AppDb = typeof appDatabase.Database.Identifier;
-export const appWrite = appDatabase.transact(Effect.map(appDatabase.readHandle, () => "written"));
+export const appWrite = appDatabase.transact(Effect.as(appDatabase.readHandle, "written"));
 export const appLayer: Layer.Layer<"AppDb", never, PgClient.PgClient> = appDatabase.layer;
 export const pooled: Layer.Layer<PgClient.PgClient, SqlError> = Pg.pgClientFromPool({
   connectionString: Redacted.make("postgresql://postgres@127.0.0.1:5432/app"),

@@ -172,7 +172,7 @@ const ISO_PROBE = "2024-01-02T03:04:05.000Z";
 const decodesFromJson = (schema: Schema.Top, input: Schema.Json): Option.Option<unknown> =>
   // SAFETY: an attribute schema's decoding needs no services (a resource's
   // attributes are plain codecs), which `Schema.Top` cannot express.
-  Schema.decodeUnknownOption(Schema.toCodecJson(schema as Schema.Codec<unknown>))(input);
+  Schema.decodeOption(Schema.toCodecJson(schema as Schema.Codec<unknown>))(input);
 
 /**
  * Project a `Resource.make` definition's resource-object attributes into

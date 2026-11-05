@@ -342,7 +342,7 @@ const parseSnapshot = (
   file: string,
   text: string,
 ): Effect.Effect<ParsedSnapshot, MalformedSnapshot> =>
-  Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(text).pipe(
+  Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown))(text).pipe(
     Effect.filterOrFail(Schema.is(SnapshotIdentity), (raw) => raw),
     Effect.mapError((cause) => new MalformedSnapshot({ file, cause })),
   );
@@ -489,7 +489,13 @@ const checkZeroDrift = (
       onNone: () => `${label} (no snapshot yet)`,
       onSome: (entry) => `${label}/${entry.dir}/snapshot.json`,
     });
-    if (Option.isSome(latest) && !isPostgresSnapshot(latest.value.raw)) {
+    // `Option.filter` with the refinement narrows the snapshot to the
+    // contract `generateMigration` reads, so `prev` below needs no cast.
+    const latestRaw = Option.filter(
+      Option.map(latest, (entry) => entry.raw),
+      isPostgresSnapshot,
+    );
+    if (Option.isSome(latest) && Option.isNone(latestRaw)) {
       return [
         `${where} doesn't match the drizzle-kit snapshot contract \`generateMigration\` expects ` +
           '(`version: "8"`, `dialect: "postgres"`, a `ddl` array): a stale (pre-v8) or hand-edited snapshot.',
@@ -501,10 +507,9 @@ const checkZeroDrift = (
         Option.getOrUndefined(Option.map(latest, (entry) => entry.snapshot.id)),
       ),
     );
-    const prev = yield* Option.match(latest, {
+    const prev = yield* Option.match(latestRaw, {
       onNone: () => drizzleKit(() => generateDrizzleJson({})),
-      // SAFETY: `isPostgresSnapshot` held for this value above.
-      onSome: (entry) => Effect.succeed(entry.raw as PostgresSnapshot),
+      onSome: (raw) => Effect.succeed(raw),
     });
     return yield* drizzleKit(() => generateMigration(prev, cur)).pipe(
       Effect.map((statements) =>
