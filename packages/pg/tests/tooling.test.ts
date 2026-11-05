@@ -40,6 +40,8 @@ import {
 } from "../src/tooling/index.ts";
 
 const FIXTURE_MIGRATIONS = `${import.meta.dirname}/fixtures/migrations`;
+/** A one-migration chain in the pre-rc.5 full-snapshot format (version `"8"`). */
+const FIXTURE_V8_CHAIN = `${import.meta.dirname}/fixtures/v8-chain/migrations`;
 
 /** The suite's runtime: the Node file system, path and child-process services. */
 const runtime = ManagedRuntime.make(NodeServices.layer);
@@ -73,6 +75,22 @@ describe("checkMigrationDrift", () => {
       }),
     );
     expect(report).toEqual({ snapshots: 2, baseRef: Option.none() });
+  });
+
+  it("reads a full v8 snapshot as the latest state", async () => {
+    // The pre-rc.5 format: the widget migration's original snapshot, alone. The
+    // fixture schema has moved past it, so a correct read reports real drift,
+    // never a contract mismatch.
+    const error = await run(
+      Effect.flip(checkMigrationDrift({ schema: fixtureSchema, migrationsDir: FIXTURE_V8_CHAIN })),
+    );
+    expect(error).toBeInstanceOf(MigrationDriftError);
+    if (!(error instanceof MigrationDriftError)) throw error;
+    expect(error.issues.join("\n")).toMatch(/Schema drift detected/);
+    expect(error.issues.join("\n")).toMatch(
+      /ALTER TABLE "fixture"\."widget" ADD COLUMN "retired_at"/,
+    );
+    expect(error.issues.join("\n")).not.toMatch(/snapshot contract/);
   });
 
   it("reports drift when the schema moved past the latest snapshot", async () => {

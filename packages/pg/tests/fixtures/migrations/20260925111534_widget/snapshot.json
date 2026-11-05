@@ -1,9 +1,72 @@
 {
-  "version": "8",
+  "type": "base",
+  "version": "9",
   "dialect": "postgres",
   "id": "0146b7f6-2933-4d88-b8d7-75d7217534ab",
-  "prevIds": [
-    "00000000-0000-0000-0000-000000000000"
+  "prevIds": ["00000000-0000-0000-0000-000000000000"],
+  "footprints": [
+    {
+      "statementType": "create_schema",
+      "statementTarget": ["schema", "fixture"],
+      "writes": ["s|sch|fixture", "n|sch|fixture", "e|sch|fixture"]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "fixture", "widget"],
+      "writes": [
+        "s|tbl|fixture.widget",
+        "n|tbl|fixture.widget",
+        "e|tbl|fixture.widget",
+        "n|rel|fixture.widget",
+        "n|type|fixture.widget",
+        "n|rel|fixture.widget_pkey",
+        "n|rel|fixture.widget_slug_key"
+      ],
+      "reads": ["n|sch|fixture"]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "fixture", "widget_version"],
+      "writes": [
+        "s|tbl|fixture.widget_version",
+        "n|tbl|fixture.widget_version",
+        "e|tbl|fixture.widget_version",
+        "n|rel|fixture.widget_version",
+        "n|type|fixture.widget_version"
+      ],
+      "reads": ["n|sch|fixture"]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "fixture", "widget_version"],
+      "writes": [
+        "s|fk|fixture.widget_version.widget_version_id_widget_id_fkey",
+        "n|fk|fixture.widget_version.widget_version_id_widget_id_fkey",
+        "e|fk|fixture.widget_version.widget_version_id_widget_id_fkey",
+        "n|con|fixture.widget_version.widget_version_id_widget_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|fixture.widget_version",
+        "n|sch|fixture",
+        "n|tbl|fixture.widget",
+        "n|sch|fixture",
+        "n|col|fixture.widget_version.id",
+        "n|col|fixture.widget.id",
+        "e|uniqueness|fixture.widget.id"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": ["view", "fixture", "widget_view"],
+      "writes": [
+        "s|view|fixture.widget_view",
+        "n|view|fixture.widget_view",
+        "e|view|fixture.widget_view",
+        "n|rel|fixture.widget_view",
+        "n|type|fixture.widget_view"
+      ],
+      "reads": ["n|sch|fixture"]
+    }
   ],
   "ddl": [
     {
@@ -11,18 +74,21 @@
       "entityType": "schemas"
     },
     {
-      "isRlsEnabled": false,
+      "schema": "fixture",
       "name": "widget",
-      "entityType": "tables",
-      "schema": "fixture"
-    },
-    {
       "isRlsEnabled": false,
-      "name": "widget_version",
-      "entityType": "tables",
-      "schema": "fixture"
+      "entityType": "tables"
     },
     {
+      "schema": "fixture",
+      "name": "widget_version",
+      "isRlsEnabled": false,
+      "entityType": "tables"
+    },
+    {
+      "schema": "fixture",
+      "table": "widget",
+      "name": "id",
       "type": "uuid",
       "typeSchema": null,
       "notNull": true,
@@ -30,12 +96,12 @@
       "default": "gen_random_uuid()",
       "generated": null,
       "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "fixture",
-      "table": "widget"
+      "entityType": "columns"
     },
     {
+      "schema": "fixture",
+      "table": "widget",
+      "name": "slug",
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -43,12 +109,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "slug",
-      "entityType": "columns",
-      "schema": "fixture",
-      "table": "widget"
+      "entityType": "columns"
     },
     {
+      "schema": "fixture",
+      "table": "widget_version",
+      "name": "id",
       "type": "uuid",
       "typeSchema": null,
       "notNull": true,
@@ -56,12 +122,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "fixture",
-      "table": "widget_version"
+      "entityType": "columns"
     },
     {
+      "schema": "fixture",
+      "table": "widget_version",
+      "name": "version",
       "type": "bigint",
       "typeSchema": null,
       "notNull": true,
@@ -69,12 +135,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "version",
-      "entityType": "columns",
-      "schema": "fixture",
-      "table": "widget_version"
+      "entityType": "columns"
     },
     {
+      "schema": "fixture",
+      "table": "widget_version",
+      "name": "name",
       "type": "text",
       "typeSchema": null,
       "notNull": true,
@@ -82,12 +148,12 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "fixture",
-      "table": "widget_version"
+      "entityType": "columns"
     },
     {
+      "schema": "fixture",
+      "table": "widget_version",
+      "name": "timestamp",
       "type": "timestamp with time zone",
       "typeSchema": null,
       "notNull": true,
@@ -95,60 +161,48 @@
       "default": "now()",
       "generated": null,
       "identity": null,
-      "name": "timestamp",
-      "entityType": "columns",
-      "schema": "fixture",
-      "table": "widget_version"
+      "entityType": "columns"
     },
     {
+      "schema": "fixture",
+      "table": "widget_version",
+      "name": "widget_version_id_widget_id_fkey",
       "nameExplicit": false,
-      "columns": [
-        "id"
-      ],
+      "columns": ["id"],
       "schemaTo": "fixture",
       "tableTo": "widget",
-      "columnsTo": [
-        "id"
-      ],
+      "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
-      "name": "widget_version_id_widget_id_fkey",
-      "entityType": "fks",
-      "schema": "fixture",
-      "table": "widget_version"
+      "entityType": "fks"
     },
     {
-      "columns": [
-        "id"
-      ],
-      "nameExplicit": false,
-      "name": "widget_pkey",
       "schema": "fixture",
       "table": "widget",
+      "name": "widget_pkey",
+      "columns": ["id"],
+      "nameExplicit": false,
       "entityType": "pks"
     },
     {
-      "nameExplicit": false,
-      "columns": [
-        "slug"
-      ],
-      "nullsNotDistinct": false,
-      "name": "widget_slug_key",
       "schema": "fixture",
       "table": "widget",
+      "name": "widget_slug_key",
+      "nameExplicit": false,
+      "columns": ["slug"],
+      "nullsNotDistinct": false,
       "entityType": "uniques"
     },
     {
+      "schema": "fixture",
+      "name": "widget_view",
       "definition": "select \"fixture\".\"widget\".\"id\", \"fixture\".\"widget\".\"slug\", \"fixture\".\"widget_version\".\"name\", \"fixture\".\"widget_version\".\"timestamp\" from \"fixture\".\"widget\" inner join \"fixture\".\"widget_version\" on \"fixture\".\"widget\".\"id\" = \"fixture\".\"widget_version\".\"id\"",
       "with": null,
       "withNoData": null,
       "using": null,
       "tablespace": null,
       "materialized": false,
-      "name": "widget_view",
-      "entityType": "views",
-      "schema": "fixture"
+      "entityType": "views"
     }
-  ],
-  "renames": []
+  ]
 }
