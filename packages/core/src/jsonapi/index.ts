@@ -45,7 +45,9 @@ import {
   type DbTable,
   type TableMeta,
   type UnwrapColumn,
+  fieldColumns,
 } from "../index.ts";
+import { buildTree, treeError, type LevelSpec, type Tree } from "../tree.ts";
 
 export type { DbTable, TableMeta };
 
@@ -251,3 +253,74 @@ export const dbTableFor =
  */
 export const readDbTable = (resource: AnyResource): Option.Option<TableMeta> =>
   coreReadDbTable(resource);
+
+// ── Tree ──────────────────────────────────────────────────────────────
+
+/**
+ * The constraint a resource tree declaration `S` is checked against: the
+ * core `CheckedTreeSpec`, with each leaf a `Resource.make` definition whose
+ * wire `type` is the level's own name. A leaf filed under another name, or a
+ * parent naming no level (or the level itself), is a type error.
+ */
+export type CheckedResourceTreeSpec<S, Ext> = {
+  readonly [K in keyof S]: LevelSpec<
+    Exclude<keyof S & string, K>,
+    AnyResource & { readonly type: K }
+  > &
+    Ext;
+};
+
+/**
+ * A {@link defineResourceTree} whose every entry also carries the consumer's
+ * extension record `Ext`, which the library never reads (pulpit's
+ * `RegistryEntry` flags). Pin it once — `const defineTree =
+ * defineResourceTreeFor<RegistryFlags>()`. Throws `DerivationError` at module
+ * load as `defineResourceTree` does.
+ */
+export const defineResourceTreeFor =
+  <Ext extends object>() =>
+  <const S extends CheckedResourceTreeSpec<S, Ext>>(spec: S): Tree<S> =>
+    buildTree<S, AnyResource>(spec, {
+      levelColumns: fieldColumns,
+      leafColumns: (resource, name) =>
+        resource.type === name
+          ? resourceColumns(resource)
+          : treeError(
+              `leaf "${name}" carries resource "${resource.type}"; a leaf's name is its resource's type`,
+            ),
+    });
+
+/**
+ * The core entry's `defineTree` over `Resource.make` definitions: each leaf's
+ * `leaf` is the resource whose wire `type` is the level's name (the
+ * discriminator value), and its domain columns are the resource's
+ * `dbColumn`-annotated attributes. Every other check is the core one. Throws
+ * `DerivationError` at module load for a leaf whose resource `type` isn't its
+ * name, and for every structural fault `defineTree` names.
+ *
+ * @example
+ * ```ts
+ * import { dbColumn } from "@thomasfosterau/effect-drizzle-ext";
+ * import { defineResourceTree } from "@thomasfosterau/effect-drizzle-ext/jsonapi";
+ * import { Resource } from "@thomasfosterau/effect-jsonapi";
+ * import * as Schema from "effect/Schema";
+ *
+ * const Book = Resource.make("book", {
+ *   attributes: {
+ *     pages: dbColumn(Schema.Finite, { column: "pages", pg: "integer", notNull: false }),
+ *   },
+ * });
+ *
+ * const tree = defineResourceTree({
+ *   work: {
+ *     columns: { title: dbColumn(Schema.String, { column: "title", pg: "text", notNull: true }) },
+ *   },
+ *   book: { parent: "work", leaf: Book },
+ * });
+ *
+ * console.log(tree.leaves); // ["book"]
+ * ```
+ */
+export const defineResourceTree: <const S extends CheckedResourceTreeSpec<S, Record<never, never>>>(
+  spec: S,
+) => Tree<S> = defineResourceTreeFor<Record<never, never>>();
