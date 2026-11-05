@@ -43,6 +43,7 @@ import {
 import * as Arr from "effect/Array";
 import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
+import { DerivationError } from "./derivation-error.ts";
 import {
   fieldColumnBounds,
   fieldColumns,
@@ -53,20 +54,11 @@ import {
 } from "./index.ts";
 
 /**
- * A construction-time derivation failure: a table could not be built from its
- * declarations (no builder registered for a column kind, a `references`
- * annotation with no resolver, numeric bounds on a column the table has no
- * column for, an unresolvable FK target).
- *
- * **Thrown, never failed.** See this module's header: derivation runs at module
- * load, before an Effect runtime exists, so the only way to stop a misdeclared
- * table from reaching production is to make its `import` fail. It is a tagged
- * error all the same, so a consumer that does catch one (a registry loader, a
- * codegen script) can match it structurally.
+ * A construction-time derivation failure, thrown at module load when a table
+ * cannot be built from its declarations. The same class the Drizzle-free `.`
+ * entry exports (for `defineTree`), re-exported here for the table derivations.
  */
-export class DerivationError extends Schema.TaggedError<DerivationError>()("DerivationError", {
-  message: Schema.String,
-}) {}
+export { DerivationError };
 
 /**
  * A registry mapping column kinds to Drizzle column builders — one builder per

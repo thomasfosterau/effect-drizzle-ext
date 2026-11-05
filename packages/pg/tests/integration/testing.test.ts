@@ -95,9 +95,7 @@ describe("runInTestTransaction against a live database", () => {
         Effect.gen(function* () {
           const tx = yield* CurrentTransaction;
           yield* tx.execute(sql`INSERT INTO rollback_probe (n) VALUES (2)`);
-          return yield* Effect.fail(
-            new SpecFailure({ message: "the spec decided this run fails" }),
-          );
+          return yield* new SpecFailure({ message: "the spec decided this run fails" });
         }),
       ),
     ).rejects.toThrow(/the spec decided this run fails/);

@@ -90,16 +90,29 @@ export default defineConfig({
       "vite-plus/prefer-vite-plus-imports": "error",
 
       // ---- type-aware rules (oxlint-tsgolint) -------------------------------
-      // Allowance (effect-drizzle-ext#104): 35 sites when type-aware linting
-      // was turned on, every one a `// SAFETY:`-commented narrowing at a
-      // Drizzle builder or schema-annotation boundary in src/, or a
-      // deliberately ill-typed `as never` fixture in a test. A new site is a
-      // defect; lower the count as sites are fixed and return the rule to
-      // `error` at zero.
+      // Allowance (effect-drizzle-ext#104): 23 sites (35 when type-aware
+      // linting was turned on; the tree interpreter's two documented
+      // type-erasure seams in versioned-chain.ts are the newest), every one a
+      // `// SAFETY:`-commented narrowing at a Drizzle builder, schema-annotation
+      // or tree-derivation boundary in src/, or a
+      // deliberately ill-typed test double (the hostile `toJsonSchema` in
+      // annotation.test.ts, the fake handle in pg's testing.test.ts). A new
+      // site is a defect; lower the count as sites are fixed and return the
+      // rule to `error` at zero.
       "typescript/no-unsafe-type-assertion": "warn",
       // Allowance (effect-drizzle-ext#104): 1 site, the `Effect` channel
       // narrowing in runInTestTransaction (packages/pg/src/testing.ts).
       "effecttsgo/unsafe-effect-type-assertion": "warn",
+      // This library is the binding of `effect/sql/*`, `@effect/sql-pg` and
+      // the platform services drizzle-kit's tooling needs (FileSystem, Path,
+      // ChildProcessSpawner): those unstable modules are its subject, so no
+      // import of them can be avoided. Off here and in tsconfig.base.json.
+      "effecttsgo/unstable-api-usage": "off",
+      // Every class it reports is a `Schema.TaggedError`, whose literal `_tag`
+      // already keeps two errors apart structurally; a brand would only add a
+      // phantom member to the published declarations. Off here and in
+      // tsconfig.base.json.
+      "effecttsgo/schema-class-missing-brand": "off",
       // Explicit default type arguments are deliberate on the public surface:
       // `Redacted.Redacted<string>` says the secret is a connection string and
       // `Schema.Codec<unknown, unknown, never, never>` says the codec needs no
@@ -133,11 +146,8 @@ export default defineConfig({
           "effect/avoid-node-imports": "off",
           "effect/avoid-sync-fs": "off",
           "effect/avoid-process-env": "off",
-          "effect/use-console-service": "off",
           "effect/use-filesystem-service": "off",
           "effect/use-path-service": "off",
-          "effect/avoid-native-fetch": "off",
-          "effect/effect-promise-vs-trypromise": "off",
         },
       },
       // The integration specs' raw `sql<…>` rows are typed by the statement's

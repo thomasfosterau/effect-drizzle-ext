@@ -42,7 +42,7 @@
  * @module tooling/migration-drift
  */
 
-import { generateDrizzleJson, generateMigration } from "drizzle-kit/api-postgres";
+import { generateDrizzleJson, generateMigration, reconstruct } from "drizzle-kit/api-postgres";
 import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -52,6 +52,7 @@ import * as Order from "effect/Order";
 import * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
 import * as Predicate from "effect/Predicate";
+import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
 import { ChildProcess } from "effect/process";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
@@ -83,8 +84,9 @@ const SnapshotIdentity = Schema.Struct({
 });
 
 /**
- * The members of drizzle-kit's `PostgresSnapshot` the zero-drift diff relies
- * on beyond the identity: checked, not decoded — the snapshot is handed to
+ * A **full** (version `"8"`) snapshot, which earlier drizzle-kit 1.0
+ * prereleases wrote: the members the zero-drift diff relies on beyond the
+ * identity, checked, not decoded, since the snapshot is handed to
  * `generateMigration` unchanged.
  */
 const PostgresSnapshotContract = Schema.Struct({
@@ -95,6 +97,20 @@ const PostgresSnapshotContract = Schema.Struct({
 
 const isPostgresSnapshot = (raw: unknown): raw is PostgresSnapshot =>
   Schema.is(PostgresSnapshotContract)(raw);
+
+/**
+ * A version `"9"` snapshot, which drizzle-kit 1.0.0-rc.5 writes (and
+ * `drizzle-kit up` upgrades a v8 chain to): a `base` or a `diff` over its
+ * parents, so the state at one is rebuilt from the whole chain with
+ * drizzle-kit's own `reconstruct`.
+ */
+const ChainSnapshotContract = Schema.Struct({
+  version: Schema.Literal("9"),
+  dialect: Schema.Literal("postgres"),
+  type: Schema.Literals(["base", "diff"]),
+});
+
+const isChainSnapshot = Schema.is(ChainSnapshotContract);
 
 /** A snapshot.json could not be read as a drizzle-kit snapshot. */
 export class MalformedSnapshot extends Schema.TaggedError<MalformedSnapshot>()(
@@ -342,7 +358,7 @@ const parseSnapshot = (
   file: string,
   text: string,
 ): Effect.Effect<ParsedSnapshot, MalformedSnapshot> =>
-  Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown))(text).pipe(
+  Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown))(text).pipe(
     Effect.filterOrFail(Schema.is(SnapshotIdentity), (raw) => raw),
     Effect.mapError((cause) => new MalformedSnapshot({ file, cause })),
   );
@@ -481,6 +497,7 @@ const isAmbiguousDiff = (cause: unknown): boolean =>
 
 const checkZeroDrift = (
   schema: MigrationDriftOptions["schema"],
+  entries: ReadonlyArray<ReadSnapshot>,
   latest: Option.Option<ReadSnapshot>,
   label: string,
 ): Effect.Effect<ReadonlyArray<string>, SchemaDiffError> =>
@@ -489,10 +506,30 @@ const checkZeroDrift = (
       onNone: () => `${label} (no snapshot yet)`,
       onSome: (entry) => `${label}/${entry.dir}/snapshot.json`,
     });
-    if (Option.isSome(latest) && !isPostgresSnapshot(latest.value.raw)) {
+    // The state the latest snapshot records: a v8 snapshot is that state; a
+    // v9 one is rebuilt from the chain (every directory's snapshot, keyed by
+    // directory name, as drizzle-kit's own folder reader keys them).
+    const stateOf = (entry: ReadSnapshot): Option.Option<Effect.Effect<object, SchemaDiffError>> =>
+      isPostgresSnapshot(entry.raw)
+        ? Option.some(Effect.succeed(entry.raw))
+        : isChainSnapshot(entry.raw)
+          ? Option.some(
+              drizzleKit(() =>
+                reconstruct(
+                  R.fromEntries(Arr.map(entries, (each) => [each.dir, each.raw])),
+                  entry.snapshot.id,
+                ),
+              ),
+            )
+          : Option.none();
+    const prevState = Option.match(latest, {
+      onNone: () => Option.some(drizzleKit(() => generateDrizzleJson({}))),
+      onSome: stateOf,
+    });
+    if (Option.isNone(prevState)) {
       return [
-        `${where} doesn't match the drizzle-kit snapshot contract \`generateMigration\` expects ` +
-          '(`version: "8"`, `dialect: "postgres"`, a `ddl` array): a stale (pre-v8) or hand-edited snapshot.',
+        `${where} doesn't match a drizzle-kit snapshot contract \`generateMigration\` reads ` +
+          '(`version: "8"` with a `ddl` array, or `version: "9"` with `type` `base` / `diff`; `dialect: "postgres"`): a stale (pre-v8) or hand-edited snapshot.',
       ];
     }
     const cur = yield* drizzleKit(() =>
@@ -501,11 +538,7 @@ const checkZeroDrift = (
         Option.getOrUndefined(Option.map(latest, (entry) => entry.snapshot.id)),
       ),
     );
-    const prev = yield* Option.match(latest, {
-      onNone: () => drizzleKit(() => generateDrizzleJson({})),
-      // SAFETY: `isPostgresSnapshot` held for this value above.
-      onSome: (entry) => Effect.succeed(entry.raw as PostgresSnapshot),
-    });
+    const prev = yield* prevState.value;
     return yield* drizzleKit(() => generateMigration(prev, cur)).pipe(
       Effect.map((statements) =>
         Arr.isReadonlyArrayNonEmpty(statements)
@@ -601,7 +634,7 @@ export const checkMigrationDrift = (
     const latest = Arr.findFirst(entries.toReversed(), (entry) => dirs.includes(entry.dir));
     const issues = Arr.isReadonlyArrayNonEmpty(structural)
       ? structural
-      : yield* checkZeroDrift(options.schema, latest, options.migrationsDir);
+      : yield* checkZeroDrift(options.schema, entries, latest, options.migrationsDir);
     if (Arr.isReadonlyArrayNonEmpty(issues)) return yield* new MigrationDriftError({ issues });
     return { snapshots: entries.length, baseRef: Option.map(base, (b) => b.ref) };
   });

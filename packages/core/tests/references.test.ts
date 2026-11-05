@@ -78,9 +78,7 @@ describe("makeReferenceRegistry", () => {
         references: { table: "owner", column: "id", onDelete: "cascade" },
       }),
     });
-    // SAFETY: `uuid` in `builders` is pg-core's, so the derived builder is a pg
-    // column builder at runtime behind the dialect-neutral return type.
-    const config = getTableConfig(pgTable("widget", columns as never));
+    const config = getTableConfig(pgTable("widget", columns));
     expect(config.foreignKeys.length).toBe(1);
     const reference = config.foreignKeys[0].reference();
     expect(reference.foreignColumns.map((c) => c.name)).toEqual(["id"]);

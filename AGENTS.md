@@ -6,7 +6,7 @@ This repo publishes the Effect ↔ Drizzle bridge as two npm packages, `@thomasf
 
 ## Common pitfalls
 
-- **No application vocabulary.** No `owner_id`, role ladders, `node` / `node_version`, id brands, Hyperdrive, KV caches, fixture users or seed data. Those stay in the apps. The generic migration tooling (the fresh-database runner, test-database provisioning, the drift and view-dependency guards) moved here by owner decision (effect-drizzle-ext#9); anything that knows an application's schema does not.
+- **No application vocabulary.** No `owner_id`, owner / viewer / role vocabulary, id brands, Hyperdrive, KV caches, fixture users or seed data, and no application's own level names. Those stay in the apps. The generic versioned-ontology vocabulary is the library's (effect-drizzle-ext#112, decision 2): a level tree (`defineTree`), its markers, leaves and level columns, and the node / node-version root a tree derives. The generic migration tooling (the fresh-database runner, test-database provisioning, the drift and view-dependency guards) moved here by owner decision (effect-drizzle-ext#9); anything that knows an application's schema does not.
 - **Declare every required peer of a dependency.** A missing one passes on a warm local tree and fails CI on a fresh runner.
 
 Package-local invariants, terms and import boundaries live only in each package's `CLAUDE.md` ([`packages/core`](packages/core/CLAUDE.md), [`packages/pg`](packages/pg/CLAUDE.md)); read it before changing that package.

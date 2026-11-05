@@ -172,9 +172,7 @@ describe("dbTable on a resource", () => {
 
 /** The DDL-relevant facts of each column a derivation produces. */
 const ddlOf = (columns: Readonly<Record<string, ColumnBuilderBase>>) =>
-  // SAFETY: both derivations build from the pg-core `builders`, so every
-  // column is a pg column builder at runtime behind the dialect-neutral type.
-  getTableConfig(pgTable("widget", columns as never)).columns.map((c) => ({
+  getTableConfig(pgTable("widget", columns)).columns.map((c) => ({
     name: c.name,
     type: c.getSQLType(),
     notNull: c.notNull,
@@ -186,9 +184,7 @@ describe("makeDeriveResourceColumns", () => {
     const derive = makeDeriveResourceColumns(builders, {
       resolveReference: () => () => owner.id,
     });
-    // SAFETY: every builder in `builders` is a pg-core builder, so each derived
-    // column is a pg column builder at runtime behind the dialect-neutral type.
-    const columns = getTableConfig(pgTable("widget", derive(WidgetResource) as never)).columns;
+    const columns = getTableConfig(pgTable("widget", derive(WidgetResource))).columns;
     const byName = R.fromEntries(columns.map((c) => [c.name, c]));
     expect(Arr.sort(R.keys(byName), Order.String)).toEqual(["name", "owner_id", "size"]);
     expect(byName.name.notNull).toBe(true);
@@ -255,13 +251,11 @@ describe("deriveCheckConstraints", () => {
 
   const checksOf = () => {
     const derive = makeDeriveResourceColumns(builders);
-    // SAFETY: the builders are pg-core's and the checks are pg-core `check`s;
-    // both derivations return dialect-neutral types `pgTable` does not accept.
     return getTableConfig(
       pgTable(
         "bounded_widget_version",
-        derive(BoundedResource) as never,
-        deriveCheckConstraints(BoundedResource, "bounded_widget_version") as never,
+        derive(BoundedResource),
+        deriveCheckConstraints(BoundedResource, "bounded_widget_version"),
       ),
     ).checks;
   };
@@ -296,13 +290,11 @@ describe("deriveCheckConstraints", () => {
       }),
     };
     const dialect = new PgDialect();
-    // SAFETY: the builders are pg-core's and the checks are pg-core `check`s;
-    // both derivations return dialect-neutral types `pgTable` does not accept.
     const fieldChecks = getTableConfig(
       pgTable(
         "bounded_widget_version",
-        makeDeriveColumns(builders).fromFields(fields) as never,
-        deriveFieldCheckConstraints(fields, "bounded_widget_version") as never,
+        makeDeriveColumns(builders).fromFields(fields),
+        deriveFieldCheckConstraints(fields, "bounded_widget_version"),
       ),
     ).checks;
     expect(fieldChecks.map((c) => [c.name, dialect.sqlToQuery(c.value).sql])).toEqual(

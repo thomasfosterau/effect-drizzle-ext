@@ -40,6 +40,8 @@ import {
 } from "../src/tooling/index.ts";
 
 const FIXTURE_MIGRATIONS = `${import.meta.dirname}/fixtures/migrations`;
+/** A one-migration chain in the pre-rc.5 full-snapshot format (version `"8"`). */
+const FIXTURE_V8_CHAIN = `${import.meta.dirname}/fixtures/v8-chain/migrations`;
 
 /** The suite's runtime: the Node file system, path and child-process services. */
 const runtime = ManagedRuntime.make(NodeServices.layer);
@@ -61,7 +63,7 @@ describe("checkMigrationDrift", () => {
     const report = await run(
       checkMigrationDrift({ schema: fixtureSchema, migrationsDir: FIXTURE_MIGRATIONS }),
     );
-    expect(report).toEqual({ snapshots: 2, baseRef: Option.none() });
+    expect(report).toEqual({ snapshots: 3, baseRef: Option.none() });
   });
 
   it("treats an explicit `base: undefined` as an absent base", async () => {
@@ -72,7 +74,23 @@ describe("checkMigrationDrift", () => {
         base: undefined,
       }),
     );
-    expect(report).toEqual({ snapshots: 2, baseRef: Option.none() });
+    expect(report).toEqual({ snapshots: 3, baseRef: Option.none() });
+  });
+
+  it("reads a full v8 snapshot as the latest state", async () => {
+    // The pre-rc.5 format: the widget migration's original snapshot, alone. The
+    // fixture schema has moved past it, so a correct read reports real drift,
+    // never a contract mismatch.
+    const error = await run(
+      Effect.flip(checkMigrationDrift({ schema: fixtureSchema, migrationsDir: FIXTURE_V8_CHAIN })),
+    );
+    expect(error).toBeInstanceOf(MigrationDriftError);
+    if (!(error instanceof MigrationDriftError)) throw error;
+    expect(error.issues.join("\n")).toMatch(/Schema drift detected/);
+    expect(error.issues.join("\n")).toMatch(
+      /ALTER TABLE "fixture"\."widget" ADD COLUMN "retired_at"/,
+    );
+    expect(error.issues.join("\n")).not.toMatch(/snapshot contract/);
   });
 
   it("reports drift when the schema moved past the latest snapshot", async () => {
@@ -87,7 +105,7 @@ describe("checkMigrationDrift", () => {
     if (!(error instanceof MigrationDriftError)) throw error;
     expect(error.issues).toHaveLength(1);
     expect(error.issues[0]).toMatch(/Schema drift detected/);
-    expect(error.issues[0]).toMatch(/20260925111541_widget-retired-at\/snapshot\.json/);
+    expect(error.issues[0]).toMatch(/20261105002649_ontology-tree\/snapshot\.json/);
     expect(error.issues[0]).toMatch(/CREATE TABLE "fixture"\."gadget"/);
   });
 
@@ -250,9 +268,13 @@ describe("readBaseMigrations", () => {
         }),
       ),
     );
-    expect(base.dirs).toEqual(["20260925111534_widget", "20260925111541_widget-retired-at"]);
+    expect(base.dirs).toEqual([
+      "20260925111534_widget",
+      "20260925111541_widget-retired-at",
+      "20261105002649_ontology-tree",
+    ]);
     expect(Option.map(base.head, (h) => h.snapshot.id)).toEqual(
-      Option.some("fa7acbdc-ec40-469b-bbdd-82348f947ba3"),
+      Option.some("ffcab908-0c2b-4531-bd7f-ceaf73fdabbe"),
     );
   });
 });

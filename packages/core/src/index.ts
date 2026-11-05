@@ -52,6 +52,28 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as SchemaAST from "effect/SchemaAST";
 import type * as SchemaRepresentation from "effect/SchemaRepresentation";
+import { DerivationError } from "./derivation-error.ts";
+import { buildTree, type CheckedTreeSpec, type Tree } from "./tree.ts";
+
+/**
+ * A construction-time derivation failure, thrown at module load when a table
+ * or a tree cannot be built from its declarations; never an Effect failure.
+ * The same class `./derive` exports.
+ */
+export { DerivationError };
+
+export type {
+  AnyTreeColumnsMeta,
+  CheckedTreeSpec,
+  LevelColumnsMeta,
+  LeafName,
+  LevelKind,
+  LevelName,
+  LevelSpec,
+  MarkerName,
+  Tree,
+  TreeLevel,
+} from "./tree.ts";
 
 /**
  * A referential action for a derived foreign-key column — the Drizzle
@@ -546,3 +568,86 @@ export const fieldColumnBounds = (fields: Schema.Struct.Fields): Record<string, 
       ),
     ),
   );
+
+// ── Tree ──────────────────────────────────────────────────────────────
+
+/** The fields an entry's member `K` (`columns` or `leaf`) declares; `{}` when absent. */
+type EntryFields<E, K extends "columns" | "leaf"> = E extends { readonly [P in K]?: infer F }
+  ? Exclude<F, undefined> extends Schema.Struct.Fields
+    ? Exclude<F, undefined>
+    : Record<never, never>
+  : Record<never, never>;
+
+/**
+ * The typed column metadata of a {@link defineTree} declaration `S`: per level,
+ * the `DbColumn` maps its level columns and its leaf fields carry. The phantom
+ * a `Tree` built by `defineTree` holds for the table derivation.
+ */
+export type FieldsTreeMeta<S> = {
+  readonly [K in keyof S]: {
+    readonly level: FieldColumnsMetaOf<EntryFields<S[K], "columns">>;
+    readonly leaf: FieldColumnsMetaOf<EntryFields<S[K], "leaf">>;
+  };
+};
+
+/**
+ * A {@link defineTree} whose every entry also carries the consumer's
+ * extension record `Ext` (pulpit's `owned` / `pageable` flags, say); the
+ * library reads none of its members and hands each entry back on
+ * `tree.level(name).entry`. Pin it once — `const defineTree =
+ * defineTreeFor<RegistryFlags>()` — so an entry missing a flag is a type
+ * error. Throws {@link DerivationError} at module load as `defineTree` does.
+ */
+export const defineTreeFor =
+  <Ext extends object>() =>
+  <const S extends CheckedTreeSpec<S, Schema.Struct.Fields, Ext>>(
+    spec: S,
+  ): Tree<S, FieldsTreeMeta<S>> =>
+    buildTree<S, Schema.Struct.Fields, FieldsTreeMeta<S>>(spec, {
+      levelColumns: fieldColumns,
+      leafColumns: fieldColumns,
+    });
+
+/**
+ * Declare an ontology's level tree once, Drizzle-free, so a models package can
+ * state it and the database layer derive every table, constraint and view from
+ * it. Each entry is a level: a **marker** (no `leaf`) or a **leaf**, whose
+ * `leaf` is the struct fields of its domain columns (`dbColumn`-annotated) and
+ * whose name is its discriminator value. An entry names its `parent` (absent:
+ * a branch root under the tree's root), and may carry level `columns`
+ * contributed to every descendant's view and a level `kind`.
+ *
+ * Returns the checked {@link Tree}: per level, its ancestors, children,
+ * descendants, subtree leaves (the discriminator CHECK value set) and branch,
+ * all in declaration order. A parent naming no level of the tree, or the level
+ * itself, is a type error. Throws {@link DerivationError} at module load for
+ * every structural fault the types can't catch: a missing parent or a cycle, a
+ * leaf with children, a marker with no leaf below it, an unannotated level
+ * column, a reserved column name (`id`, `version`, `action`, `type`), or two
+ * columns on one root-to-leaf path sharing a field key or a column name.
+ *
+ * @example
+ * ```ts
+ * import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext";
+ * import * as Schema from "effect/Schema";
+ *
+ * const tree = defineTree({
+ *   work: {
+ *     columns: { title: dbColumn(Schema.String, { column: "title", pg: "text", notNull: true }) },
+ *   },
+ *   book: {
+ *     parent: "work",
+ *     leaf: { pages: dbColumn(Schema.Finite, { column: "pages", pg: "integer", notNull: false }) },
+ *   },
+ *   film: { parent: "work", leaf: {} },
+ * });
+ *
+ * console.log(tree.level("work").subtreeLeaves); // ["book", "film"]
+ * console.log(tree.level("book").ancestors); // ["work"]
+ * ```
+ */
+export const defineTree: <
+  const S extends CheckedTreeSpec<S, Schema.Struct.Fields, Record<never, never>>,
+>(
+  spec: S,
+) => Tree<S, FieldsTreeMeta<S>> = defineTreeFor<Record<never, never>>();

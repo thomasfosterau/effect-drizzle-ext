@@ -53,10 +53,7 @@ const widgetFields = {
 
 /** Materialise a set of derived column builders into a real table to inspect the DDL shape. */
 const columnsOf = (cols: Readonly<Record<string, ColumnBuilderBase>>) =>
-  // SAFETY: every builder in `builders` is a pg-core builder, so each derived
-  // `ColumnBuilderBase` is a pg column builder at runtime; the derivation's
-  // return type is the dialect-neutral base, which `pgTable` does not accept.
-  getTableConfig(pgTable("widget", cols as never)).columns;
+  getTableConfig(pgTable("widget", cols)).columns;
 
 describe("makeDeriveColumns.fromFields", () => {
   it("derives one builder per annotated field, dropping plain ones", () => {
@@ -99,9 +96,7 @@ describe("makeDeriveColumns.fromFields", () => {
       },
     });
     expect(columnsOf(derive.fromFields(fkFields)).map((c) => c.name)).toContain("owner_id");
-    // SAFETY: `uuid` in `builders` is pg-core's, so the derived builder is a pg
-    // column builder at runtime behind the dialect-neutral return type.
-    const config = getTableConfig(pgTable("gadget", derive.fromFields(fkFields) as never));
+    const config = getTableConfig(pgTable("gadget", derive.fromFields(fkFields)));
     expect(config.foreignKeys.length).toBe(1);
     expect(config.foreignKeys[0].onDelete).toBe("cascade");
   });
@@ -193,12 +188,10 @@ describe("deriveFieldCheckConstraints", () => {
   /** Materialise the derived checks by building a real table around them. */
   const checksOf = () => {
     const derive = makeDeriveColumns(builders);
-    // SAFETY: the builders are pg-core's and the checks are pg-core `check`s;
-    // both derivations return dialect-neutral types `pgTable` does not accept.
     const table = pgTable(
       "bounded_widget",
-      derive.fromFields(boundedFields) as never,
-      deriveFieldCheckConstraints(boundedFields, "bounded_widget") as never,
+      derive.fromFields(boundedFields),
+      deriveFieldCheckConstraints(boundedFields, "bounded_widget"),
     );
     return getTableConfig(table).checks;
   };
@@ -243,8 +236,6 @@ describe("deriveCheckConstraintsFrom", () => {
   });
 
   it("renders an exclusive-minimum-only bound as a bare comparison named min", () => {
-    // SAFETY: the derived checks are pg-core `check`s behind a dialect-neutral
-    // return type `pgTable`'s extra-config parameter does not accept.
     const table = pgTable(
       "gauge",
       { reading: integer("reading").notNull() },
@@ -256,7 +247,7 @@ describe("deriveCheckConstraintsFrom", () => {
           },
         },
         "gauge",
-      ) as never,
+      ),
     );
     const checks = getTableConfig(table).checks;
     expect(checks.map((c) => c.name)).toEqual(["gauge_reading_min"]);

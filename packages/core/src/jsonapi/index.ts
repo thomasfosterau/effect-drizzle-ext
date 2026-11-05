@@ -45,7 +45,10 @@ import {
   type DbTable,
   type TableMeta,
   type UnwrapColumn,
+  type FieldColumnsMetaOf,
+  fieldColumns,
 } from "../index.ts";
+import { buildTree, treeError, type LevelSpec, type Tree } from "../tree.ts";
 
 export type { DbTable, TableMeta };
 
@@ -172,7 +175,7 @@ const ISO_PROBE = "2024-01-02T03:04:05.000Z";
 const decodesFromJson = (schema: Schema.Top, input: Schema.Json): Option.Option<unknown> =>
   // SAFETY: an attribute schema's decoding needs no services (a resource's
   // attributes are plain codecs), which `Schema.Top` cannot express.
-  Schema.decodeUnknownOption(Schema.toCodecJson(schema as Schema.Codec<unknown>))(input);
+  Schema.decodeOption(Schema.toCodecJson(schema as Schema.Codec<unknown>))(input);
 
 /**
  * Project a `Resource.make` definition's resource-object attributes into
@@ -251,3 +254,102 @@ export const dbTableFor =
  */
 export const readDbTable = (resource: AnyResource): Option.Option<TableMeta> =>
   coreReadDbTable(resource);
+
+// ── Tree ──────────────────────────────────────────────────────────────
+
+/** The resource an entry's `leaf` holds, when it holds one. */
+type EntryResource<E> = E extends { readonly leaf?: infer L }
+  ? Exclude<L, undefined> extends AnyResource
+    ? Exclude<L, undefined>
+    : never
+  : never;
+
+/** The fields an entry's `columns` declares; `{}` when absent. */
+type EntryLevelFields<E> = E extends { readonly columns?: infer F }
+  ? Exclude<F, undefined> extends Schema.Struct.Fields
+    ? Exclude<F, undefined>
+    : Record<never, never>
+  : Record<never, never>;
+
+/**
+ * The typed column metadata of a {@link defineResourceTree} declaration `S`:
+ * per level, its level columns' `DbColumn` map and its leaf resource's
+ * attribute columns. The phantom the table derivation reads.
+ */
+export type ResourceTreeMeta<S> = {
+  readonly [K in keyof S]: {
+    readonly level: FieldColumnsMetaOf<EntryLevelFields<S[K]>>;
+    readonly leaf: [EntryResource<S[K]>] extends [never]
+      ? Record<never, never>
+      : ResourceColumnsMetaOf<EntryResource<S[K]>>;
+  };
+};
+
+/**
+ * The constraint a resource tree declaration `S` is checked against: the
+ * core `CheckedTreeSpec`, with each leaf a `Resource.make` definition whose
+ * wire `type` is the level's own name. A leaf filed under another name, or a
+ * parent naming no level (or the level itself), is a type error.
+ */
+export type CheckedResourceTreeSpec<S, Ext> = {
+  readonly [K in keyof S]: LevelSpec<
+    Exclude<keyof S & string, K>,
+    AnyResource & { readonly type: K }
+  > &
+    Ext;
+};
+
+/**
+ * A {@link defineResourceTree} whose every entry also carries the consumer's
+ * extension record `Ext`, which the library never reads (pulpit's
+ * `RegistryEntry` flags). Pin it once — `const defineTree =
+ * defineResourceTreeFor<RegistryFlags>()`. Throws `DerivationError` at module
+ * load as `defineResourceTree` does.
+ */
+export const defineResourceTreeFor =
+  <Ext extends object>() =>
+  <const S extends CheckedResourceTreeSpec<S, Ext>>(spec: S): Tree<S, ResourceTreeMeta<S>> =>
+    buildTree<S, AnyResource, ResourceTreeMeta<S>>(spec, {
+      levelColumns: fieldColumns,
+      leafColumns: (resource, name) =>
+        resource.type === name
+          ? resourceColumns(resource)
+          : treeError(
+              `leaf "${name}" carries resource "${resource.type}"; a leaf's name is its resource's type`,
+            ),
+    });
+
+/**
+ * The core entry's `defineTree` over `Resource.make` definitions: each leaf's
+ * `leaf` is the resource whose wire `type` is the level's name (the
+ * discriminator value), and its domain columns are the resource's
+ * `dbColumn`-annotated attributes. Every other check is the core one. Throws
+ * `DerivationError` at module load for a leaf whose resource `type` isn't its
+ * name, and for every structural fault `defineTree` names.
+ *
+ * @example
+ * ```ts
+ * import { dbColumn } from "@thomasfosterau/effect-drizzle-ext";
+ * import { defineResourceTree } from "@thomasfosterau/effect-drizzle-ext/jsonapi";
+ * import { Resource } from "@thomasfosterau/effect-jsonapi";
+ * import * as Schema from "effect/Schema";
+ *
+ * const Book = Resource.make("book", {
+ *   attributes: {
+ *     pages: dbColumn(Schema.Finite, { column: "pages", pg: "integer", notNull: false }),
+ *   },
+ * });
+ *
+ * const tree = defineResourceTree({
+ *   work: {
+ *     columns: { title: dbColumn(Schema.String, { column: "title", pg: "text", notNull: true }) },
+ *   },
+ *   book: { parent: "work", leaf: Book },
+ * });
+ *
+ * console.log(tree.leaves); // ["book"]
+ * ```
+ */
+export const defineResourceTree: <const S extends CheckedResourceTreeSpec<S, Record<never, never>>>(
+  spec: S,
+) => Tree<S, ResourceTreeMeta<S>> = defineResourceTreeFor<Record<never, never>>();
