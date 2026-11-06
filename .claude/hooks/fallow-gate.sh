@@ -225,28 +225,38 @@ fi
 # and its `.claude/worktrees/*` checkouts are trusted for that; a commit to any
 # other tree (a scratch clone, a third-party checkout) is not this gate's to
 # audit, so it says so and runs nothing there rather than execute what that
-# tree carries. gate_trusted checks a directory against $CLAUDE_PROJECT_DIR
-# (as given and physical); with no CLAUDE_PROJECT_DIR every directory is
-# trusted, as before. It is applied here to the hook's own directory and in
-# the #58 block to the checkout the command targets. Inside a trusted
-# checkout fallow runs through Vite+ (`vp exec fallow`), which resolves that
-# checkout's own pinned copy; its `./node_modules/.bin/fallow` is the fallback
-# where `vp` is not on PATH. The generated PATH, yarn and `npx --no-install`
-# arms are dropped: a `fallow` on PATH may be anything, this workspace is
-# pnpm, and the family standard allows no yarn or npx invocation.
+# tree carries. gate_trusted checks a checkout's top level against
+# $CLAUDE_PROJECT_DIR (as given and physical): the project itself, or a
+# worktree exactly one path component under its `.claude/worktrees/`, so a
+# repository nested inside a worktree is not trusted. With no
+# CLAUDE_PROJECT_DIR every directory is trusted, as before. It is applied here
+# to the top level of the hook's own checkout (so a commit run from a
+# subdirectory is still audited) and in the #58 block to the top level of the
+# checkout the command targets. This block then moves the hook to that top
+# level, remembering where it started in GATE_ORIG_PWD, from which #58
+# replays the command's cd and -C steps. Inside a trusted checkout fallow runs
+# through Vite+ (`vp exec fallow`), which resolves that checkout's own pinned
+# copy; its `./node_modules/.bin/fallow` is the fallback where `vp` is not on
+# PATH. The generated PATH, yarn and `npx --no-install` arms are dropped: a
+# `fallow` on PATH may be anything, this workspace is pnpm, and the family
+# standard allows no yarn or npx invocation.
 gate_trusted() {
-  local dir="${1%/}" project="${CLAUDE_PROJECT_DIR:-}" physical=""
+  local dir="${1%/}" project="${CLAUDE_PROJECT_DIR:-}" root rest
   project="${project%/}"
   [ -n "$project" ] || return 0
-  physical="$(cd -P -- "$project" 2>/dev/null && pwd -P)" || physical=""
-  case "$dir" in
-    "$project" | "$project"/.claude/worktrees/*) return 0 ;;
-  esac
-  if [ -n "$physical" ]; then
+  for root in "$project" "$(cd -P -- "$project" 2>/dev/null && pwd -P)"; do
+    [ -n "$root" ] || continue
+    [ "$dir" != "$root" ] || return 0
     case "$dir" in
-      "$physical" | "$physical"/.claude/worktrees/*) return 0 ;;
+      "$root"/.claude/worktrees/*)
+        rest="${dir#"$root"/.claude/worktrees/}"
+        case "$rest" in
+          */* | '') ;;
+          *) return 0 ;;
+        esac
+        ;;
     esac
-  fi
+  done
   return 1
 }
 # Sets RUNNER and BIN_DESC for the checkout in $PWD, or exits 0 with a notice
@@ -263,10 +273,13 @@ gate_runner() {
     exit 0
   fi
 }
-if ! gate_trusted "$PWD"; then
-  echo "fallow-gate: $PWD is not this project or one of its worktrees; not running its tooling, skipping audit." >&2
+GATE_ORIG_PWD="$PWD"
+GATE_CHECKOUT="$(git rev-parse --show-toplevel 2>/dev/null || printf '%s' "$PWD")"
+if ! gate_trusted "$GATE_CHECKOUT"; then
+  echo "fallow-gate: $GATE_CHECKOUT is not this project or one of its worktrees; not running its tooling, skipping audit." >&2
   exit 0
 fi
+cd "$GATE_CHECKOUT" || exit 0
 gate_runner
 # --- local edit end ---
 
@@ -506,7 +519,7 @@ command_unmodelled() {
 SELF="${BASH_SOURCE[0]-}"
 case "$SELF" in
   /*) ;;
-  *) SELF="$PWD/$SELF" ;;
+  *) SELF="${GATE_ORIG_PWD:-$PWD}/$SELF" ;; # trusted-checkout block: the hook started there
 esac
 set -f
 git_write_target "$CMD"
@@ -518,6 +531,8 @@ elif [ "${#T_OPS[@]}" -gt 0 ]; then
   if TOP="$(
     exec 2>/dev/null
     CDPATH=
+    # Trusted-checkout block: replay from where the hook started.
+    cd -- "${GATE_ORIG_PWD:-.}" || exit 1
     for STEP in "${T_OPS[@]}"; do
       case "$STEP" in
         L*) cd -L -- "${STEP#L}" || exit 1 ;;
