@@ -6,7 +6,7 @@ Branch model, changesets and PR rules: [AGENTS.md → Branches and pull requests
 
 ## Dev container
 
-Open in a Codespace or Dev Container: `.devcontainer/` provisions it with the same hook as agent sessions (the Vite+ image at the catalog's `vite-plus` pin, then `.claude/hooks/session-start.sh`). Its Docker-in-Docker feature gives `vp run test:integration` a Docker daemon, so the suite starts its own `pgvector/pgvector:pg17` server through Testcontainers, the same image as CI's service container. The image tag moves by hand with `vite-plus` on the toolchain PR.
+Open in a Codespace or Dev Container: `.devcontainer/` provisions it with the same hook as agent sessions (the Vite+ image at the catalog's `vite-plus` pin, then `.claude/hooks/session-start.sh`). Its Docker-in-Docker feature gives `vp run test:integration` a Docker daemon, so the suite starts its own `pgvector/pgvector:pg17` server through Testcontainers, the same image as CI's service container. The image tag moves by hand with `vite-plus` on the toolchain PR. The `Dev Container` workflow (`.github/workflows/devcontainer.yml`) builds it in CI whenever its inputs change; to try a change locally, `pnpm dlx @devcontainers/cli@0.89.0 up --workspace-folder .` (needs Docker).
 
 Editors with EditorConfig support pick up [.editorconfig](.editorconfig). Oxfmt reads the same file, so it holds Oxfmt's own settings; formatting changes start in the `fmt` block of `vite.config.ts`.
 
