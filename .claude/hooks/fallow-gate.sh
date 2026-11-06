@@ -18,18 +18,21 @@ set -euo pipefail
 # diverge on prereleases (BSD sorts `2.48.0-alpha.1` ABOVE `2.48.0`, GNU below).
 # If you set a prerelease floor explicitly, verify the behavior on the target OS.
 #
-# Local edits (effect-drizzle-ext#30, #55, #58, #61, #73): this paragraph, the
-# five blocks between "local edit" markers below (a #61 block directly before
-# the jq check, the #73 block directly after `VERSION_RAW=`, a second #61
-# block directly after `trap cleanup EXIT`, then the #58 block directly before
-# the #30 one) and `--base "$BASE"` on the audit call are not generated. The
-# installer passes no --base, audits the hook's own directory rather than the
-# checkout a `cd <dir> &&` or `git -C <dir>` in the command targets, writes
-# its fail-open notices to stderr only, which Claude Code keeps in its debug
-# log when the hook exits 0, and keeps every line of `fallow --version`. After
-# regenerating with `fallow hooks install --target agent --agent claude
-# --force`, re-apply exactly those seven pieces; the rest of the file is the
-# installer's.
+# Local edits (effect-drizzle-ext#30, #55, #58, #61, #73, and the trusted
+# checkouts): this paragraph, the six blocks between "local edit" markers
+# below (a #61 block directly before the jq check, the trusted-checkout block
+# in place of the generated fallow lookup arms, the #73 block directly after
+# `VERSION_RAW=`, a second #61 block directly after `trap cleanup EXIT`, then
+# the #58 block, with its trusted-checkout lines, directly before the #30 one)
+# and `--base "$BASE"` on the audit call are not generated. The installer
+# passes no --base, finds fallow on PATH, in node_modules/.bin, through yarn
+# or npx and runs it in any checkout, audits the hook's own directory rather
+# than the checkout a `cd <dir> &&` or `git -C <dir>` in the command targets,
+# writes its fail-open notices to stderr only, which Claude Code keeps in its
+# debug log when the hook exits 0, and keeps every line of `fallow
+# --version`. After regenerating with `fallow hooks install --target agent
+# --agent claude --force`, re-apply exactly those eight pieces; the rest of
+# the file is the installer's.
 
 # --- local edit begin (effect-drizzle-ext#61) ---
 # Surface every fail-open notice. Claude Code shows a hook's stderr only when
@@ -216,29 +219,80 @@ if [ "$GIT_WRITE" -eq 0 ]; then
   exit 0
 fi
 
-# A real installed Git hook keeps its caller's PATH and does not add
-# node_modules/.bin, so a project-local install is invisible to `command -v`.
-# The arms below cover the layouts a project-local install can take, in the
-# order they are cheapest to probe. Keep them in step with the Lefthook job
-# `fallow init --hooks` prints: the two must resolve the same installs.
-if command -v fallow >/dev/null 2>&1; then
-  RUNNER=(fallow)
-  BIN_DESC="$(command -v fallow)"
-elif [ -x ./node_modules/.bin/fallow ]; then
-  RUNNER=(./node_modules/.bin/fallow)
-  BIN_DESC="./node_modules/.bin/fallow"
-elif command -v yarn >/dev/null 2>&1 && YARN_BIN="$(yarn bin fallow 2>/dev/null)" && [ -n "$YARN_BIN" ]; then
-  # Yarn Plug'n'Play has no node_modules/.bin at all, so neither the launcher
-  # check above nor npx can see the install.
-  RUNNER=(yarn exec fallow --)
-  BIN_DESC="yarn exec fallow"
-elif command -v npx >/dev/null 2>&1 && VER_PROBE="$(npx --no-install fallow --version 2>/dev/null || true)" && [[ "$VER_PROBE" == fallow* ]]; then
-  RUNNER=(npx --no-install fallow)
-  BIN_DESC="npx --no-install fallow"
-else
-  echo "fallow-gate: fallow binary not found (tried PATH, node_modules/.bin, yarn and npx --no-install), skipping audit." >&2
+# --- local edit begin (trusted checkouts and the vp runner) ---
+# Replaces the generated fallow lookup arms. Everything after this runs code
+# from the checkout it audits: fallow from its node_modules. Only this project
+# and its `.claude/worktrees/*` checkouts are trusted for that; a commit to any
+# other tree (a scratch clone, a third-party checkout) is not this gate's to
+# audit, so it says so and runs nothing there rather than execute what that
+# tree carries. gate_trusted checks a checkout's top level against
+# $CLAUDE_PROJECT_DIR (as given and physical): the project itself, or a
+# worktree exactly one path component under its `.claude/worktrees/` that
+# shares the project's git directory (`--git-common-dir`, compared by
+# realpath), so neither a repository nested inside a worktree nor a separate
+# clone placed at a worktree path is trusted. With no
+# CLAUDE_PROJECT_DIR every directory is trusted, as before. It is applied here
+# to the top level of the hook's own checkout (so a commit run from a
+# subdirectory is still audited) and in the #58 block to the top level of the
+# checkout the command targets. This block then moves the hook to that top
+# level, remembering where it started in GATE_ORIG_PWD, from which #58
+# replays the command's cd and -C steps. Inside a trusted checkout fallow runs
+# through Vite+ (`vp exec fallow`), which resolves that checkout's own pinned
+# copy; its `./node_modules/.bin/fallow` is the fallback where `vp` is not on
+# PATH. The generated PATH, yarn and `npx --no-install` arms are dropped: a
+# `fallow` on PATH may be anything, this workspace is pnpm, and the family
+# standard allows no yarn or npx invocation.
+gate_trusted() {
+  local dir="${1%/}" project="${CLAUDE_PROJECT_DIR:-}" root rest common project_common
+  project="${project%/}"
+  [ -n "$project" ] || return 0
+  for root in "$project" "$(cd -P -- "$project" 2>/dev/null && pwd -P)"; do
+    [ -n "$root" ] || continue
+    [ "$dir" != "$root" ] || return 0
+    case "$dir" in
+      "$root"/.claude/worktrees/*)
+        rest="${dir#"$root"/.claude/worktrees/}"
+        case "$rest" in
+          */* | '') ;;
+          *)
+            # A worktree of this project shares its git directory; a
+            # separate clone placed at that path does not.
+            common="$(git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || common=""
+            project_common="$(git -C "$project" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || project_common=""
+            if [ -n "$common" ] && [ -n "$project_common" ] \
+              && [ "$(realpath "$common" 2>/dev/null)" = "$(realpath "$project_common" 2>/dev/null)" ]; then
+              return 0
+            fi
+            ;;
+        esac
+        ;;
+    esac
+  done
+  return 1
+}
+# Sets RUNNER and BIN_DESC for the checkout in $PWD, or exits 0 with a notice
+# when it has no fallow installed.
+gate_runner() {
+  if command -v vp >/dev/null 2>&1 && [ -x ./node_modules/.bin/fallow ]; then
+    RUNNER=(vp exec fallow)
+    BIN_DESC="vp exec fallow ($PWD/node_modules/.bin/fallow)"
+  elif [ -x ./node_modules/.bin/fallow ]; then
+    RUNNER=("$PWD/node_modules/.bin/fallow")
+    BIN_DESC="$PWD/node_modules/.bin/fallow"
+  else
+    echo "fallow-gate: fallow not installed in $PWD (run \`vp install\` there), skipping audit." >&2
+    exit 0
+  fi
+}
+GATE_ORIG_PWD="$PWD"
+GATE_CHECKOUT="$(git rev-parse --show-toplevel 2>/dev/null || printf '%s' "$PWD")"
+if ! gate_trusted "$GATE_CHECKOUT"; then
+  echo "fallow-gate: $GATE_CHECKOUT is not this project or one of its worktrees; not running its tooling, skipping audit." >&2
   exit 0
 fi
+cd "$GATE_CHECKOUT" || exit 0
+gate_runner
+# --- local edit end ---
 
 VERSION_RAW="$("${RUNNER[@]}" --version 2>/dev/null || true)"
 # --- local edit begin (effect-drizzle-ext#73) ---
@@ -476,7 +530,7 @@ command_unmodelled() {
 SELF="${BASH_SOURCE[0]-}"
 case "$SELF" in
   /*) ;;
-  *) SELF="$PWD/$SELF" ;;
+  *) SELF="${GATE_ORIG_PWD:-$PWD}/$SELF" ;; # trusted-checkout block: the hook started there
 esac
 set -f
 git_write_target "$CMD"
@@ -488,6 +542,8 @@ elif [ "${#T_OPS[@]}" -gt 0 ]; then
   if TOP="$(
     exec 2>/dev/null
     CDPATH=
+    # Trusted-checkout block: replay from where the hook started.
+    cd -- "${GATE_ORIG_PWD:-.}" || exit 1
     for STEP in "${T_OPS[@]}"; do
       case "$STEP" in
         L*) cd -L -- "${STEP#L}" || exit 1 ;;
@@ -497,6 +553,20 @@ elif [ "${#T_OPS[@]}" -gt 0 ]; then
     git rev-parse --show-toplevel
   )" && [ -n "$TOP" ]; then
     HERE_TOP="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+    # Trusted-checkout block: never run a target's tooling outside this
+    # project and its worktrees. A command this hook models writes only
+    # there, so it is not this gate's to audit; one it does not model may
+    # still write here, so this directory alone is audited.
+    if [ "$TOP" != "$HERE_TOP" ] && ! gate_trusted "$TOP"; then
+      if [ -n "$HERE_TOP" ] && { [ "$T_LOOSE" -eq 1 ] || [ -n "${GIT_DIR:-}${GIT_WORK_TREE:-}" ] || command_unmodelled "$CMD"; }; then
+        echo "fallow-gate: $TOP is not this project or one of its worktrees; not running its tooling, auditing $PWD only." >&2
+        GATE_NOTICE=1
+        TOP="$HERE_TOP"
+      else
+        echo "fallow-gate: $TOP is not this project or one of its worktrees; not running its tooling, skipping audit." >&2
+        exit 0
+      fi
+    fi
     if [ "$TOP" != "$HERE_TOP" ]; then
       if [ -n "$HERE_TOP" ] && { [ "$T_LOOSE" -eq 1 ] || [ -n "${GIT_DIR:-}${GIT_WORK_TREE:-}" ] || command_unmodelled "$CMD"; }; then
         echo "fallow-gate: the command has shell syntax this hook does not model; auditing both $PWD and $TOP." >&2
@@ -528,11 +598,10 @@ elif [ "${#T_OPS[@]}" -gt 0 ]; then
         fi
       fi
       if [ -n "$TOP" ]; then
-        # Keep a relative runner pointing at the install found above.
-        case "${RUNNER[0]}" in
-          ./*) RUNNER[0]="$PWD/${RUNNER[0]#./}" ;;
-        esac
+        # The target's own install runs its audit (trusted-checkout block);
+        # the version floor above was checked on the hook directory's copy.
         cd "$TOP"
+        gate_runner
       fi
     fi
   else
