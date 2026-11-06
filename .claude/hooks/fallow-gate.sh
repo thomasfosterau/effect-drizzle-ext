@@ -227,8 +227,10 @@ fi
 # audit, so it says so and runs nothing there rather than execute what that
 # tree carries. gate_trusted checks a checkout's top level against
 # $CLAUDE_PROJECT_DIR (as given and physical): the project itself, or a
-# worktree exactly one path component under its `.claude/worktrees/`, so a
-# repository nested inside a worktree is not trusted. With no
+# worktree exactly one path component under its `.claude/worktrees/` that
+# shares the project's git directory (`--git-common-dir`, compared by
+# realpath), so neither a repository nested inside a worktree nor a separate
+# clone placed at a worktree path is trusted. With no
 # CLAUDE_PROJECT_DIR every directory is trusted, as before. It is applied here
 # to the top level of the hook's own checkout (so a commit run from a
 # subdirectory is still audited) and in the #58 block to the top level of the
@@ -241,7 +243,7 @@ fi
 # `fallow` on PATH may be anything, this workspace is pnpm, and the family
 # standard allows no yarn or npx invocation.
 gate_trusted() {
-  local dir="${1%/}" project="${CLAUDE_PROJECT_DIR:-}" root rest
+  local dir="${1%/}" project="${CLAUDE_PROJECT_DIR:-}" root rest common project_common
   project="${project%/}"
   [ -n "$project" ] || return 0
   for root in "$project" "$(cd -P -- "$project" 2>/dev/null && pwd -P)"; do
@@ -252,7 +254,16 @@ gate_trusted() {
         rest="${dir#"$root"/.claude/worktrees/}"
         case "$rest" in
           */* | '') ;;
-          *) return 0 ;;
+          *)
+            # A worktree of this project shares its git directory; a
+            # separate clone placed at that path does not.
+            common="$(git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || common=""
+            project_common="$(git -C "$project" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || project_common=""
+            if [ -n "$common" ] && [ -n "$project_common" ] \
+              && [ "$(realpath "$common" 2>/dev/null)" = "$(realpath "$project_common" 2>/dev/null)" ]; then
+              return 0
+            fi
+            ;;
         esac
         ;;
     esac
