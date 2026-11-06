@@ -21,7 +21,7 @@
 #
 # Rather than fight PATH — which this script cannot export into its caller —
 # it links the tools into `~/.local/bin`, a directory already on PATH in this
-# image and writable by the session user. A symlink survives where an `export`
+# image and writable by the session user. A file there survives where an `export`
 # cannot.
 #
 # ## Node, and why this repairs rather than clobbers
@@ -122,11 +122,42 @@ SHIM
     || { rm -f "$dest.tmp" 2>/dev/null; log "could not write vp shim"; }
 }
 
+# A tool from node_modules/.bin (`fallow`) gets a re-exec shim too,
+# never a symlink (effect-wikimedia#219). pnpm's `.bin` entries are sh scripts that find
+# the package from `$0`; run through a symlink in ~/.local/bin, `$0` is the
+# link, so the script looks for the package under ~/.local and node exits
+# with MODULE_NOT_FOUND. The fallow gate then saw `fallow audit` exit 1 and let
+# every commit and push through ungated. A shim that execs the real path keeps
+# `$0` right. A symlink left by an earlier version of this hook (broken, or
+# stale) is removed, so it is replaced even when the tool is not installed yet.
+BIN_SHIM_MARKER="# generated-by: .claude/hooks/session-start.sh (node_modules/.bin re-exec shim, effect-wikimedia#219)"
+write_bin_shim() {
+  name="$1"
+  src="$PROJECT_DIR/node_modules/.bin/$name"
+  dest="$LOCAL_BIN/$name"
+  # Leave a real, non-generated file alone: something deliberately installed it.
+  if [ -e "$dest" ] && [ ! -L "$dest" ] \
+    && ! grep -qF "$BIN_SHIM_MARKER" "$dest" 2>/dev/null; then
+    return 0
+  fi
+  if [ -L "$dest" ]; then
+    rm -f "$dest" 2>/dev/null || { log "could not remove the old $name symlink"; return 0; }
+  fi
+  [ -x "$src" ] || return 0
+  cat >"$dest.tmp" <<SHIM
+#!/usr/bin/env bash
+$BIN_SHIM_MARKER
+exec "$src" "\$@"
+SHIM
+  chmod +x "$dest.tmp" 2>/dev/null && mv -f "$dest.tmp" "$dest" 2>/dev/null \
+    || { rm -f "$dest.tmp" 2>/dev/null; log "could not write $name shim"; }
+}
+
 # ── 1. Repo binaries the documented workflows invoke directly ─────────────────
 # AGENTS.md's fallow gate runs `fallow audit …` before every commit, and it
 # resolves only from node_modules/.bin. `vp` is included for the remote/web
 # runner, where the global launcher does not exist.
-link_tool "$PROJECT_DIR/node_modules/.bin/fallow"
+write_bin_shim fallow
 write_vp_shim
 
 # ── 2. Bare `node` (gardeneria #1462) ───────────────────────────────────────────────────
@@ -161,7 +192,7 @@ if [ -f "$PROJECT_DIR/pnpm-lock.yaml" ]; then
     || (cd "$PROJECT_DIR" && pnpm install --frozen-lockfile >/dev/null 2>&1) \
     || log "dependency install failed; continuing"
   # node_modules/.bin only exists after the install, so re-link what it provides.
-  link_tool "$PROJECT_DIR/node_modules/.bin/fallow"
+  write_bin_shim fallow
   write_vp_shim
 fi
 
