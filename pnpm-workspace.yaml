@@ -29,7 +29,7 @@ catalog:
   "@changesets/cli": ^3.0.3
   # Compiles AND RUNS every JSDoc `@example` (the `docgen` task); needs `tsx`
   # and a TypeScript JS API — the TS6 alias below satisfies its peer.
-  "@effect/docgen": ^4.0.6
+  "@effect/docgen": ^4.1.2
   "@effect/language-service": ^0.87.5
   # Effect Language Service as a native (TypeScript-Go) binary — the TS7 side
   # of the 6/7 split. `effect-tsgo patch` overwrites the native `tsc` binary
@@ -43,18 +43,18 @@ catalog:
   # node_modules/@effect/tsgo/dist/effect-tsgo.cjs before bumping any of the
   # three.
   "@effect/tsgo": 0.63.0
-  "@effect/sql-pg": 4.0.6
+  "@effect/sql-pg": 4.1.2
   # The Node `FileSystem` / `Path` / `ChildProcessSpawner` layer the pg
   # package's tests provide to `./migrations`, `./testing`'s provisioning and
   # `./tooling` — a consumer provides its own (these modules only require the
   # services).
-  "@effect/platform-node": 4.0.6
+  "@effect/platform-node": 4.1.2
   # Starts the integration suite's ephemeral `pgvector/pgvector` server when no
   # local PostgreSQL is reachable — see packages/pg/tests/integration/global-setup.ts.
   "@testcontainers/postgresql": ^12.2.1
   # Optional peer of the core package: only the `./jsonapi*` subpaths import it.
-  "@thomasfosterau/effect-jsonapi": ^0.17.0
-  "@types/node": ^26.6.5
+  "@thomasfosterau/effect-jsonapi": ^0.20.0
+  "@types/node": ^26.6.6
   # Must equal the vitest that vite-plus bundles (see `vitest` below).
   "@vitest/coverage-istanbul": 5.0.5
   # The published `rc` build: the first drizzle line to ship the Effect
@@ -74,8 +74,8 @@ catalog:
   # on `effect` 4.1.0 exactly, but the `effect: "catalog:"` override below
   # resolves it to this workspace's singleton, which it lints fine against.
   "@enfect/oxlint": 0.9.0
-  effect: 4.0.6
-  fallow: 3.37.0
+  effect: 4.1.2
+  fallow: 3.40.0
   # Exists only for `@effect/docgen`, which requires it as a peer and spawns
   # the `tsx` binary itself to run the compiled examples. Scripts run
   # TypeScript with `vpx`, never `tsx`.
