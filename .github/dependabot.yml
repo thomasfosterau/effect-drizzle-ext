@@ -1,32 +1,33 @@
 # Dependabot version updates. The `npm` ecosystem at `/` reads the pnpm
 # workspace, its catalogs and pnpm-lock.yaml.
 #
-# Dependabot puts a dependency in the FIRST group whose patterns match, so the
-# groups run specific → general, and each lockstep set is a group that takes
-# every update type (major included) so its members can never move apart:
+# Groups exist only for sets that must move in ONE pull request because
+# updating one member without the others breaks the install or the build;
+# every other dependency (fallow, `@changesets/*`, `@enfect/oxlint`, `tsx`,
+# `@testcontainers/postgresql`, each GitHub Action, …) gets a PR of its own.
+# Dependabot puts a dependency in the FIRST group whose patterns match, and
+# each group takes every update type (major included) so its members can
+# never move apart:
 #
 # - `toolchain`: `effect-tsgo patch` matches the native `tsc` (@typescript/native)
 #   and the `oxlint` / `oxlint-tsgolint` that vite-plus carries by gitHead and
 #   hard-errors on a pairing it has no artifact for, failing `pnpm install`;
-#   vite-plus pins its own oxlint, oxfmt and vitest exactly, the `vite` /
+#   vite-plus pins its own oxlint, oxfmt and vitest exactly, and the `vite` /
 #   `vitest` catalog entries and `@vitest/coverage-istanbul` must equal those
-#   pins, and the Effect lint preset (`@enfect/oxlint`) runs inside that oxlint. A group PR can
-#   still go red when no @effect/tsgo release supports the new oxlint yet:
-#   read the `components` table in node_modules/@effect/tsgo/dist/effect-tsgo.cjs
-#   (pnpm-workspace.yaml's comments say how).
+#   pins. A group PR can still go red when no @effect/tsgo release supports
+#   the new oxlint yet: read the `components` table in
+#   node_modules/@effect/tsgo/dist/effect-tsgo.cjs (pnpm-workspace.yaml's
+#   comments say how). `@enfect/oxlint` is not in it: its `@oxlint/plugins`
+#   dependency is a caret range, not tied to vite-plus's oxlint.
 # - `effect`: the Effect 4 line is a lockstep-versioned singleton set
 #   (`effect`, `@effect/sql-pg`, `@effect/platform-node`, the language
-#   service); `@effect/tsgo` belongs to the toolchain set and
-#   `@effect/docgen` to the `docgen` set instead.
-# - `docgen`: `@effect/docgen` compiles the JSDoc examples and runs them
-#   with `tsx`, so the two move together.
+#   service, and `@effect/docgen`, which depends on `effect` and
+#   `@effect/platform-node` of its own release); `@effect/tsgo` belongs to
+#   the toolchain set instead.
 # - `drizzle`: drizzle-kit is always the drizzle-orm pin. Both are
 #   commit-suffixed prereleases with no meaningful semver bump to compute, so
 #   their *version* updates are ignored below and the group carries only
 #   security updates; move them by hand, together.
-# - `testcontainers`, `changesets`, `fallow`: sets released together.
-# - `minor-and-patch`: every other minor / patch update in one PR, so PR
-#   volume stays low; a major outside the sets above stays its own PR.
 #
 # Not bumpable by Dependabot, so moved by hand (AGENTS.md → Commands):
 # - the npm-alias catalog entries: `vite` (`npm:@voidzero-dev/vite-plus-core`,
@@ -35,8 +36,8 @@
 #   (`npm:typescript`, a version `@effect/tsgo`'s `components` table lists).
 #   Set them on the `toolchain` group's PR branch;
 # - the `overrides` literals in pnpm-workspace.yaml: the `@grpc/grpc-js`
-#   security pin (a transitive pin of @testcontainers; revisit it whenever the
-#   `testcontainers` group moves) and the `undici` / `launch-editor` security
+#   security pin (a transitive pin of @testcontainers; revisit it whenever
+#   `@testcontainers/postgresql` moves) and the `undici` / `launch-editor` security
 #   floors, each dropped once its comment's condition holds.
 #
 # `cooldown` is 1 day, Dependabot's smallest unit (it takes whole days only).
@@ -66,6 +67,8 @@ updates:
       exclude:
         - "@thomasfosterau/*"
     groups:
+      # vite-plus pins vitest / oxlint exactly; @effect/tsgo patches only listed
+      # TS / oxlint versions.
       toolchain:
         applies-to: version-updates
         patterns:
@@ -73,15 +76,12 @@ updates:
           - "vite"
           - "vitest"
           - "@vitest/*"
-          - "oxlint"
-          - "oxfmt"
-          - "oxlint-tsgolint"
           - "@effect/tsgo"
           - "@typescript/native"
           - "typescript"
           - "@typescript/typescript6"
-          - "@enfect/oxlint"
         update-types: ["major", "minor", "patch"]
+      # One release train (docgen included).
       effect:
         applies-to: version-updates
         patterns:
@@ -89,43 +89,14 @@ updates:
           - "@effect/*"
         exclude-patterns:
           - "@effect/tsgo"
-          - "@effect/docgen"
         update-types: ["major", "minor", "patch"]
-      docgen:
-        applies-to: version-updates
-        patterns:
-          - "@effect/docgen"
-          - "tsx"
-        update-types: ["major", "minor", "patch"]
+      # drizzle-kit is always the drizzle-orm pin.
       drizzle:
         applies-to: version-updates
         patterns:
           - "drizzle-orm"
           - "drizzle-kit"
         update-types: ["major", "minor", "patch"]
-      testcontainers:
-        applies-to: version-updates
-        patterns:
-          - "pg"
-          - "@types/pg"
-          - "testcontainers"
-          - "@testcontainers/*"
-        update-types: ["major", "minor", "patch"]
-      changesets:
-        applies-to: version-updates
-        patterns:
-          - "@changesets/*"
-        update-types: ["major", "minor", "patch"]
-      fallow:
-        applies-to: version-updates
-        patterns:
-          - "fallow"
-        update-types: ["major", "minor", "patch"]
-      minor-and-patch:
-        applies-to: version-updates
-        patterns:
-          - "*"
-        update-types: ["minor", "patch"]
     ignore:
       - dependency-name: "drizzle-orm"
         update-types:
@@ -153,10 +124,6 @@ updates:
       prefix: "chore"
     cooldown:
       default-days: 1
-    groups:
-      github-actions:
-        patterns:
-          - "*"
   - package-ecosystem: "docker-compose"
     directory: "/.devcontainer"
     schedule:
