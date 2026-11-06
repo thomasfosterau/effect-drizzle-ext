@@ -103,21 +103,20 @@ catalog:
   vitest: 5.0.5
 
 # Peer ranges the PUBLISHED packages declare. Kept as a named catalog so the
-# strict catalog mode still governs them while they stay ranges (an exact
-# `4.0.0-rc.118` peer would reject a consumer on a later prerelease, so the
-# floor is a range). `pnpm pack` replaces `catalog:peers` with these ranges in the
+# strict catalog mode still governs them while they stay ranges. `pnpm pack` replaces `catalog:peers` with these ranges in the
 # published manifest (see scripts/release.sh).
 catalogs:
   peers:
-    # rc.115 replaced the `pg` driver with @effect/sql-pg's own protocol and
-    # removed `PgClient.fromPool`; the pg package's client constructors are
-    # written against it (and `pg` stopped being a peer). rc.118 is the floor
-    # because its `effect/sql/*` entry points replaced `effect/unstable/sql/*`.
-    "@effect/sql-pg": ">=4.0.0-rc.118"
+    # The `effect` and `@effect/sql-pg` peers are `^4.0.0` (owner policy):
+    # raise one only when a dependency requires a newer release, naming that
+    # dependency and its range here. None does: drizzle-orm 1.0.0-rc.5 peers
+    # on `effect` / `@effect/sql-pg` `>=4.0.0`, and @effect/sql-pg 4.0.0 on
+    # `effect ^4.0.0`.
+    "@effect/sql-pg": ^4.0.0
     "@thomasfosterau/effect-jsonapi": ">=0.16.0"
     drizzle-kit: ">=1.0.0-rc.5"
     drizzle-orm: ">=1.0.0-rc.5"
-    effect: ">=4.0.0-rc.118"
+    effect: ^4.0.0
     # Optional peer of the pg package's `./testing` Testcontainers fallback.
     "@testcontainers/postgresql": ">=12"
 

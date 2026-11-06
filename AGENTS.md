@@ -73,7 +73,7 @@ Steps 2–8 are CI's job, in CI's order ([ci.yml](.github/workflows/ci.yml)). CI
 
 Read the installed package before writing Effect code: `node_modules/effect/AGENTS.md` and `node_modules/effect/ai-docs/` (the pinned version ships both), then the declarations and sources (`node_modules/effect/dist/*.d.ts`, `node_modules/effect/src`). Never guess at an Effect API.
 
-- The pinned version is the `effect` entry in `pnpm-workspace.yaml`'s catalog; the published peer floor is under `catalogs.peers`.
+- The pinned version is the `effect` entry in `pnpm-workspace.yaml`'s catalog; the published peers are under `catalogs.peers`. The `effect` (and `@effect/sql-pg`) peer is `^4.0.0`; raise it only when a dependency requires it, naming the dependency in the catalog comment.
 - Tagged errors are `Schema.TaggedError<Self>()(tag, fields)` classes (the rc spelling; `Schema.TaggedErrorClass` was the beta-line name).
 - Failures at module load (table derivation) are thrown `DerivationError`, never Effect failures, because no runtime exists yet; query-time failures travel in the Effect error channel.
 - SQL modules are `effect/sql/*` (not `effect/unstable/sql/*`) since rc.118.
