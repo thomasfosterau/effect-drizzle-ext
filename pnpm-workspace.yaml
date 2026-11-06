@@ -69,7 +69,8 @@ catalog:
   drizzle-kit: 1.0.0-rc.5
   # The Effect lint preset (`effect/*` rules, anti-slop included) that
   # vite.config.ts extends with `configs.recommended`; it runs inside the
-  # oxlint vite-plus carries, so it moves with the `toolchain` set. It depends
+  # oxlint vite-plus carries, but takes `@oxlint/plugins` as a caret range, so
+  # Dependabot proposes it on its own, outside the `toolchain` group. It depends
   # on `effect` 4.1.0 exactly, but the `effect: "catalog:"` override below
   # resolves it to this workspace's singleton, which it lints fine against.
   "@enfect/oxlint": 0.9.0
