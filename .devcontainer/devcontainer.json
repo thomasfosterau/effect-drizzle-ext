@@ -1,17 +1,27 @@
 {
-  "$schema": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.base.schema.json",
   "name": "effect-drizzle-ext",
-  "dockerComposeFile": "compose.yaml",
-  "service": "workspace",
-  "workspaceFolder": "/workspaces/effect-drizzle-ext",
-  "remoteUser": "node",
-  "remoteEnv": {
-    "PATH": "${containerWorkspaceFolder}/node_modules/.bin:${containerEnv:PATH}"
+  // The Vite+ base image: Node + pnpm + the vp CLI. The tag is the catalog's
+  // `vite-plus` pin in pnpm-workspace.yaml; Dependabot cannot move it, so bump it
+  // by hand on the toolchain PR that moves `vite-plus`.
+  "image": "ghcr.io/voidzero-dev/vite-plus:1.4.0",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers-extra/features/ripgrep:1": {},
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {},
+    "ghcr.io/devcontainer-community/devcontainer-features/jq:1": {},
+    // A Docker daemon for `vp run test:integration`: with no `PG*` variable set and
+    // nothing on 127.0.0.1:5432, the suite starts its `pgvector/pgvector:pg17`
+    // server through Testcontainers (packages/pg/src/provisioning.ts).
+    "ghcr.io/devcontainers/features/docker-in-docker:4": {}
   },
-  "postCreateCommand": "sudo chown node:node node_modules packages/core/node_modules packages/pg/node_modules tests/dist-consumer/node_modules && npm install --global corepack@0.36.0 && corepack enable pnpm && pnpm install --frozen-lockfile",
+  // Same provisioning as an agent session: .claude/hooks/session-start.sh installs
+  // the pinned Vite+ CLI, links `vp` / `vpx` into ~/.local/bin and runs
+  // `vp install --frozen-lockfile` (see that file's header).
+  "postCreateCommand": "bash .claude/hooks/session-start.sh",
   "customizations": {
     "vscode": {
-      "extensions": ["EditorConfig.EditorConfig", "oxc.oxc-vscode"]
+      "extensions": ["Anthropic.claude-code", "oxc.oxc-vscode", "EditorConfig.EditorConfig"]
     }
-  }
+  },
+  "workspaceFolder": "/workspaces/effect-drizzle-ext"
 }

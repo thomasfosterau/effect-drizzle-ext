@@ -39,6 +39,8 @@
 #   security pin (a transitive pin of @testcontainers; revisit it whenever
 #   `@testcontainers/postgresql` moves) and the `undici` / `launch-editor` security
 #   floors, each dropped once its comment's condition holds.
+# - the `ghcr.io/voidzero-dev/vite-plus:<tag>` image in .devcontainer/devcontainer.json:
+#   it equals the catalog's `vite-plus` pin, moved on the toolchain PR.
 #
 # `cooldown` is 1 day, Dependabot's smallest unit (it takes whole days only).
 # pnpm-workspace.yaml's `minimumReleaseAge` holds a new version for 8 hours,
@@ -46,10 +48,10 @@
 # version pnpm would still refuse. First-party `@thomasfosterau/*` is exempt,
 # as `minimumReleaseAgeExclude` exempts it.
 #
-# `docker-compose` watches the dev container's images (.devcontainer/compose.yaml).
-# The workspace image's Node major tracks CI's newest released Node and pgvector's `pg17`
-# tracks CI's service container, so a PR that moves either major lands only
-# together with the matching CI change.
+# `devcontainers` keeps the dev container's features and their lockfile
+# current (.devcontainer/devcontainer.json). Its base image tag is not a
+# feature: it equals the catalog's `vite-plus` pin and is moved by hand on the
+# `toolchain` PR.
 version: 2
 updates:
   - package-ecosystem: "npm"
@@ -124,8 +126,8 @@ updates:
       prefix: "chore"
     cooldown:
       default-days: 1
-  - package-ecosystem: "docker-compose"
-    directory: "/.devcontainer"
+  - package-ecosystem: "devcontainers"
+    directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
