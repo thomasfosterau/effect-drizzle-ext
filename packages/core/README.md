@@ -22,7 +22,7 @@ This library **extends** drizzle-orm's own Effect integration (`drizzle-orm/effe
 
 | Subpath | Drizzle? | Contents |
 | --- | --- | --- |
-| `.` | no | The `dbColumn` / `dbTable` annotation vocabulary, phantoms, `Option` readers, numeric bounds, struct-field projection. |
+| `.` | no | The `dbColumn` / `dbTable` annotation vocabulary, phantoms, `Option` readers, numeric bounds, struct-field projection, and `defineTree`, the Drizzle-free ontology declaration. |
 | `./derive` | yes | The builder registry, `makeDeriveColumns`, CHECK derivation from bounds, `DerivationError`. |
 | `./references` | yes | The lazy FK-reference registry a `resolveReference` hook is built from. |
 | `./constraints` | yes | `enumCheck` and the threaded `type`-discriminator toolkit. |
@@ -32,8 +32,8 @@ This library **extends** drizzle-orm's own Effect integration (`drizzle-orm/effe
 | `./update` | no | The update tri-state as a `SET` map: `updateSetMap`, `insertValues`. |
 | `./errors` | no (types only) | Postgres error facts and tagged classification over drizzle / `@effect/sql` error graphs. |
 | `./database` | types only | The driver-agnostic `makeDatabaseServices` factory (`Database`, `CurrentTransaction`, `transact`, `readHandle`). |
-| `./versioned-chain` | yes | `makeSubtypeTables`, `makeCurrentVersionView`, the `VersionChainEntry` / `VersionSnapshot` read shapes, `versionTimestamps`. |
-| `./jsonapi` | no | `Resource.*`-shaped readers, including `resourceAttributeProjections` (optional peer `@thomasfosterau/effect-jsonapi`). |
+| `./versioned-chain` | yes | The whole-tree builders `makeTreeTables` / `makeTreeViews`, the per-leaf `makeSubtypeTables` / `makeCurrentVersionView`, the `VersionChainEntry` / `VersionSnapshot` read shapes, `versionTimestamps`. |
+| `./jsonapi` | no | `Resource.*`-shaped readers, including `resourceAttributeProjections`, and `defineResourceTree` (optional peer `@thomasfosterau/effect-jsonapi`). |
 | `./jsonapi/derive` | yes | The Drizzle-emitting half of `./jsonapi`. |
 
 ## Quick start
@@ -116,6 +116,39 @@ export const readDbTable: (target: object) => Option.Option<TableMeta>;
 export const numericBounds: (schema: Schema.Constraint) => Option.Option<NumericBounds>;
 export const fieldColumns: (fields: Schema.Struct.Fields) => Record<string, DbColumn>;
 export const fieldColumnBounds: (fields: Schema.Struct.Fields) => Record<string, ColumnBounds>;
+```
+
+### Declaring a tree
+
+`defineTree(spec)` declares a versioned ontology once, with no Drizzle import, so a models package can state it and the database layer derive every table, constraint and view from it (effect-drizzle-ext#112). Each entry of `spec` is a level:
+
+- A **marker** has no `leaf`; a **leaf** carries its domain fields (`dbColumn`-annotated), and its name is its discriminator value.
+- `parent` names another level; absent, the level is a branch root under the tree's root (the `node` identity and `node_version` tables).
+- `columns` are **level columns**: fields on that level's version table that reach every descendant's view (a work's `title` on every book).
+- `kind: "fact-scoped"` keeps a level's columns in one 6NF fact table each, where a fact's absence at a version is its `NULL`.
+- `keyed: { name, columns }` (a leaf only) declares a **keyed fact level**: columns held once per `(id, version, key)`, such as a localised leaf's translated columns keyed by `locale`. They stay out of the leaf's shared columns.
+
+`defineResourceTree` (`./jsonapi`) is the same over `Resource.make` definitions, each leaf's resource `type` being its level's name. `defineTreeFor<Ext>()` / `defineResourceTreeFor<Ext>()` pin an extension record every entry must carry (pulpit's registry flags), which the library never reads.
+
+The result is a checked `Tree`: per level, its ancestors, children, descendants, subtree leaves (its discriminator CHECK value set) and branch, all in declaration order. A parent naming no level is a type error. Every other fault throws `DerivationError` at module load: a cycle, a leaf with children, a marker with no leaf below it, an unannotated column, a reserved name (`id`, `version`, `action`, `type`), two columns on one root-to-leaf path sharing a key or column name, or a keyed level on a marker.
+
+```ts
+import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext";
+import * as Schema from "effect/Schema";
+
+const text = (column: string) => dbColumn(Schema.String, { column, pg: "text", notNull: false });
+
+export const tree = defineTree({
+  work: { columns: { title: text("title") } },
+  book: { parent: "work", leaf: { isbn: text("isbn") } },
+  essay: {
+    parent: "work",
+    leaf: {},
+    keyed: { name: "locale", columns: { abstract: text("abstract") } },
+  },
+  agent: {},
+  person: { parent: "agent", leaf: {} },
+});
 ```
 
 ## `./derive`
@@ -382,6 +415,27 @@ export const makeDatabaseServices: <
 ## `./versioned-chain`
 
 The opt-in interpreter for "a tree of levels, each a stable + version table pair, joined up a composite `(id, version)` FK chain to a root, with fail-closed current-version views" — the shape a temporal-versioned node hierarchy takes. `./versioned-chain` carries no application ontology; both factories are parameterised over the bits one hierarchy pins.
+
+### The whole tree: `makeTreeTables` and `makeTreeViews`
+
+`makeTreeTables(tree, { schema, builders, root?, levels? })` derives every table and constraint of a `defineTree` tree in one call. Column types still come from your builder registry:
+
+- **The root:** the identity table (`id`, `type`, `root.identityColumns`; `UNIQUE (id, type)`) and the root version table, keyed `(id, version)`. The root version table carries `action` (CHECKed to `create` / `update` / `delete`, the single home of currency and tombstone state), `timestamp`, the actor and `root.versionColumns`.
+- **Per level:** a stable table (`id` → parent, the `type` discriminator arced down the tree and CHECKed to the level's subtree leaves) and a version table (`(id, version)` → the parent's, cascading on delete) carrying its level and leaf columns and `levels[name].columns` hooks. A fact-scoped level gets its fact tables, a keyed leaf its `${leaf}_${name}` table, and each name in `root.pointers` an append-only `${name}_pointer` log.
+
+Constraint names are canonical, and the same tree always generates the same migration.
+
+`makeTreeViews(tree, tables, { schema, branches?, pointers? })` derives the read views:
+
+- **Per leaf, a fail-closed current-version view** (`${leaf}_view`). It resolves the head from the root version table and INNER JOINs every level's version table at it, so ancestor level columns appear with no per-anchor factory. A node whose head advanced past any level yields **no row**.
+- **Per marker named in `branches`, a `UNION ALL` branch view.** An optional per-leaf `project` builds a search union.
+- **Per keyed leaf, a keyed view** (one row per key, and one `NULL`-key row for a head with none).
+- **Per pointer and leaf named in `pointers`, the leaf view at the pointer's effective fact.** It projects the head's `action` and `${pointer}At`, and composes with the keyed view.
+- **`asOf(leaf, { version } | { at })`:** the leaf view at an older point, as a subquery.
+
+Every derived view reads base tables only, never another view. Each view's row type is derived from the tree. The write side is [`@thomasfosterau/effect-drizzle-ext-pg/chain`](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/packages/pg/README.md#chain).
+
+### Per-leaf builders
 
 `makeSubtypeTables(applyDiscriminator)(schema, config)` builds one leaf's `{ stable, version }` pair: the stable identity row (`id` primary key referencing the parent branch's stable `id`, plus a denormalised `type` discriminator), and the version row (`(id, version)` primary key, `(id, version)` foreign-keyed to the parent branch's version table). Domain columns are authored per leaf and merged in via `config.columns`; `discriminator`, when present, makes `type` `NOT NULL` and appends the constraints `applyDiscriminator` returns (a `./constraints` `DiscriminatorToolkit` is the intended hook). Its return type, `SubtypeTables<TColumns>`, is written out as an explicit annotation rather than inferred — the declaration printer cannot reduce the homomorphic `PgBuildColumns` mapped type while `TColumns` is still generic, and would otherwise emit an unbound `TTableName` reference that `skipLibCheck` hides.
 

@@ -14,6 +14,7 @@ May import from `packages/core` only (`.fallowrc.json` zone `pg`), for the drive
 - `./migrations` applies to a **brand-new** database only (no ledger), one transaction per migration, statements split on `--> statement-breakpoint` because `@effect/sql-pg`'s extended protocol refuses multi-statement queries.
 - Provisioning owns drop / create / migrate and the container; fixture users and seed data stay with the application (website #1847: the harness → database edge is one-way).
 - `./tooling` is bin-less: the application's own task supplies the schema module and runs the Effect.
+- **`./chain` is append-only and never opens a transaction** (`VERSION-CHAIN-001/002`): every write inserts at `N_max + 1` on the root and every level, never an `UPDATE` or `DELETE` of a version row, and requires `CurrentTransaction`. A plain update never resurrects a tombstone (`VERSION-CHAIN-006`); `restoreVersion` reads every level before writing; `history` is capped (`PERF-DB-001`). The race is closed by the root `(id, version)` key, not by a lock: keep the precondition check and the append on the same head read. Error names and fields stay pulpit's, so `pulpit-drizzle-pg` maps them one to one.
 
 ## Terms
 
@@ -22,4 +23,5 @@ May import from `packages/core` only (`.fallowrc.json` zone `pg`), for the drive
 - **Sentinel rollback** — the `./testing` runner wraps a spec in an outer transaction it always fails with a sentinel so nothing the spec wrote survives.
 - **Fixture chain** — `tests/fixtures/`: a schema module and the drizzle-kit migrations generated from it (regenerate with `vp exec drizzle-kit generate --config tests/fixtures/drizzle.config.ts --name <slug>` from `packages/pg`; never hand-edit `migrations/`, and `.prettierignore` keeps the formatter off it). The integration suite provisions from it; the `./tooling` guards run against it in the unit suite.
 - **Provisioning** — `provisionTestDatabase`: explicit URL → reachable local server (drop / create / migrate) → Testcontainers; an explicit but unreachable `PG*` target is an error, never a fallback. Preferenceflow's `local-database.ts` is the reference.
+- **Leaf chain** — one leaf's `./chain` operations (`create` / `update` / `restore` / `delete` / `restoreVersion` / `getVersion` / `history`); its state is keyed by field across the leaf's path, and its tri-state patch is core's `./update` rule.
 - **Connect seam** — a `SqlError` raised while opening or acquiring a connection (`operation` of `connect` / `acquireConnection`), the only failure class the test runner retries.
