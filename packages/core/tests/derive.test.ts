@@ -230,6 +230,44 @@ describe("deriveFieldCheckConstraints", () => {
   });
 });
 
+describe("deriveFieldCheckConstraints over Schema.Int (effect-drizzle-ext#138)", () => {
+  const intFields = {
+    count: dbColumn(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)), {
+      column: "count",
+      pg: "integer",
+      notNull: true,
+    }),
+    width: dbColumn(
+      Schema.Int.check(Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(2147483647)),
+      { column: "width", pg: "integer", notNull: true },
+    ),
+    rank: dbColumn(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 10 })), {
+      column: "rank",
+      pg: "integer",
+      notNull: true,
+    }),
+    plain: dbColumn(Schema.Int, { column: "plain", pg: "integer", notNull: true }),
+  };
+
+  it("derives only the declared bounds, never isInt's safe-integer range", () => {
+    const derive = makeDeriveColumns(builders);
+    const table = pgTable(
+      "int_widget",
+      derive.fromFields(intFields),
+      deriveFieldCheckConstraints(intFields, "int_widget"),
+    );
+    const dialect = new PgDialect();
+    const t = '"int_widget"';
+    expect(
+      getTableConfig(table).checks.map((c) => [c.name, dialect.sqlToQuery(c.value).sql]),
+    ).toEqual([
+      ["int_widget_count_non_negative", `${t}."count" >= 0`],
+      ["int_widget_width_range", `${t}."width" > 0 AND ${t}."width" <= 2147483647`],
+      ["int_widget_rank_range", `${t}."rank" BETWEEN 1 AND 10`],
+    ]);
+  });
+});
+
 describe("deriveCheckConstraintsFrom", () => {
   it("emits nothing for an empty bounds map", () => {
     expect(deriveCheckConstraintsFrom({}, "widget")({})).toEqual([]);

@@ -228,6 +228,70 @@ describe("numericBounds", () => {
     );
     expect(numericBounds(hostile)).toEqual(Option.some({ minimum: 0 }));
   });
+
+  // effect 4.0.5+ gives `isInt` a `toJsonSchema` of the whole safe-integer
+  // range; that is the integer type, not a bound the model declared
+  // (effect-drizzle-ext#138).
+  describe("Schema.isInt's own safe-integer range", () => {
+    it("is not a bound on an otherwise unbounded integer", () => {
+      expect(numericBounds(Schema.Int)).toStrictEqual(Option.none());
+      expect(numericBounds(Schema.Finite.check(Schema.isInt()))).toStrictEqual(Option.none());
+      expect(numericBounds(Schema.NullOr(Schema.Int))).toStrictEqual(Option.none());
+    });
+
+    it("leaves a declared exclusive minimum on its own", () => {
+      expect(numericBounds(Schema.Int.check(Schema.isGreaterThan(0)))).toStrictEqual(
+        Option.some({ exclusiveMinimum: 0 }),
+      );
+    });
+
+    it("leaves a declared inclusive minimum on its own (Schema.Natural)", () => {
+      expect(numericBounds(Schema.Natural)).toStrictEqual(Option.some({ minimum: 0 }));
+      expect(
+        numericBounds(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
+      ).toStrictEqual(Option.some({ minimum: 0 }));
+    });
+
+    it("leaves a declared maximum on its own", () => {
+      expect(numericBounds(Schema.Int.check(Schema.isLessThanOrEqualTo(2147483647)))).toStrictEqual(
+        Option.some({ maximum: 2147483647 }),
+      );
+    });
+
+    it("keeps an exclusive minimum alongside a declared maximum", () => {
+      expect(
+        numericBounds(
+          Schema.Finite.check(
+            Schema.isInt(),
+            Schema.isGreaterThan(0),
+            Schema.isLessThanOrEqualTo(2147483647),
+          ),
+        ),
+      ).toStrictEqual(Option.some({ exclusiveMinimum: 0, maximum: 2147483647 }));
+    });
+
+    it("keeps a declared isBetween, whichever side of isInt it sits on", () => {
+      const between = Schema.isBetween({ minimum: 1, maximum: 10 });
+      expect(numericBounds(Schema.Int.check(between))).toStrictEqual(
+        Option.some({ minimum: 1, maximum: 10 }),
+      );
+      expect(numericBounds(Schema.Finite.check(between, Schema.isInt()))).toStrictEqual(
+        Option.some({ minimum: 1, maximum: 10 }),
+      );
+    });
+
+    it("keeps the range of a filter group that nests isInt (Schema.isInt32)", () => {
+      expect(numericBounds(Schema.Finite.check(Schema.isInt32()))).toStrictEqual(
+        Option.some({ minimum: -2147483648, maximum: 2147483647 }),
+      );
+    });
+
+    it("keeps an explicitly declared safe-integer bound", () => {
+      expect(
+        numericBounds(Schema.Finite.check(Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER))),
+      ).toStrictEqual(Option.some({ maximum: Number.MAX_SAFE_INTEGER }));
+    });
+  });
 });
 
 describe("fieldColumns", () => {
