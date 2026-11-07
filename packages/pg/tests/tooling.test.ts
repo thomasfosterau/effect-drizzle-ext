@@ -63,7 +63,7 @@ describe("checkMigrationDrift", () => {
     const report = await run(
       checkMigrationDrift({ schema: fixtureSchema, migrationsDir: FIXTURE_MIGRATIONS }),
     );
-    expect(report).toEqual({ snapshots: 5, baseRef: Option.none() });
+    expect(report).toEqual({ snapshots: 6, baseRef: Option.none() });
   });
 
   it("treats an explicit `base: undefined` as an absent base", async () => {
@@ -74,7 +74,7 @@ describe("checkMigrationDrift", () => {
         base: undefined,
       }),
     );
-    expect(report).toEqual({ snapshots: 5, baseRef: Option.none() });
+    expect(report).toEqual({ snapshots: 6, baseRef: Option.none() });
   });
 
   it("reads a full v8 snapshot as the latest state", async () => {
@@ -105,7 +105,7 @@ describe("checkMigrationDrift", () => {
     if (!(error instanceof MigrationDriftError)) throw error;
     expect(error.issues).toHaveLength(1);
     expect(error.issues[0]).toMatch(/Schema drift detected/);
-    expect(error.issues[0]).toMatch(/20261107072244_version-fk-cascade\/snapshot\.json/);
+    expect(error.issues[0]).toMatch(/20261107073635_keyed-pointer\/snapshot\.json/);
     expect(error.issues[0]).toMatch(/CREATE TABLE "fixture"\."gadget"/);
   });
 
@@ -274,9 +274,10 @@ describe("readBaseMigrations", () => {
       "20261105002649_ontology-tree",
       "20261107070600_ontology-views",
       "20261107072244_version-fk-cascade",
+      "20261107073635_keyed-pointer",
     ]);
     expect(Option.map(base.head, (h) => h.snapshot.id)).toEqual(
-      Option.some("b1dc999f-d8fc-4abc-aeb7-4913b4b1062a"),
+      Option.some("f70c5c53-7579-4ef6-bf6d-fc263c85ed24"),
     );
   });
 });
@@ -284,9 +285,9 @@ describe("readBaseMigrations", () => {
 // ── checkViewDependencies ────────────────────────────────────────────────
 
 describe("checkViewDependencies", () => {
-  it("passes on the fixture schema's views: the widget view and the tree's six", async () => {
+  it("passes on the fixture schema's views: the widget view and the tree's ten", async () => {
     expect(await run(checkViewDependencies({ schema: fixtureSchema }))).toEqual({
-      viewCount: 7,
+      viewCount: 11,
     });
   });
 

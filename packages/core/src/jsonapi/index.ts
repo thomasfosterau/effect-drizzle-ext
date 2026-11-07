@@ -44,6 +44,7 @@ import {
   type DbTable,
   type TableMeta,
   type UnwrapColumn,
+  type EntryKeyedFields,
   type FieldColumnsMetaOf,
   fieldColumns,
 } from "../index.ts";
@@ -268,6 +269,7 @@ export type ResourceTreeMeta<S> = {
     readonly leaf: [EntryResource<S[K]>] extends [never]
       ? Record<never, never>
       : ResourceColumnsMetaOf<EntryResource<S[K]>>;
+    readonly keyed: FieldColumnsMetaOf<EntryKeyedFields<S[K]>>;
   };
 };
 

@@ -61,8 +61,8 @@ const ontologyBuilders = {
 
 /**
  * A small tree with the shapes the version-chain slices need: a work spine
- * whose level column reaches two leaves, a fact-scoped level, and a
- * refinable agent branch.
+ * whose level column reaches two leaves, a localised leaf (`essay`, keyed by
+ * locale), a fact-scoped level, and a refinable agent branch.
  */
 export const ontologyTree = defineTree({
   work: {
@@ -72,7 +72,16 @@ export const ontologyTree = defineTree({
     parent: "work",
     leaf: { pages: dbColumn(Schema.Finite, { column: "pages", pg: "integer", notNull: false }) },
   },
-  essay: { parent: "work", leaf: {} },
+  essay: {
+    parent: "work",
+    leaf: {},
+    keyed: {
+      name: "locale",
+      columns: {
+        abstract: dbColumn(Schema.String, { column: "abstract", pg: "text", notNull: false }),
+      },
+    },
+  },
   manifestation: {
     kind: "fact-scoped",
     columns: { isbn: dbColumn(Schema.String, { column: "isbn", pg: "text", notNull: false }) },
@@ -91,6 +100,7 @@ export const ontologyTables = makeTreeTables(ontologyTree, {
   schema: ontology,
   builders: ontologyBuilders,
   levels: { agent: { refinable: true } },
+  root: { pointers: ["live"] },
 });
 
 export const node = ontologyTables.root.identity;
@@ -112,11 +122,17 @@ export const person = ontologyTables.levels.person.stable;
 export const personVersion = ontologyTables.levels.person.version;
 export const organisation = ontologyTables.levels.organisation.stable;
 export const organisationVersion = ontologyTables.levels.organisation.version;
+export const essayLocale = ontologyTables.keyed.essay;
+export const livePointer = ontologyTables.pointers.live;
 
-/** Every view the tree derives: a view per leaf, and the `work` branch. */
+/**
+ * Every view the tree derives: a view per leaf, the `work` branch, essay's
+ * locale view, and book's and essay's views at the `live` pointer.
+ */
 export const ontologyViews = makeTreeViews(ontologyTree, ontologyTables, {
   schema: ontology,
   branches: { work: true },
+  pointers: { live: ["book", "essay"] },
 });
 
 export const bookView = ontologyViews.leaves.book;
@@ -125,3 +141,7 @@ export const editionView = ontologyViews.leaves.edition;
 export const personView = ontologyViews.leaves.person;
 export const organisationView = ontologyViews.leaves.organisation;
 export const workView = ontologyViews.branches.work;
+export const essayLocaleView = ontologyViews.keyed.essay;
+export const bookLiveView = ontologyViews.pointers.live.leaves.book;
+export const essayLiveView = ontologyViews.pointers.live.leaves.essay;
+export const essayLocaleLiveView = ontologyViews.pointers.live.keyed.essay;
