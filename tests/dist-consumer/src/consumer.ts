@@ -85,6 +85,7 @@ import {
 } from "@thomasfosterau/effect-drizzle-ext/jsonapi";
 import { makeDeriveResourceColumns } from "@thomasfosterau/effect-drizzle-ext/jsonapi/derive";
 import * as Pg from "@thomasfosterau/effect-drizzle-ext-pg";
+import * as PgChain from "@thomasfosterau/effect-drizzle-ext-pg/chain";
 import * as PgMigrations from "@thomasfosterau/effect-drizzle-ext-pg/migrations";
 import * as PgTesting from "@thomasfosterau/effect-drizzle-ext-pg/testing";
 import * as PgTooling from "@thomasfosterau/effect-drizzle-ext-pg/tooling";
@@ -265,20 +266,47 @@ const ontologyTree = defineTree({
   novel: {
     parent: "work",
     leaf: { words: dbColumn(Schema.Finite, { column: "words", pg: "integer", notNull: false }) },
+    keyed: {
+      name: "locale",
+      columns: { blurb: dbColumn(Schema.String, { column: "blurb", pg: "text", notNull: false }) },
+    },
   },
 });
 const ontology = pgSchema("ontology");
 const ontologyTables = makeTreeTables(ontologyTree, {
   schema: ontology,
   builders: { text: (c: string) => text(c), integer: (c: string) => integer(c) },
+  root: { pointers: ["live"] },
 });
 export const ontologyViews = makeTreeViews(ontologyTree, ontologyTables, {
   schema: ontology,
   branches: { work: true },
+  pointers: { live: ["novel"] },
 });
 type NovelViewRow = typeof ontologyViews.leaves.novel.$inferSelect;
 type WorkViewRow = typeof ontologyViews.branches.work.$inferSelect;
+type NovelLocaleRow = typeof ontologyViews.keyed.novel.$inferSelect;
+type NovelLiveRow = typeof ontologyViews.pointers.live.leaves.novel.$inferSelect;
+type NovelLocaleLiveRow = typeof ontologyViews.pointers.live.keyed.novel.$inferSelect;
+type NovelLocaleTableRow = typeof ontologyTables.keyed.novel.$inferSelect;
+type LivePointerRow = typeof ontologyTables.pointers.live.$inferSelect;
 export const novelAsOf = ontologyViews.asOf("novel", { version: 0n });
+
+// ── chain ─────────────────────────────────────────────────────────────────
+
+const chainDatabase = Pg.makePgDatabase({ relations: {}, key: "ChainDb" });
+export const chain = PgChain.makeVersionChain({
+  tree: ontologyTree,
+  tables: ontologyTables,
+  CurrentTransaction: chainDatabase.CurrentTransaction,
+});
+export const novelCreated = chain.novel.create({
+  state: { title: "Dune", words: 1 },
+  actor: undefined,
+});
+export const novelUpdated = chain.novel.update({ id: "x", patch: { words: null }, actor: "a" });
+export const novelSnapshot = chain.novel.getVersion("x", 0n);
+type NovelState = Effect.Success<typeof novelSnapshot>["state"];
 
 // ── sort ──────────────────────────────────────────────────────────────────
 
@@ -449,6 +477,29 @@ export type Checks = [
   /** _novelViewCreatedAt */ Assert<Equals<NovelViewRow["createdAt"], Date>>,
   /** _workViewType */ Assert<Equals<WorkViewRow["type"], string>>,
   /** _workViewTitle */ Assert<Equals<WorkViewRow["title"], string>>,
+  /* oxlint-disable effect/prefer-option-over-null -- the derived row types under test: a LEFT JOINed keyed column, a cleared pointer and a nullable chain column are `T | null` in Drizzle's own row inference */
+  /** _novelLocale */ Assert<Equals<NovelLocaleRow["locale"], string | null>>,
+  /** _novelLocaleBlurb */ Assert<Equals<NovelLocaleRow["blurb"], string | null>>,
+  /** _novelLiveAt */ Assert<Equals<NovelLiveRow["liveAt"], Date>>,
+  /** _novelLiveVersion */ Assert<Equals<NovelLiveRow["version"], bigint>>,
+  /** _novelLocaleLiveAt */ Assert<Equals<NovelLocaleLiveRow["liveAt"], Date>>,
+  /** _keyedTableLocale */ Assert<Equals<NovelLocaleTableRow["locale"], string>>,
+  /** _pointerVersion */ Assert<Equals<LivePointerRow["version"], bigint | null>>,
+  /** _chainStateTitle */ Assert<Equals<NovelState["title"], string>>,
+  /** _chainStateWords */ Assert<Equals<NovelState["words"], number | null>>,
+  /* oxlint-enable effect/prefer-option-over-null */
+  /** _chainCreateRequiresTx */ Assert<
+    Equals<Effect.Services<typeof novelCreated>, "ChainDb/CurrentTransaction">
+  >,
+  /** _chainUpdateErrors */ Assert<
+    Equals<
+      Exclude<
+        Effect.Error<typeof novelUpdated>,
+        { readonly _tag: "EffectDrizzleQueryError" }
+      >["_tag"],
+      "NodeNotFound" | "StaleVersion" | "VersionConflict"
+    >
+  >,
   /** _novelAsOfAlias */ Assert<Equals<(typeof novelAsOf)["_"]["alias"], "novel_as_of">>,
   /** _appDbKey */ Assert<Equals<AppDb, "AppDb">>,
   /** _appTxKey */ Assert<
