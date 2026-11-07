@@ -195,4 +195,21 @@ describe("makeTreeTables against PostgreSQL", () => {
       }),
     );
   });
+
+  it("deletes a multi-level leaf's whole chain with its node (effect-drizzle-ext#145)", async () => {
+    await runInTestTransaction(
+      runtime,
+      Effect.gen(function* () {
+        yield* seedBook();
+        yield* exec(`DELETE FROM ontology.node WHERE id = '${BOOK}'`);
+        const tx = yield* CurrentTransaction;
+        const left = yield* tx.execute<{ readonly n: string }>(
+          sql`SELECT (SELECT count(*) FROM ontology.node_version WHERE id = ${BOOK})
+            + (SELECT count(*) FROM ontology.work_version WHERE id = ${BOOK})
+            + (SELECT count(*) FROM ontology.book_version WHERE id = ${BOOK}) AS n`,
+        );
+        expect(left.rows.map((row) => Number(row.n))).toEqual([0]);
+      }),
+    );
+  });
 });
