@@ -4,3 +4,8 @@
 # package's fixture chain under tests/fixtures/migrations/ — are drizzle-kit's
 # output and are never hand-formatted.
 migrations/
+# Changesets writes each package's CHANGELOG.md in the Release workflow's
+# "Version Packages" PR, indenting every line of a multi-paragraph changeset,
+# blank ones included; oxfmt would then fail that PR and trunk once it merges
+# (effect-auth#546). The file is generated, never hand-edited.
+CHANGELOG.md
