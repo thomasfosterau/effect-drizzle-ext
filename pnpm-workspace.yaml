@@ -52,8 +52,13 @@ catalog:
   # Starts the integration suite's ephemeral `pgvector/pgvector` server when no
   # local PostgreSQL is reachable — see packages/pg/tests/integration/global-setup.ts.
   "@testcontainers/postgresql": ^12.2.1
+  # A dependency (not a peer) of the core package: the pure Schema helpers
+  # (`./Ast`, `./LiteralExact`) carry no service identity a consumer must
+  # share, and its one required peer, `effect ^4.0.0`, is already core's peer
+  # at the same range (effect-drizzle-ext#135).
+  "@thomasfosterau/effect-ext": ^0.1.0
   # Optional peer of the core package: only the `./jsonapi*` subpaths import it.
-  "@thomasfosterau/effect-jsonapi": ^0.20.0
+  "@thomasfosterau/effect-jsonapi": ^0.20.1
   "@types/node": ^26.6.6
   # Must equal the vitest that vite-plus bundles (see `vitest` below).
   "@vitest/coverage-istanbul": 5.0.5

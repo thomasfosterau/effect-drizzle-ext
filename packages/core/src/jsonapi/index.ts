@@ -26,13 +26,12 @@
  * @module jsonapi
  */
 
+import * as Ast from "@thomasfosterau/effect-ext/Ast";
 import { Resource } from "@thomasfosterau/effect-jsonapi";
 import * as Arr from "effect/Array";
 import * as Option from "effect/Option";
-import * as Predicate from "effect/Predicate";
 import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
-import * as SchemaAST from "effect/SchemaAST";
 import {
   dbTable as coreDbTable,
   readDbTable as coreReadDbTable,
@@ -163,20 +162,6 @@ export interface ResourceAttributeProjection {
   readonly column: Option.Option<string>;
 }
 
-/** An ISO timestamp a `Date`-decoding attribute schema accepts. */
-const ISO_PROBE = "2024-01-02T03:04:05.000Z";
-
-/**
- * What a schema's **JSON codec** decodes `input` to — the wire reading, so an
- * ISO string decodes to a `Date` for `Schema.Date` (whose own decoder accepts
- * only a `Date` instance). A decoder is built per call: this is start-up
- * introspection over a model, not a hot path.
- */
-const decodesFromJson = (schema: Schema.Top, input: Schema.Json): Option.Option<unknown> =>
-  // SAFETY: an attribute schema's decoding needs no services (a resource's
-  // attributes are plain codecs), which `Schema.Top` cannot express.
-  Schema.decodeOption(Schema.toCodecJson(schema as Schema.Codec<unknown>))(input);
-
 /**
  * Project a `Resource.make` definition's resource-object attributes into
  * ordered plain-data {@link ResourceAttributeProjection}s (declaration
@@ -184,7 +169,8 @@ const decodesFromJson = (schema: Schema.Top, input: Schema.Json): Option.Option<
  * property optional); nullability, array-ness and date-ness are recovered by
  * behavioural decode probes through each schema's JSON codec (the wire
  * reading), so the read stays robust across schema-AST shapes (a `NullOr` of
- * a transformation, a branded array, …).
+ * a transformation, a branded array, …). Each trait is
+ * `@thomasfosterau/effect-ext`'s `Ast` predicate of the same name.
  *
  * Input-only attributes (`resource: false`) are not on the resource object,
  * and so not here. The `column` read is {@link resourceColumns}'.
@@ -198,10 +184,10 @@ export const resourceAttributeProjections = (
   const columns = resourceColumns(resource);
   return Arr.map(R.toEntries(fields), ([key, schema]) => ({
     key,
-    optional: SchemaAST.isOptional(schema.ast),
-    nullable: Option.isSome(decodesFromJson(schema, null)),
-    array: Option.isSome(decodesFromJson(schema, [])),
-    date: Option.exists(decodesFromJson(schema, ISO_PROBE), Predicate.isDate),
+    optional: Ast.isOptionalKey(schema),
+    nullable: Ast.acceptsNull(schema),
+    array: Ast.isArray(schema),
+    date: Ast.isDate(schema),
     column: Option.fromNullishOr(columns[key]?.column),
   }));
 };
@@ -331,7 +317,8 @@ export const defineResourceTreeFor =
  * ```ts
  * import { dbColumn } from "@thomasfosterau/effect-drizzle-ext";
  * import { defineResourceTree } from "@thomasfosterau/effect-drizzle-ext/jsonapi";
- * import { Resource } from "@thomasfosterau/effect-jsonapi";
+ * import * as Ast from "@thomasfosterau/effect-ext/Ast";
+import { Resource } from "@thomasfosterau/effect-jsonapi";
  * import * as Schema from "effect/Schema";
  *
  * const Book = Resource.make("book", {

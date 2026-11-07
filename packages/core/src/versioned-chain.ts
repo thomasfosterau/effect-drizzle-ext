@@ -58,6 +58,7 @@ import {
   type SetIsPrimaryKey,
   type SetNotNull,
 } from "drizzle-orm/pg-core";
+import * as LiteralExact from "@thomasfosterau/effect-ext/LiteralExact";
 import * as Arr from "effect/Array";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
@@ -822,8 +823,11 @@ export interface TreeTablesConfig<
 const columnsOrEmpty = <T extends ColumnMap>(columns: T | undefined): T => columns ?? ({} as T);
 /* oxlint-enable effect/prefer-option-over-null */
 
-/** The `action` values the root version table admits. */
-const VERSION_ACTIONS: ReadonlyArray<VersionAction> = ["create", "update", "delete"];
+/**
+ * The `action` values the root version table admits, in CHECK order; a
+ * compile error if they stop naming every {@link VersionAction} exactly.
+ */
+const VERSION_ACTIONS = LiteralExact.tuple<VersionAction>()(["create", "update", "delete"]);
 
 /**
  * Derive every table and constraint of a tree in one call: the root identity

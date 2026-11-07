@@ -33,9 +33,12 @@ catalogs:
     '@testcontainers/postgresql':
       specifier: ^12.2.1
       version: 12.2.1
+    '@thomasfosterau/effect-ext':
+      specifier: ^0.1.0
+      version: 0.1.0
     '@thomasfosterau/effect-jsonapi':
-      specifier: ^0.20.0
-      version: 0.20.0
+      specifier: ^0.20.1
+      version: 0.20.1
     '@types/node':
       specifier: ^26.6.6
       version: 26.6.6
@@ -135,13 +138,17 @@ importers:
         version: 1.4.0(@types/node@26.6.6)(@typescript/typescript6@6.0.2)(@vitest/coverage-istanbul@5.0.5(vitest@5.0.5))(@vitest/ui@5.0.5(vitest@5.0.5))(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
 
   packages/core:
+    dependencies:
+      '@thomasfosterau/effect-ext':
+        specifier: 'catalog:'
+        version: 0.1.0(@effect/platform-node@4.1.2(effect@4.1.2)(redis@6.2.1))(@thomasfosterau/effect-jsonapi@0.20.1(effect@4.1.2))(effect@4.1.2)
     devDependencies:
       '@effect/language-service':
         specifier: 'catalog:'
         version: 0.87.5
       '@thomasfosterau/effect-jsonapi':
         specifier: 'catalog:'
-        version: 0.20.0(effect@4.1.2)
+        version: 0.20.1(effect@4.1.2)
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.6
@@ -202,7 +209,7 @@ importers:
         version: 4.1.2(effect@4.1.2)
       '@thomasfosterau/effect-jsonapi':
         specifier: 'catalog:'
-        version: 0.20.0(effect@4.1.2)
+        version: 0.20.1(effect@4.1.2)
       drizzle-kit:
         specifier: 'catalog:'
         version: 1.0.0-rc.5(drizzle-orm@1.0.0-rc.5(@effect/sql-pg@4.1.2(effect@4.1.2))(@types/pg@8.23.1)(effect@4.1.2)(pg@8.23.0))
@@ -1092,8 +1099,28 @@ packages:
     peerDependencies:
       '@testing-library/dom': '>=7.21.4'
 
-  '@thomasfosterau/effect-jsonapi@0.20.0':
-    resolution: {integrity: sha512-vn/MBiwWhqeEWS/RxhgjgREg7ErpmGCCP8u1/ESz+bKAWX0Yes9CvruULkq2d6buIihpVSDL+SDDSzVJOY/vIw==}
+  '@thomasfosterau/effect-ext@0.1.0':
+    resolution: {integrity: sha512-gCewDQmefBF48NeR/3iVdPSxilNbPel6P/AYU5j1iykcBCmXNv3ZwAkkLOls2c5j7iscquXLlTov2IGsAvhgzw==}
+    engines: {node: '>=22.18'}
+    hasBin: true
+    peerDependencies:
+      '@effect/platform-browser': ^4.0.0
+      '@effect/platform-node': ^4.0.0
+      '@thomasfosterau/effect-jsonapi': '>=0.16.1'
+      '@thomasfosterau/effect-parse': ^0.4.1
+      effect: 4.1.2
+    peerDependenciesMeta:
+      '@effect/platform-browser':
+        optional: true
+      '@effect/platform-node':
+        optional: true
+      '@thomasfosterau/effect-jsonapi':
+        optional: true
+      '@thomasfosterau/effect-parse':
+        optional: true
+
+  '@thomasfosterau/effect-jsonapi@0.20.1':
+    resolution: {integrity: sha512-hjnRJbUJmnYJ9uG8RQp5GwWbLPq1HrQxZoZjPYASIC1EsFplayYm7sz10qXemgjccFRCw0BctTBm0l1hALLfgg==}
     engines: {node: '>=22', pnpm: '>=11'}
     peerDependencies:
       effect: 4.1.2
@@ -1127,9 +1154,6 @@ packages:
 
   '@types/node@18.19.130':
     resolution: {integrity: sha512-GRaXQx6jGfL8sKfaIDD6OupbIHBr9jv7Jnaml9tB7l4v068PAOXqfcujMMo5PhbIs6ggR1XODELqahT2R8v0fg==}
-
-  '@types/node@26.6.5':
-    resolution: {integrity: sha512-uMzsv9stDdofIZBx4UGh4Z9ZgXnGC9seRDscilBcTHAeOFk67MZg/k9bWVfO+bk4qZmG+l52hRnLwUiH2LnJTg==}
 
   '@types/node@26.6.6':
     resolution: {integrity: sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog==}
@@ -3706,7 +3730,14 @@ snapshots:
     dependencies:
       '@testing-library/dom': 10.4.2
 
-  '@thomasfosterau/effect-jsonapi@0.20.0(effect@4.1.2)':
+  '@thomasfosterau/effect-ext@0.1.0(@effect/platform-node@4.1.2(effect@4.1.2)(redis@6.2.1))(@thomasfosterau/effect-jsonapi@0.20.1(effect@4.1.2))(effect@4.1.2)':
+    dependencies:
+      effect: 4.1.2
+    optionalDependencies:
+      '@effect/platform-node': 4.1.2(effect@4.1.2)(redis@6.2.1)
+      '@thomasfosterau/effect-jsonapi': 0.20.1(effect@4.1.2)
+
+  '@thomasfosterau/effect-jsonapi@0.20.1(effect@4.1.2)':
     dependencies:
       effect: 4.1.2
 
@@ -3746,17 +3777,13 @@ snapshots:
     dependencies:
       undici-types: 5.26.5
 
-  '@types/node@26.6.5':
-    dependencies:
-      undici-types: 8.9.0
-
   '@types/node@26.6.6':
     dependencies:
       undici-types: 8.9.0
 
   '@types/pg@8.23.1':
     dependencies:
-      '@types/node': 26.6.5
+      '@types/node': 26.6.6
       pg-protocol: 1.16.0
       pg-types: 2.2.0
     optional: true
@@ -3776,7 +3803,7 @@ snapshots:
 
   '@types/ws@8.18.2':
     dependencies:
-      '@types/node': 26.6.5
+      '@types/node': 26.6.6
 
   '@typescript/typescript-aix-ppc64@7.0.2':
     optional: true
