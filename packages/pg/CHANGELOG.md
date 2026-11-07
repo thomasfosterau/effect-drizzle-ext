@@ -1,5 +1,31 @@
 # @thomasfosterau/effect-drizzle-ext-pg
 
+## 0.2.0
+
+### Minor Changes
+
+- [#151](https://github.com/thomasfosterau/effect-drizzle-ext/pull/151) [`572ac13`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/572ac13b5bc6558f699aae9add571445dcc3d611) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - `./chain` writes and reads a keyed leaf's keyed level, such as a localised leaf's locales (effect-drizzle-ext#149). `create` takes `keyed`, the whole level at version 0. `update` / `restore` take `keyed`, a per-key tri-state patch: a patch updates that key (starting from none for a new key), `null` drops it, and an absent key carries it forward. Every write appends one version of the whole node. `delete` carries every key through the tombstone, and `restoreVersion` restores them with the shared columns. `getVersion` returns them as `keyed`, keyed by key, with `{}` for a version that carries none. This matches pulpit's `LocaleStates` / `LocalePatch`. `ChainTables` now requires `keyed`, which every `makeTreeTables` result has.
+
+- [#146](https://github.com/thomasfosterau/effect-drizzle-ext/pull/146) [`7b9309b`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/7b9309bf4a9f3ba79559f10f92adb557206512fa) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - New subpath `./chain`: the version-chain discipline, written directly over the tables `makeTreeTables` derives (effect-drizzle-ext#117). `makeVersionChain({ tree, tables, CurrentTransaction })` returns a `LeafChain` per leaf with seven operations:
+
+  - `create`: never an upsert. A taken id fails `NodeAlreadyExists`.
+  - `update`: a tri-state carry-forward patch, written at `N_max + 1` on every level.
+  - `delete`: a tombstone that carries the state forward. Idempotent.
+  - `restore`: the only plain write over a tombstone.
+  - `restoreVersion`: reads every level first, and fails `VersionNotFound` before writing.
+  - `getVersion`
+  - `history`: bounded by `MAX_HISTORY_LIMIT`.
+
+  Every write to an existing node takes an `expectedVersion` precondition. A moved head fails `StaleVersion`. A writer that races between the read and the append loses the root `(id, version)` key and fails `VersionConflict`. The actor is a required `string | undefined`, and the root tables' injected columns ride along. Every operation requires the application's `CurrentTransaction`; the chain never opens a transaction itself. The error names and fields match pulpit's `version-chain`.
+
+### Patch Changes
+
+- [#143](https://github.com/thomasfosterau/effect-drizzle-ext/pull/143) [`5176714`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/517671487e285b77d6fc436f029b82e3a18131a9) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - The published tarballs now include `CHANGELOG.md`, so the release notes can be read from `node_modules` (effect-drizzle-ext#142). npm adds only `package.json`, the README and the licence on its own, and each package's `files` list didn't name the changelog Changesets writes.
+
+- [#141](https://github.com/thomasfosterau/effect-drizzle-ext/pull/141) [`daa16d2`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/daa16d2ad6532d93d4f2ca4d6b1054c2e8a987c2) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - `engines.node` is now `>=22.18`, the floor of the `@thomasfosterau/effect-ext` dependency core gained in effect-drizzle-ext#136 (pg reaches it through core). Before this, both packages declared `>=22` while depending on a package that declares `>=22.18`, so Node 22.0–22.17 installs warned (`EBADENGINE`) or, under `engine-strict`, failed inside the dependency (effect-drizzle-ext#140).
+- Updated dependencies [[`54ba05f`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/54ba05f526f5f0c852c15d2ee9ff3d6677c78b09), [`5176714`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/517671487e285b77d6fc436f029b82e3a18131a9), [`e8696df`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/e8696df5ad51b60e3c50168251344122150e9ec1), [`daa16d2`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/daa16d2ad6532d93d4f2ca4d6b1054c2e8a987c2), [`9b9db79`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/9b9db7967a1d773173b9ba83d693134ac648e702), [`6a1c5ee`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/6a1c5ee91a9275672d6c56c1471aca68a24ad436), [`6b9f155`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/6b9f15562eb57f078241bf221a0f8c57c2e8c664)]:
+  - @thomasfosterau/effect-drizzle-ext@0.2.0
+
 ## 0.1.0
 
 ### Minor Changes
