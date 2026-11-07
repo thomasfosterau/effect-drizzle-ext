@@ -63,7 +63,7 @@ describe("checkMigrationDrift", () => {
     const report = await run(
       checkMigrationDrift({ schema: fixtureSchema, migrationsDir: FIXTURE_MIGRATIONS }),
     );
-    expect(report).toEqual({ snapshots: 3, baseRef: Option.none() });
+    expect(report).toEqual({ snapshots: 4, baseRef: Option.none() });
   });
 
   it("treats an explicit `base: undefined` as an absent base", async () => {
@@ -74,7 +74,7 @@ describe("checkMigrationDrift", () => {
         base: undefined,
       }),
     );
-    expect(report).toEqual({ snapshots: 3, baseRef: Option.none() });
+    expect(report).toEqual({ snapshots: 4, baseRef: Option.none() });
   });
 
   it("reads a full v8 snapshot as the latest state", async () => {
@@ -105,7 +105,7 @@ describe("checkMigrationDrift", () => {
     if (!(error instanceof MigrationDriftError)) throw error;
     expect(error.issues).toHaveLength(1);
     expect(error.issues[0]).toMatch(/Schema drift detected/);
-    expect(error.issues[0]).toMatch(/20261105002649_ontology-tree\/snapshot\.json/);
+    expect(error.issues[0]).toMatch(/20261107070600_ontology-views\/snapshot\.json/);
     expect(error.issues[0]).toMatch(/CREATE TABLE "fixture"\."gadget"/);
   });
 
@@ -272,9 +272,10 @@ describe("readBaseMigrations", () => {
       "20260925111534_widget",
       "20260925111541_widget-retired-at",
       "20261105002649_ontology-tree",
+      "20261107070600_ontology-views",
     ]);
     expect(Option.map(base.head, (h) => h.snapshot.id)).toEqual(
-      Option.some("ffcab908-0c2b-4531-bd7f-ceaf73fdabbe"),
+      Option.some("b70f123e-31af-45d9-a245-53cb359a3b39"),
     );
   });
 });
@@ -282,9 +283,9 @@ describe("readBaseMigrations", () => {
 // ── checkViewDependencies ────────────────────────────────────────────────
 
 describe("checkViewDependencies", () => {
-  it("passes on the fixture schema's one view", async () => {
+  it("passes on the fixture schema's views: the widget view and the tree's six", async () => {
     expect(await run(checkViewDependencies({ schema: fixtureSchema }))).toEqual({
-      viewCount: 1,
+      viewCount: 7,
     });
   });
 

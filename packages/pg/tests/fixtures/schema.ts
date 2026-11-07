@@ -3,8 +3,8 @@
  * stable + version table pair and one view over them, in its own `fixture`
  * Postgres schema so nothing collides with the `TEMPORARY` tables the other
  * integration specs create; and an ontology tree's derived tables
- * (`makeTreeTables`) in an `ontology` schema, which the tree integration
- * spec exercises.
+ * (`makeTreeTables`) and read views (`makeTreeViews`) in an `ontology`
+ * schema, which the tree integration specs exercise.
  *
  * `migrations/` beside this file is drizzle-kit's output for it, generated
  * with `drizzle.config.ts` (`vp exec drizzle-kit generate --config
@@ -18,7 +18,7 @@
 
 import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext";
 import type { ColumnBuilders } from "@thomasfosterau/effect-drizzle-ext/derive";
-import { makeTreeTables } from "@thomasfosterau/effect-drizzle-ext/versioned-chain";
+import { makeTreeTables, makeTreeViews } from "@thomasfosterau/effect-drizzle-ext/versioned-chain";
 import { eq } from "drizzle-orm";
 import { bigint, integer, pgSchema, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import * as Schema from "effect/Schema";
@@ -112,3 +112,16 @@ export const person = ontologyTables.levels.person.stable;
 export const personVersion = ontologyTables.levels.person.version;
 export const organisation = ontologyTables.levels.organisation.stable;
 export const organisationVersion = ontologyTables.levels.organisation.version;
+
+/** Every view the tree derives: a view per leaf, and the `work` branch. */
+export const ontologyViews = makeTreeViews(ontologyTree, ontologyTables, {
+  schema: ontology,
+  branches: { work: true },
+});
+
+export const bookView = ontologyViews.leaves.book;
+export const essayView = ontologyViews.leaves.essay;
+export const editionView = ontologyViews.leaves.edition;
+export const personView = ontologyViews.leaves.person;
+export const organisationView = ontologyViews.leaves.organisation;
+export const workView = ontologyViews.branches.work;
