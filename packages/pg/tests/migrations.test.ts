@@ -52,6 +52,7 @@ describe("readMigrations", () => {
       "20260925111534_widget",
       "20260925111541_widget-retired-at",
       "20261105002649_ontology-tree",
+      "20261107070600_ontology-views",
     ]);
     expect(migrations[0]?.statements[0]).toBe('CREATE SCHEMA "fixture";');
     expect(migrations[0]?.statements).toHaveLength(5);

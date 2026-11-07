@@ -25,6 +25,7 @@ import {
   fieldColumns,
   readDbColumn,
   readDbTable,
+  defineTree,
 } from "@thomasfosterau/effect-drizzle-ext";
 import {
   DerivationError,
@@ -71,6 +72,8 @@ import { insertValues, updateSetMap } from "@thomasfosterau/effect-drizzle-ext/u
 import {
   makeCurrentVersionView,
   makeSubtypeTables,
+  makeTreeTables,
+  makeTreeViews,
   type VersionChainEntry,
   type VersionSnapshot,
   versionTimestamps,
@@ -253,6 +256,30 @@ type FilmViewRow = typeof filmView.$inferSelect;
 export const filmTimestamps = versionTimestamps({ timestamp: new Date(0) });
 type Snapshot = VersionSnapshot<"create", { readonly draft?: boolean }>;
 
+// ── tree views ────────────────────────────────────────────────────────────
+
+const ontologyTree = defineTree({
+  work: {
+    columns: { title: dbColumn(Schema.String, { column: "title", pg: "text", notNull: true }) },
+  },
+  novel: {
+    parent: "work",
+    leaf: { words: dbColumn(Schema.Finite, { column: "words", pg: "integer", notNull: false }) },
+  },
+});
+const ontology = pgSchema("ontology");
+const ontologyTables = makeTreeTables(ontologyTree, {
+  schema: ontology,
+  builders: { text: (c: string) => text(c), integer: (c: string) => integer(c) },
+});
+export const ontologyViews = makeTreeViews(ontologyTree, ontologyTables, {
+  schema: ontology,
+  branches: { work: true },
+});
+type NovelViewRow = typeof ontologyViews.leaves.novel.$inferSelect;
+type WorkViewRow = typeof ontologyViews.branches.work.$inferSelect;
+export const novelAsOf = ontologyViews.asOf("novel", { version: 0n });
+
 // ── sort ──────────────────────────────────────────────────────────────────
 
 export const filmSortable: SortableColumns = sortableColumnsFor(filmView);
@@ -416,6 +443,13 @@ export type Checks = [
   /** _filmRuntime */ Assert<Equals<FilmVersionRow["runtime"], number | null>>,
   /** _viewId */ Assert<Equals<FilmViewRow["id"], string>>,
   /** _viewType */ Assert<Equals<FilmViewRow["type"], string>>,
+  /** _novelViewId */ Assert<Equals<NovelViewRow["id"], string>>,
+  /** _novelViewVersion */ Assert<Equals<NovelViewRow["version"], bigint>>,
+  /** _novelViewTitle */ Assert<Equals<NovelViewRow["title"], string>>,
+  /** _novelViewCreatedAt */ Assert<Equals<NovelViewRow["createdAt"], Date>>,
+  /** _workViewType */ Assert<Equals<WorkViewRow["type"], string>>,
+  /** _workViewTitle */ Assert<Equals<WorkViewRow["title"], string>>,
+  /** _novelAsOfAlias */ Assert<Equals<(typeof novelAsOf)["_"]["alias"], "novel_as_of">>,
   /** _appDbKey */ Assert<Equals<AppDb, "AppDb">>,
   /** _appTxKey */ Assert<
     Equals<typeof appDatabase.CurrentTransaction.Identifier, "AppDb/CurrentTransaction">

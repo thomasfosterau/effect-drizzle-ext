@@ -32,13 +32,14 @@
  * @module versioned-chain
  */
 
-import { and, eq, getTableName, max } from "drizzle-orm";
+import { and, eq, getTableColumns, getTableName, lte, max, sql } from "drizzle-orm";
 import type { ColumnBuilderBase, GetColumnData, SQL } from "drizzle-orm";
 import {
   alias,
   bigint,
   foreignKey,
   primaryKey,
+  QueryBuilder,
   text,
   timestamp,
   uuid,
@@ -54,6 +55,7 @@ import {
   type PgTimestampBuilder,
   type PgUUIDBuilder,
   type PgViewWithSelection,
+  type SubqueryWithSelection,
   type SetHasDefault,
   type SetIsPrimaryKey,
   type SetNotNull,
@@ -78,7 +80,7 @@ import {
   type DeriveOptions,
 } from "./derive.ts";
 import type { DbColumn } from "./index.ts";
-import { treeError, type Tree } from "./tree.ts";
+import { treeError, type LeafName, type MarkerName, type Tree } from "./tree.ts";
 
 // ── Subtype table pair ────────────────────────────────────────────────
 
@@ -1028,4 +1030,468 @@ export const makeTreeTables = <
   // in the record shape `TreeTables` names; only the per-level precision was
   // erased by assembling them from the runtime tree.
   return derived as TreeTables<S, M, B, H, IE, VE>;
+};
+
+// ── Tree → views ──────────────────────────────────────────────────────
+
+/**
+ * The shape of {@link makeTreeTables}'s output that {@link makeTreeViews}
+ * reads: the root pair, every level's pair and every level's fact tables.
+ */
+export interface AnyTreeTables {
+  readonly root: { readonly identity: PgTable; readonly version: PgTable };
+  readonly levels: Readonly<
+    Record<string, { readonly stable: PgTable; readonly version: PgTable }>
+  >;
+  readonly facts: Readonly<Record<string, Readonly<Record<string, PgTable>>>>;
+}
+
+/** Flatten an intersection of selections into one object type, for the hover. */
+type Simplify<A> = { [K in keyof A]: A[K] };
+
+/** A table type's built column map. */
+type ColumnsOfTable<T> = T extends { readonly _: { readonly columns: infer C } } ? C : never;
+
+/* oxlint-disable effect/prefer-option-over-null -- Drizzle row types: a LEFT JOINed fact is `T | null` in Drizzle's own row inference, and `project` is view-builder config (`?: T | undefined`, packages/core/CLAUDE.md) */
+/** The data type of column `F` in column map `C`. */
+type ColumnDataOf<C, F> = F extends keyof C
+  ? C[F] extends AnyPgColumn
+    ? GetColumnData<C[F]>
+    : never
+  : never;
+
+/** Level `K`'s path from its branch root down to itself, as a tuple of names. */
+export type TreePathOf<S, K> = K extends keyof S
+  ? S[K] extends { readonly parent: infer P }
+    ? P extends keyof S
+      ? [...TreePathOf<S, P>, K]
+      : [K]
+    : [K]
+  : [];
+
+/**
+ * What one level contributes to a view: its version table's columns past
+ * `(id, version)`, then each fact table's fact, LEFT JOINed and so nullable.
+ */
+type LevelViewColumns<T extends AnyTreeTables, L> = L extends keyof T["levels"]
+  ? Omit<ColumnsOfTable<T["levels"][L]["version"]>, "id" | "version"> &
+      (L extends keyof T["facts"]
+        ? {
+            readonly [F in keyof T["facts"][L]]: SQL.Aliased<ColumnDataOf<
+              ColumnsOfTable<T["facts"][L][F]>,
+              F
+            > | null>;
+          }
+        : Record<never, never>)
+  : Record<never, never>;
+
+/** Every level on a path's contribution, root-most first. */
+type PathViewColumns<T extends AnyTreeTables, P> = P extends readonly [infer H, ...infer Rest]
+  ? LevelViewColumns<T, H> & PathViewColumns<T, Rest>
+  : Record<never, never>;
+
+/** The root version table's columns. */
+type RootVersionColumnsOf<T extends AnyTreeTables> = ColumnsOfTable<T["root"]["version"]>;
+
+/** The columns every tree view opens with: the head's `id`, `version` and `action`. */
+type HeadViewColumns<T extends AnyTreeTables> = Pick<
+  RootVersionColumnsOf<T>,
+  "id" | "version" | "action"
+>;
+
+/** The columns every tree view closes with: the head's `timestamp` and the birth row's. */
+type TailViewColumns<T extends AnyTreeTables> = Pick<RootVersionColumnsOf<T>, "timestamp"> & {
+  readonly createdAt: SQL.Aliased<Date>;
+};
+
+/** The root identity table's injected extras (`slug`, say). */
+type IdentityViewColumns<T extends AnyTreeTables> = Omit<
+  ColumnsOfTable<T["root"]["identity"]>,
+  "id" | "type"
+>;
+
+/**
+ * The selection of leaf `K`'s current-version view: `id`, `version`, `action`,
+ * the identity extras, every level's columns from the branch root down to the
+ * leaf, then `timestamp` and `createdAt` (the version-0 timestamp).
+ */
+export type TreeLeafSelection<S, T extends AnyTreeTables, K> = Simplify<
+  HeadViewColumns<T> &
+    IdentityViewColumns<T> &
+    PathViewColumns<T, TreePathOf<S, K>> &
+    TailViewColumns<T>
+>;
+
+/** The columns a branch view's `project` adds, or none. */
+type ProjectedColumnsOf<P> = P extends ViewColumns ? P : Record<never, never>;
+
+/* oxlint-enable effect/prefer-option-over-null */
+
+/**
+ * The selection of marker `K`'s branch view: `id`, `version`, `action`, the
+ * leaf `type`, the identity extras, the columns of every level from the branch
+ * root down to `K`, `timestamp`, `createdAt`, then whatever `project` adds.
+ */
+export type TreeBranchSelection<S, T extends AnyTreeTables, K, P> = Simplify<
+  HeadViewColumns<T> &
+    Pick<ColumnsOfTable<T["root"]["identity"]>, "type"> &
+    IdentityViewColumns<T> &
+    PathViewColumns<T, TreePathOf<S, K>> &
+    TailViewColumns<T> &
+    ProjectedColumnsOf<P>
+>;
+
+/**
+ * A view {@link makeTreeViews} derives: a real Drizzle view, usable in `from` /
+ * `join` and exposing its column proxies, with `$inferSelect` pinned to its
+ * selection. Written out for the declaration printer, as
+ * {@link SubtypeTables} is.
+ */
+export type TreeView<TSelection extends ViewColumns> = Omit<
+  PgViewWithSelection<{
+    name: string;
+    schema: string;
+    existing: false;
+    selectedFields: TSelection;
+    isAlias: false;
+  }>,
+  "$inferSelect"
+> & {
+  $inferSelect: ViewRow<TSelection>;
+};
+
+/* oxlint-disable effect/prefer-option-over-null -- Drizzle view inputs: config threaded straight into the view builder stays `?: T | undefined` (packages/core/CLAUDE.md) */
+/**
+ * One branch view's options. `project` adds per-leaf columns to every arm of
+ * the union (a search vector, a search text): it receives the leaf's name and
+ * every column the leaf's chain joins (level, leaf, hook and fact columns,
+ * keyed by field), and must return the same keys, in the same order, for
+ * every leaf.
+ */
+export interface TreeBranchViewConfig<P = ViewColumns> {
+  readonly project?:
+    | ((leaf: string, columns: Readonly<ViewColumns>) => P & ViewColumns)
+    | undefined;
+}
+
+/**
+ * The configuration {@link makeTreeViews} takes. `BR` maps each opted-in
+ * marker to the columns its `project` adds (inferred).
+ */
+export interface TreeViewsConfig<BR> {
+  /** The schema every view is created in. */
+  readonly schema: PgSchema;
+  /**
+   * The marker levels that get a branch view (`${level}_view`), each `true` or
+   * its {@link TreeBranchViewConfig}. Absent: no branch views. An entry with a
+   * `project` that names a leaf or no level is a type error; any such entry
+   * throws `DerivationError` at module load.
+   */
+  readonly branches?: { readonly [K in keyof BR]: true | TreeBranchViewConfig<BR[K]> } | undefined;
+}
+/* oxlint-enable effect/prefer-option-over-null */
+
+/**
+ * The point an {@link TreeViews.asOf} read resolves each node at: the latest
+ * version at or below `version`, or the latest written at or before `at`.
+ */
+export type AsOfPoint = { readonly version: bigint } | { readonly at: Date };
+
+/** Everything {@link makeTreeViews} derives from a tree. */
+export interface TreeViews<S, T extends AnyTreeTables, BR> {
+  /** Every leaf's current-version view (`${leaf}_view`), keyed by leaf name. */
+  readonly leaves: { readonly [K in LeafName<S>]: TreeView<TreeLeafSelection<S, T, K>> };
+  /** Every opted-in marker's branch view (`${level}_view`), keyed by level name. */
+  readonly branches: {
+    readonly [K in keyof BR & MarkerName<S>]: TreeView<TreeBranchSelection<S, T, K, BR[K]>>;
+  };
+  /**
+   * Leaf `leaf`'s view resolved at `point` instead of the head, as a subquery
+   * (`${leaf}_as_of`) to select from: `tx.select().from(views.asOf("book",
+   * { version: 2n }))`. A PostgreSQL view takes no parameter, so this is a
+   * query builder; it fails closed exactly as the view does, at the resolved
+   * version.
+   */
+  readonly asOf: <K extends LeafName<S>>(
+    leaf: K,
+    point: AsOfPoint,
+  ) => SubqueryWithSelection<TreeLeafSelection<S, T, K>, `${K}_as_of`>;
+}
+
+/** A head subquery: one `(id, version)` row per node. */
+type HeadSubquery = SubqueryWithSelection<
+  { id: AnyPgColumn; version: SQL.Aliased<unknown> },
+  string
+>;
+
+/** A runtime view selection, assembled from the tree. */
+type RuntimeSelection = ViewColumns;
+
+/** Column `key` of a root table, or a thrown `DerivationError` for a table not built by `makeTreeTables`. */
+const rootColumnOf = (columns: Readonly<Record<string, AnyPgColumn>>, key: string): AnyPgColumn =>
+  Option.getOrElse(R.get(columns, key), () =>
+    treeError(`the root tables have no "${key}" column; were they built by makeTreeTables?`),
+  );
+
+/** A branch entry as the builder reads it: `project` returns some selection. */
+interface RuntimeBranchConfig {
+  // oxlint-disable-next-line effect/prefer-option-over-null -- the builder's view of `TreeBranchViewConfig`, which is view-builder config and so `?: T | undefined` (packages/core/CLAUDE.md)
+  readonly project?: ((leaf: string, columns: Readonly<ViewColumns>) => ViewColumns) | undefined;
+}
+
+/** The projection of a view with no per-leaf columns. */
+const noProjection = (): RuntimeSelection => ({});
+
+/**
+ * Derive every read view of a tree from its {@link makeTreeTables} output: per
+ * leaf a fail-closed current-version view (`${leaf}_view`), per opted-in
+ * marker a branch view (`${level}_view`, a `UNION ALL` over its subtree's
+ * leaves), and `asOf`, the leaf view at an older version or time.
+ *
+ * Every view resolves the head from the root version table (`MAX(version)`
+ * per node), then INNER JOINs the root version row, the identity row and
+ * **every level's version table** from the branch root down to the leaf at
+ * that `(id, version)`, LEFT JOINs each fact table, and INNER JOINs the
+ * version-0 root row for `createdAt`. A node whose head advanced past any
+ * level yields **no row**, never a stale older one; a tombstone yields its row
+ * with `action = 'delete'`. Columns follow declaration order: `id`,
+ * `version`, `action` (and a branch view's `type`), the identity extras, each
+ * level's columns root-most first, `timestamp`, `createdAt`.
+ *
+ * Every view reads base tables only, never another view, so drizzle-kit's
+ * view-on-view DROP ordering can't bite (website #1228). Throws
+ * `DerivationError` at module load for a `branches` entry naming a leaf or no
+ * level, or a `project` whose keys differ between leaves.
+ *
+ * @example
+ * ```ts
+ * import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext";
+ * import { makeTreeTables, makeTreeViews } from "@thomasfosterau/effect-drizzle-ext/versioned-chain";
+ * import { getViewConfig, integer, pgSchema, text } from "drizzle-orm/pg-core";
+ * import * as Schema from "effect/Schema";
+ *
+ * const tree = defineTree({
+ *   work: {
+ *     columns: { title: dbColumn(Schema.String, { column: "title", pg: "text", notNull: true }) },
+ *   },
+ *   book: {
+ *     parent: "work",
+ *     leaf: { pages: dbColumn(Schema.Finite, { column: "pages", pg: "integer", notNull: false }) },
+ *   },
+ * });
+ * const schema = pgSchema("catalogue");
+ * const tables = makeTreeTables(tree, {
+ *   schema,
+ *   builders: { text: (c: string) => text(c), integer: (c: string) => integer(c) },
+ * });
+ * const views = makeTreeViews(tree, tables, { schema, branches: { work: true } });
+ *
+ * console.log(Object.keys(getViewConfig(views.leaves.book).selectedFields));
+ * // ["id", "version", "action", "title", "pages", "timestamp", "createdAt"]
+ * ```
+ */
+export const makeTreeViews = <
+  S,
+  M,
+  T extends AnyTreeTables,
+  const BR extends { readonly [K in keyof BR]: K extends MarkerName<S> ? unknown : never } = Record<
+    never,
+    never
+  >,
+>(
+  tree: Tree<S, M>,
+  tables: T,
+  config: TreeViewsConfig<BR>,
+): TreeViews<S, T, BR> => {
+  const { schema } = config;
+  const rootVersion = getTableColumns(tables.root.version);
+  const identity = getTableColumns(tables.root.identity);
+  const columnOf = rootColumnOf;
+  const levelOf = (name: string) =>
+    Option.getOrElse(
+      Arr.findFirst(tree.levels, (level) => level.name === name),
+      () => treeError(`"${name}" is not a level of this tree`),
+    );
+  const rootId = columnOf(rootVersion, "id");
+  const rootVersionNumber = columnOf(rootVersion, "version");
+  const identityExtras = R.filter(identity, (_, key) => key !== "id" && key !== "type");
+  const tablesOf = (name: string) =>
+    Option.getOrElse(R.get(tables.levels, name), () =>
+      treeError(`level "${name}" has no tables; were they built from this tree?`),
+    );
+  const factsOf = (name: string) => Option.getOrElse(R.get(tables.facts, name), () => ({}));
+
+  /** One level's columns in a view: its version columns, then its facts (nullable). */
+  const levelSelection = (name: string) => ({
+    ...R.filter(
+      getTableColumns(tablesOf(name).version),
+      (_, key) => key !== "id" && key !== "version",
+    ),
+    ...R.map(factsOf(name), (fact, key) => {
+      const column = columnOf(getTableColumns(fact), key);
+      return sql`${column}`.mapWith(column).as(column.name);
+    }),
+  });
+
+  /**
+   * One arm: the head drives the FROM; the root version row, the identity row
+   * and every level on `leaf`'s path join at the head's `(id, version)`. `cut`
+   * is the deepest level whose columns are projected (the leaf, or a branch's
+   * marker); the levels below it still INNER JOIN, so the arm fails closed.
+   */
+  const armOf = (
+    qb: QueryBuilder,
+    head: HeadSubquery,
+    leaf: string,
+    cut: string,
+    lead: RuntimeSelection,
+    project: (columns: RuntimeSelection) => RuntimeSelection,
+  ) => {
+    const path = [...levelOf(leaf).ancestors, leaf];
+    const projected = Arr.take(
+      path,
+      Arr.findFirstIndex(path, (name) => name === cut).pipe(
+        Option.map((i) => i + 1),
+        Option.getOrElse(() => path.length),
+      ),
+    );
+    const versionZero = alias(tables.root.version, "version_zero");
+    const zeroTimestamp = columnOf(getTableColumns(versionZero), "timestamp");
+    const projection = project(
+      R.fromEntries(Arr.flatMap(path, (name) => R.toEntries(levelSelection(name)))),
+    );
+    const selection = {
+      ...lead,
+      ...identityExtras,
+      ...R.fromEntries(Arr.flatMap(projected, (name) => R.toEntries(levelSelection(name)))),
+      timestamp: columnOf(rootVersion, "timestamp"),
+      createdAt: sql<Date>`${zeroTimestamp}`.mapWith(zeroTimestamp).as("created_at"),
+      ...projection,
+    };
+    const atHead = (table: PgTable) => {
+      const columns = getTableColumns(table);
+      return and(
+        eq(head.id, columnOf(columns, "id")),
+        eq(head.version, columnOf(columns, "version")),
+      );
+    };
+    const joined = Arr.reduce(
+      path,
+      qb
+        .select(selection)
+        .from(head)
+        .$dynamic()
+        .innerJoin(tables.root.version, atHead(tables.root.version))
+        .innerJoin(tables.root.identity, eq(head.id, columnOf(identity, "id"))),
+      (q, name) => q.innerJoin(tablesOf(name).version, atHead(tablesOf(name).version)),
+    );
+    const withFacts = Arr.reduce(
+      Arr.flatMap(path, (name) => R.values(factsOf(name))),
+      joined,
+      (q, fact) => q.leftJoin(fact, atHead(fact)),
+    );
+    const query = withFacts.innerJoin(
+      versionZero,
+      and(
+        eq(head.id, columnOf(getTableColumns(versionZero), "id")),
+        eq(columnOf(getTableColumns(versionZero), "version"), 0n),
+      ),
+    );
+    return { keys: R.keys(projection), query };
+  };
+
+  /** The head per node: `MAX(version)` from the root version table, optionally bounded. */
+  const headOf = (qb: QueryBuilder, bound: Option.Option<SQL>, name: string): HeadSubquery => {
+    const select = qb
+      .select({ id: rootId, version: max(rootVersionNumber).as("head_version") })
+      .from(tables.root.version)
+      .$dynamic();
+    return Option.match(bound, {
+      onNone: () => select,
+      onSome: (where) => select.where(where),
+    })
+      .groupBy(rootId)
+      .as(name);
+  };
+
+  const leafLead = {
+    id: rootId,
+    version: rootVersionNumber,
+    action: columnOf(rootVersion, "action"),
+  };
+
+  const leafView = (leaf: string) =>
+    schema.view(`${leaf}_view`).as((qb) => {
+      const head = headOf(qb, Option.none(), "head");
+      return armOf(qb, head, leaf, leaf, leafLead, noProjection).query;
+    });
+
+  const branchEntries: Readonly<Record<string, RuntimeBranchConfig | true>> = config.branches ?? {};
+  const branchConfigs: ReadonlyArray<readonly [string, RuntimeBranchConfig]> = Arr.map(
+    R.toEntries(branchEntries),
+    ([name, entry]): readonly [string, RuntimeBranchConfig] => {
+      if (
+        !Option.exists(
+          Arr.findFirst(tree.levels, (level) => level.name === name),
+          (level) => !level.isLeaf,
+        )
+      ) {
+        treeError(`branches names "${name}", which is not a marker level of this tree`);
+      }
+      return [name, entry === true || entry === undefined ? {} : entry];
+    },
+  );
+
+  const branchView = (name: string, entry: RuntimeBranchConfig) => {
+    const leaves = levelOf(name).subtreeLeaves;
+    const projectFor =
+      (leaf: string) =>
+      (columns: RuntimeSelection): RuntimeSelection =>
+        entry.project === undefined ? {} : entry.project(leaf, columns);
+    return schema.view(`${name}_view`).as((qb) => {
+      const head = headOf(qb, Option.none(), "head");
+      const arms = Arr.map(leaves, (leaf) =>
+        armOf(
+          qb,
+          head,
+          leaf,
+          name,
+          { ...leafLead, type: columnOf(identity, "type") },
+          projectFor(leaf),
+        ),
+      );
+      const [first, ...rest] = arms;
+      Arr.forEach(rest, (arm, i) => {
+        if (arm.keys.join(",") !== first.keys.join(",")) {
+          treeError(
+            `branch "${name}"'s project returns columns (${arm.keys.join(", ")}) for "${leaves[i + 1]}" but (${first.keys.join(", ")}) for "${leaves[0]}"`,
+          );
+        }
+      });
+      return Arr.reduce(rest, first.query, (union, arm) => union.unionAll(arm.query));
+    });
+  };
+
+  const asOf = (leaf: string, point: AsOfPoint) => {
+    const qb = new QueryBuilder();
+    const bound =
+      "version" in point
+        ? lte(rootVersionNumber, point.version)
+        : lte(columnOf(rootVersion, "timestamp"), point.at);
+    const head = headOf(qb, Option.some(bound), "head");
+    return armOf(qb, head, leaf, leaf, leafLead, noProjection).query.as(`${leaf}_as_of`);
+  };
+
+  const derived = {
+    leaves: R.fromEntries(Arr.map(tree.leaves, (leaf) => [leaf, leafView(leaf)])),
+    branches: R.fromEntries(
+      Arr.map(branchConfigs, ([name, entry]) => [name, branchView(name, entry)]),
+    ),
+    asOf,
+  };
+  // SAFETY: the type-erasure seam, as in makeTreeTables. Every view was built
+  // above from the same tables `T` types, selecting exactly the columns
+  // `TreeLeafSelection` / `TreeBranchSelection` name, in that order; only the
+  // per-level precision was erased by assembling them from the runtime tree.
+  return derived as TreeViews<S, T, BR>;
 };
