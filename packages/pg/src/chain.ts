@@ -398,6 +398,13 @@ export interface LeafChain<
     version: bigint,
     options: ChainWriteOptions<VE>,
   ) => Effect.Effect<ChainWrite, E | VersionNotFound | StaleVersion | VersionConflict, I>;
+  /**
+   * The node's head entry (`version`, `action`, `timestamp`): what a caller
+   * reads to pin a write's `expectedVersion`. `Option.none()` for an id with
+   * no versions of this leaf (unknown, or another leaf's node); never a
+   * failure. A tombstone's head is its `delete` entry.
+   */
+  readonly head: (id: string) => Effect.Effect<Option.Option<VersionChainEntry>, E, I>;
   /** The reconstructed state at `(id, version)`. Fails {@link VersionNotFound} when any level has no row there. */
   readonly getVersion: (
     id: string,
@@ -948,6 +955,7 @@ export const makeVersionChain = <
     });
 
     return {
+      head,
       create,
       update,
       restore,
