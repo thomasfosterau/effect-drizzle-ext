@@ -21,6 +21,12 @@ export default defineConfig({
     "*.{js,ts,css,json,md}": "vp check --fix",
   },
   fmt: {
+    // Changesets writes each package's CHANGELOG.md in the Release workflow's
+    // "Version Packages" PR, indenting every line of a multi-paragraph
+    // changeset, blank ones included, which the formatter rejects; that PR
+    // and then trunk would fail `vp check` (effect-auth#546). Generated, never
+    // hand-edited, so it is not formatted.
+    ignorePatterns: ["**/CHANGELOG.md"],
     overrides: [
       {
         files: ["**/*.md"],
