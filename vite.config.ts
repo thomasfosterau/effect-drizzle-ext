@@ -96,10 +96,10 @@ export default defineConfig({
       "vite-plus/prefer-vite-plus-imports": "error",
 
       // ---- type-aware rules (oxlint-tsgolint) -------------------------------
-      // Allowance (effect-drizzle-ext#104): 25 sites (35 when type-aware
+      // Allowance (effect-drizzle-ext#104): 26 sites (35 when type-aware
       // linting was turned on; the tree interpreter's documented type-erasure
-      // seams in versioned-chain.ts, for its tables, keyed tables, pointer
-      // logs and views, are the newest), every one a
+      // seams, in core's versioned-chain.ts for its tables, keyed tables,
+      // pointer logs and views, and in pg's chain.ts, are the newest), every one a
       // `// SAFETY:`-commented narrowing at a Drizzle builder, schema-annotation
       // or tree-derivation boundary in src/, or a
       // deliberately ill-typed test double (the hostile `toJsonSchema` in
