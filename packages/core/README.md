@@ -12,7 +12,7 @@ The Effect ↔ Drizzle bridge: Effect Schema → Drizzle column derivation with 
 pnpm add @thomasfosterau/effect-drizzle-ext effect drizzle-orm
 ```
 
-`effect` (`^4.0.0`) and `drizzle-orm` (`>=1.0.0-rc.5`) are peer dependencies. `@thomasfosterau/effect-jsonapi` (`>=0.16.0`) is an **optional** peer, needed only by the `./jsonapi` and `./jsonapi/derive` subpaths — a plain `Schema.Struct` consumer never installs it. Node.js 22 or newer is required.
+`effect` (`^4.0.0`) and `drizzle-orm` (`>=1.0.0-rc.5`) are peer dependencies. `@thomasfosterau/effect-jsonapi` (`>=0.16.0`) is an **optional** peer, needed only by the `./jsonapi` and `./jsonapi/derive` subpaths — a plain `Schema.Struct` consumer never installs it. Node.js 22.18 or newer is required (the floor of the `@thomasfosterau/effect-ext` dependency).
 
 ## Overview
 
