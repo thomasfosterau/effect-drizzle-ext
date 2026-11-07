@@ -1,6 +1,6 @@
 {
   "name": "@thomasfosterau/effect-drizzle-ext",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "The Effect ↔ Drizzle bridge: Effect Schema → Drizzle column derivation with an extensible column-kind system, a versioned-chain interpreter, typed Postgres error classification, pagination and transaction combinators.",
   "keywords": [
     "drizzle",
