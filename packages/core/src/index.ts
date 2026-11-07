@@ -377,18 +377,35 @@ const isFragment = (
   output: SchemaRepresentation.ToJsonSchema.CheckOutput,
 ): output is JsonSchema.JsonSchema => Predicate.isObject(output);
 
+/** The `representation.id` effect gives the `Schema.isInt()` filter. */
+const IS_INT_REPRESENTATION_ID = "effect/schema/isInt";
+
+/**
+ * Whether `check` is `Schema.isInt()` itself. Since effect 4.0.5 its
+ * `toJsonSchema` is `{ type: "integer", minimum: MIN_SAFE_INTEGER, maximum:
+ * MAX_SAFE_INTEGER }`: the integer type, not a bound the model declared, so
+ * the walker reads no bounds from it (effect-drizzle-ext#138). Matched by the
+ * filter's identity rather than its fragment's shape, so an explicitly
+ * declared safe-integer bound still counts.
+ */
+const isIntTypeCheck = (check: SchemaAST.Check<never>): boolean =>
+  Predicate.isObject(check.annotations?.representation) &&
+  check.annotations.representation.id === IS_INT_REPRESENTATION_ID;
+
 /** The JSON-Schema fragment a check's `toJsonSchema` annotation exposes, if any. */
 const checkFragment = (check: SchemaAST.Check<never>): Option.Option<JsonSchema.JsonSchema> =>
-  Option.flatMap(Option.fromNullishOr(check.annotations?.toJsonSchema), (toJsonSchema) =>
-    Option.filter(
-      // A filter whose toJsonSchema needs context it wasn't given throws — no bounds.
-      Option.flatMap(
-        Result.getSuccess(Result.try(() => toJsonSchema(NEUTRAL_CHECK_INPUT))),
-        Option.fromNullishOr,
-      ),
-      isFragment,
-    ),
-  );
+  isIntTypeCheck(check)
+    ? Option.none()
+    : Option.flatMap(Option.fromNullishOr(check.annotations?.toJsonSchema), (toJsonSchema) =>
+        Option.filter(
+          // A filter whose toJsonSchema needs context it wasn't given throws — no bounds.
+          Option.flatMap(
+            Result.getSuccess(Result.try(() => toJsonSchema(NEUTRAL_CHECK_INPUT))),
+            Option.fromNullishOr,
+          ),
+          isFragment,
+        ),
+      );
 
 /** Merge a fragment's numeric bound keys over `bounds` (the later check wins a key). */
 const mergeBounds = (fragment: JsonSchema.JsonSchema, bounds: NumericBounds): NumericBounds =>
@@ -429,7 +446,8 @@ const collectCheckBounds = (
  * checks of each union member — the `Schema.NullOr(Schema.Finite.check(...))`
  * shape a nullable numeric attribute takes. Deliberately shallow: bounds
  * buried deeper than one union level are a modelling smell, not a supported
- * shape.
+ * shape. `Schema.isInt()`'s safe-integer range is the integer type, not a
+ * declared bound, so `Schema.Int` alone yields `Option.none()`.
  *
  * Exported because the `./jsonapi` entry's resource-level bounds reader is the
  * same walk over a different field source.
