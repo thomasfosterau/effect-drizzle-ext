@@ -31,6 +31,7 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
+    "./chain": "./src/chain.ts",
     "./migrations": "./src/migrations.ts",
     "./testing": "./src/testing.ts",
     "./tooling": "./src/tooling/index.ts"
@@ -40,6 +41,10 @@
       ".": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
+      },
+      "./chain": {
+        "types": "./dist/chain.d.ts",
+        "default": "./dist/chain.js"
       },
       "./migrations": {
         "types": "./dist/migrations.d.ts",
