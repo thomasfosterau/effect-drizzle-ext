@@ -32,7 +32,17 @@
  * @module versioned-chain
  */
 
-import { and, eq, getTableColumns, getTableName, lte, max, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  getTableColumns,
+  getTableName,
+  lte,
+  max,
+  sql,
+  type Subquery,
+} from "drizzle-orm";
 import type { ColumnBuilderBase, GetColumnData, SQL } from "drizzle-orm";
 import {
   alias,
@@ -45,6 +55,8 @@ import {
   uuid,
   type AnyPgColumn,
   type ExtraConfigColumn,
+  type HasIdentity,
+  index,
   type PgBigInt64Builder,
   type PgBuildColumns,
   type PgSchema,
@@ -54,6 +66,7 @@ import {
   type PgTextBuilder,
   type PgTimestampBuilder,
   type PgUUIDBuilder,
+  type PgView,
   type PgViewWithSelection,
   type SubqueryWithSelection,
   type SetHasDefault,
@@ -639,7 +652,7 @@ type ColumnMap = Record<string, ColumnBuilderBase>;
 type AsColumns<T> = T extends ColumnMap ? T : never;
 
 /** The metadata map member `P` of level `K` in tree metadata `M`; `{}` when absent. */
-type MetaOf<M, K, P extends "level" | "leaf"> = K extends keyof M
+type MetaOf<M, K, P extends "level" | "leaf" | "keyed"> = K extends keyof M
   ? M[K] extends { readonly [Q in P]: infer X }
     ? X
     : Record<never, never>
@@ -710,6 +723,68 @@ export type TreeFactTables<S, M, B extends ColumnBuilders> = {
     : Record<never, never>;
 };
 
+/** The key column's name a leaf entry's keyed level declares; `never` when it has none. */
+type KeyedNameOf<E> = E extends { readonly keyed?: infer K }
+  ? Exclude<K, undefined> extends { readonly name: infer N extends string }
+    ? N
+    : never
+  : never;
+
+/** A keyed table's column builders: the `(id, version)` key, the key column, then the keyed columns. */
+type KeyedColumnBuilders<N extends string, TColumns extends ColumnMap> = {
+  id: SetNotNull<PgUUIDBuilder>;
+  version: SetNotNull<PgBigInt64Builder>;
+} & { [P in N]: SetNotNull<PgTextBuilder<[string, ...string[]]>> } & TColumns;
+
+/**
+ * A leaf's keyed fact table: one row per `(id, version, key)`, foreign-keyed
+ * to the leaf's version table. Written out for the declaration printer, as
+ * {@link SubtypeTables} is.
+ */
+export type KeyedTable<N extends string, TColumns extends ColumnMap> = PgTableWithColumns<{
+  name: string;
+  schema: string;
+  columns: PgBuildColumns<string, KeyedColumnBuilders<N, TColumns>>;
+  dialect: "pg";
+  isAlias: false;
+}>;
+
+/** Every keyed leaf's keyed table, keyed by leaf name; a leaf with no keyed level is absent. */
+export type TreeKeyedTables<S, M, B extends ColumnBuilders> = {
+  readonly [K in keyof S & string as [KeyedNameOf<S[K]>] extends [never] ? never : K]: KeyedTable<
+    KeyedNameOf<S[K]>,
+    AsColumns<DerivedColumns<MetaOf<M, K, "keyed">, B>>
+  >;
+};
+
+/**
+ * A pointer log's column builders: the record order `seq`, the node, the
+ * version it names (`NULL` clears the pointer), when the fact takes effect
+ * (`at`), the actor and when it was recorded.
+ */
+type PointerColumnBuilders = {
+  seq: HasIdentity<SetIsPrimaryKey<PgBigInt64Builder>, "always">;
+  id: SetNotNull<PgUUIDBuilder>;
+  version: PgBigInt64Builder;
+  at: SetHasDefault<SetNotNull<PgTimestampBuilder>>;
+  actor: PgTextBuilder<[string, ...string[]]>;
+  recordedAt: SetHasDefault<SetNotNull<PgTimestampBuilder>>;
+};
+
+/**
+ * A named pointer's append-only log (`${name}_pointer`). Its effective fact
+ * per node is the latest recorded one (highest `seq`) whose `at` has
+ * arrived; the pointer names that fact's version, or nothing when it is
+ * `NULL`. Written out for the declaration printer.
+ */
+export type PointerTable = PgTableWithColumns<{
+  name: string;
+  schema: string;
+  columns: PgBuildColumns<string, PointerColumnBuilders>;
+  dialect: "pg";
+  isAlias: false;
+}>;
+
 /** The root identity table's column builders: `id`, the leaf `type`, then the injected extras. */
 type RootIdentityColumnBuilders<IE extends ColumnMap> = {
   id: SetIsPrimaryKey<PgUUIDBuilder>;
@@ -755,6 +830,7 @@ export interface TreeTables<
   H,
   IE extends ColumnMap,
   VE extends ColumnMap,
+  P extends string = never,
 > {
   /** The root identity and version tables. */
   readonly root: TreeRootTables<IE, VE>;
@@ -762,6 +838,10 @@ export interface TreeTables<
   readonly levels: TreeLevelTables<S, M, B, H>;
   /** Every fact-scoped level's fact tables, keyed by level then field. */
   readonly facts: TreeFactTables<S, M, B>;
+  /** Every keyed leaf's keyed table, keyed by leaf name. */
+  readonly keyed: TreeKeyedTables<S, M, B>;
+  /** Every named pointer's log, keyed by pointer name. */
+  readonly pointers: { readonly [N in P]: PointerTable };
 }
 
 /* oxlint-disable effect/prefer-option-over-null -- Drizzle builder inputs: this library's rule (packages/core/CLAUDE.md) is that any config threaded straight into a Drizzle builder call stays `?: T | undefined`, never `Option` */
@@ -786,8 +866,12 @@ export interface TreeLevelHooks {
   readonly refinable?: boolean | undefined;
 }
 
-/** The root tables' names and injected columns. */
-export interface TreeRootConfig<IE extends ColumnMap, VE extends ColumnMap> {
+/** The root tables' names, injected columns and named pointers. */
+export interface TreeRootConfig<
+  IE extends ColumnMap,
+  VE extends ColumnMap,
+  P extends string = never,
+> {
   /** The identity table's name; `node` when absent. */
   readonly identity?: string | undefined;
   /** The root version table's name; `${identity}_version` when absent. */
@@ -798,6 +882,12 @@ export interface TreeRootConfig<IE extends ColumnMap, VE extends ColumnMap> {
   readonly versionColumns?: VE | undefined;
   /** The actor column's name; `actor` when absent. */
   readonly actorColumn?: string | undefined;
+  /**
+   * Named pointers into each node's chain (`["live"]`, say): one append-only
+   * `${name}_pointer` log each, whose effective fact names the version a
+   * pointer view resolves at. Writing a pointer never appends a version.
+   */
+  readonly pointers?: ReadonlyArray<P> | undefined;
 }
 
 /** The configuration {@link makeTreeTables} takes. */
@@ -806,6 +896,7 @@ export interface TreeTablesConfig<
   H,
   IE extends ColumnMap,
   VE extends ColumnMap,
+  P extends string = never,
 > {
   /** The schema every table is created in. */
   readonly schema: PgSchema;
@@ -813,8 +904,8 @@ export interface TreeTablesConfig<
   readonly builders: B;
   /** Resolves a `references` annotation to its target column (see `./derive`). */
   readonly resolveReference?: DeriveOptions["resolveReference"];
-  /** The root tables' names and injected columns. */
-  readonly root?: TreeRootConfig<IE, VE> | undefined;
+  /** The root tables' names, injected columns and named pointers. */
+  readonly root?: TreeRootConfig<IE, VE, P> | undefined;
   /** Per-level hooks, keyed by level name. */
   readonly levels?: H | undefined;
 }
@@ -848,6 +939,11 @@ const VERSION_ACTIONS = LiteralExact.tuple<VersionAction>()(["create", "update",
  * A fact-scoped level's version table is a spine, with one
  * `${level}_${column}` fact table per own column, keyed and foreign-keyed on
  * `(id, version)` (cascade delete).
+ * A keyed leaf (`keyed: { name, columns }` on its tree entry) gets a
+ * `${leaf}_${name}` table keyed `(id, version, name)`, foreign-keyed to its
+ * version table (cascade delete). Each name in `root.pointers` gets an
+ * append-only `${name}_pointer` log (`seq`, `id`, a nullable `version`
+ * foreign-keyed to the root version table, `at`, the actor, `recorded_at`).
  *
  * Constraint names are canonical (`${table}_pkey`, `${table}_${parent}_fk`,
  * `${level}_id_type_unique` / `_fk` / `_type_valid`); no version table carries
@@ -893,10 +989,11 @@ export const makeTreeTables = <
   const H extends { readonly [K in keyof S]?: TreeLevelHooks } = Record<never, never>,
   IE extends ColumnMap = Record<never, never>,
   VE extends ColumnMap = Record<never, never>,
+  const P extends string = never,
 >(
   tree: Tree<S, M>,
-  config: TreeTablesConfig<B, H, IE, VE>,
-): TreeTables<S, M, B, H, IE, VE> => {
+  config: TreeTablesConfig<B, H, IE, VE, P>,
+): TreeTables<S, M, B, H, IE, VE, P> => {
   const { schema } = config;
   const derive = makeDeriveColumns(config.builders, { resolveReference: config.resolveReference });
   const identityName = config.root?.identity ?? "node";
@@ -1023,17 +1120,84 @@ export const makeTreeTables = <
     R.empty<string, BuiltLevel>(),
     (acc, level) => ({ ...acc, [level.name]: buildLevel(acc, level) }),
   );
+  // A keyed leaf's `(id, version, key)` table, foreign-keyed to its version table.
+  const keyedOf = (level: Tree<S, M>["levels"][number]) =>
+    Option.map(level.keyed, (keyed): readonly [string, PgTable] => {
+      const leafVersion = builtLevel(built, level.name).tables.version;
+      const name = `${level.name}_${keyed.name}`;
+      const table: PgTable = schema.table(
+        name,
+        {
+          id: uuid("id").notNull(),
+          version: bigint("version", { mode: "bigint" }).notNull(),
+          [keyed.name]: text(keyed.name).notNull(),
+          ...derive.fromMeta(keyed.columns),
+        },
+        (columns) => [
+          primaryKey({
+            name: `${name}_pkey`,
+            columns: [columns.id, columns.version, rootColumnOf(columns, keyed.name)],
+          }),
+          foreignKey({
+            name: `${name}_${getTableName(leafVersion)}_fk`,
+            columns: [columns.id, columns.version],
+            foreignColumns: [leafVersion.id, leafVersion.version],
+          }).onDelete("cascade"),
+        ],
+      );
+      return [level.name, table];
+    });
+  // A named pointer's append-only log.
+  const pointerOf = (pointer: string) => {
+    const name = `${pointer}_pointer`;
+    const table = schema.table<string, PointerColumnBuilders>(
+      name,
+      {
+        seq: bigint("seq", { mode: "bigint" }).primaryKey().generatedAlwaysAsIdentity(),
+        id: uuid("id")
+          .notNull()
+          .references((): AnyPgColumn => identity.id, { onDelete: "cascade" }),
+        version: bigint("version", { mode: "bigint" }),
+        at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+        actor: text(config.root?.actorColumn ?? "actor"),
+        recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
+      },
+      (columns) => [
+        foreignKey({
+          name: `${name}_${versionName}_fk`,
+          columns: [columns.id, columns.version],
+          foreignColumns: [version.id, version.version],
+        }).onDelete("cascade"),
+        index(`${name}_id_seq_idx`).on(columns.id, columns.seq),
+      ],
+    );
+    return [pointer, table] as const;
+  };
   const derived = {
     root: { identity, version },
     levels: R.fromEntries(Arr.map(tree.names, (name) => [name, builtLevel(built, name).tables])),
     facts: R.fromEntries(Arr.map(tree.names, (name) => [name, builtLevel(built, name).facts])),
+  };
+  // SAFETY: as the seam below: each keyed table was built from the leaf's
+  // keyed `DbColumn` map through `builders`, under its declared key name.
+  const keyed = R.fromEntries(
+    Arr.flatMap(tree.levels, (level) => Arr.fromOption(keyedOf(level))),
+  ) as TreeKeyedTables<S, M, B>;
+  // SAFETY: one log per name in `config.root.pointers`, the very names `P`
+  // was inferred from.
+  const pointers = R.fromEntries(Arr.map(config.root?.pointers ?? [], pointerOf)) as {
+    readonly [N in P]: PointerTable;
   };
   // SAFETY: the type-erasure seam. Every level's tables were built above from
   // the same runtime column maps the tree's phantom `M` types (the level's
   // level and leaf `DbColumn` maps through `builders`, plus its hook columns),
   // in the record shape `TreeTables` names; only the per-level precision was
   // erased by assembling them from the runtime tree.
-  return derived as TreeTables<S, M, B, H, IE, VE>;
+  return {
+    ...(derived as Omit<TreeTables<S, M, B, H, IE, VE, P>, "keyed" | "pointers">),
+    keyed,
+    pointers,
+  };
 };
 
 // ── Tree → views ──────────────────────────────────────────────────────
@@ -1048,6 +1212,8 @@ export interface AnyTreeTables {
     Record<string, { readonly stable: PgTable; readonly version: PgTable }>
   >;
   readonly facts: Readonly<Record<string, Readonly<Record<string, PgTable>>>>;
+  readonly keyed: Readonly<Record<string, PgTable>>;
+  readonly pointers: Readonly<Record<string, PgTable>>;
 }
 
 /** Flatten an intersection of selections into one object type, for the hover. */
@@ -1145,6 +1311,44 @@ export type TreeBranchSelection<S, T extends AnyTreeTables, K, P> = Simplify<
     ProjectedColumnsOf<P>
 >;
 
+/* oxlint-disable effect/prefer-option-over-null -- Drizzle row types: a LEFT JOINed keyed row is `T | null` in Drizzle's own row inference */
+/** The key column and keyed columns a keyed view adds for leaf `K`, LEFT JOINed and so nullable. */
+type KeyedViewColumns<T extends AnyTreeTables, K> = K extends keyof T["keyed"]
+  ? {
+      readonly [
+        C in keyof Omit<ColumnsOfTable<T["keyed"][K]>, "id" | "version">
+      ]: SQL.Aliased<ColumnDataOf<ColumnsOfTable<T["keyed"][K]>, C> | null>;
+    }
+  : Record<never, never>;
+/* oxlint-enable effect/prefer-option-over-null */
+
+/**
+ * The selection of leaf `K`'s keyed view: the leaf view's, then the key
+ * column and the keyed columns (`NULL` for a version that carries no key).
+ */
+export type TreeKeyedSelection<S, T extends AnyTreeTables, K> = Simplify<
+  TreeLeafSelection<S, T, K> & KeyedViewColumns<T, K>
+>;
+
+/** `X` as a view selection, so a mapped selection satisfies `TreeView`'s constraint. */
+type AsViewColumns<X> = X extends ViewColumns ? X : never;
+
+/** The column a pointer view adds: when its effective fact took effect (`${pointer}At`). */
+type PointerViewColumns<N> = { readonly [Q in `${N & string}At`]: SQL.Aliased<Date> };
+
+/**
+ * The selection of leaf `K`'s view at pointer `N`: the leaf view's, with
+ * `version` the pointed one and `action` the head's, then `${N}At`.
+ */
+export type TreePointerSelection<S, T extends AnyTreeTables, K, N> = Simplify<
+  TreeLeafSelection<S, T, K> & PointerViewColumns<N>
+>;
+
+/** {@link TreePointerSelection} of a keyed leaf, with the keyed columns. */
+export type TreeKeyedPointerSelection<S, T extends AnyTreeTables, K, N> = Simplify<
+  TreeLeafSelection<S, T, K> & KeyedViewColumns<T, K> & PointerViewColumns<N>
+>;
+
 /**
  * A view {@link makeTreeViews} derives: a real Drizzle view, usable in `from` /
  * `join` and exposing its column proxies, with `$inferSelect` pinned to its
@@ -1182,9 +1386,15 @@ export interface TreeBranchViewConfig<P = ViewColumns> {
  * The configuration {@link makeTreeViews} takes. `BR` maps each opted-in
  * marker to the columns its `project` adds (inferred).
  */
-export interface TreeViewsConfig<BR> {
+export interface TreeViewsConfig<BR, PV = Record<never, never>> {
   /** The schema every view is created in. */
   readonly schema: PgSchema;
+  /**
+   * Per named pointer (`makeTreeTables`' `root.pointers`), the leaves that
+   * get a view resolved at it (`${leaf}_${pointer}_view`, and
+   * `${leaf}_${keyed}_${pointer}_view` for a keyed leaf). Absent: none.
+   */
+  readonly pointers?: PV | undefined;
   /**
    * The marker levels that get a branch view (`${level}_view`), each `true` or
    * its {@link TreeBranchViewConfig}. Absent: no branch views. An entry with a
@@ -1202,9 +1412,42 @@ export interface TreeViewsConfig<BR> {
 export type AsOfPoint = { readonly version: bigint } | { readonly at: Date };
 
 /** Everything {@link makeTreeViews} derives from a tree. */
-export interface TreeViews<S, T extends AnyTreeTables, BR> {
+/** The leaves `PV` names for pointer `N`. */
+type PointerLeavesOf<PV, N, S> = N extends keyof PV
+  ? PV[N] extends ReadonlyArray<infer L>
+    ? L & LeafName<S>
+    : never
+  : never;
+
+export interface TreeViews<S, T extends AnyTreeTables, BR, PV = Record<never, never>> {
   /** Every leaf's current-version view (`${leaf}_view`), keyed by leaf name. */
   readonly leaves: { readonly [K in LeafName<S>]: TreeView<TreeLeafSelection<S, T, K>> };
+  /**
+   * Every keyed leaf's keyed view (`${leaf}_${keyed}_view`): one row per key
+   * the head carries, and one row with a `NULL` key for a head with none.
+   */
+  readonly keyed: {
+    readonly [K in LeafName<S> & keyof T["keyed"]]: TreeView<TreeKeyedSelection<S, T, K>>;
+  };
+  /**
+   * Per pointer, its leaves' views at the pointed version: `leaves` (one row
+   * per node) and, for a keyed leaf, `keyed` (one row per key). A node whose
+   * effective fact names no version, or that has none, has no row.
+   */
+  readonly pointers: {
+    readonly [N in keyof PV & string]: {
+      readonly leaves: {
+        readonly [K in PointerLeavesOf<PV, N, S>]: TreeView<
+          AsViewColumns<TreePointerSelection<S, T, K, N>>
+        >;
+      };
+      readonly keyed: {
+        readonly [K in PointerLeavesOf<PV, N, S> & keyof T["keyed"]]: TreeView<
+          AsViewColumns<TreeKeyedPointerSelection<S, T, K, N>>
+        >;
+      };
+    };
+  };
   /** Every opted-in marker's branch view (`${level}_view`), keyed by level name. */
   readonly branches: {
     readonly [K in keyof BR & MarkerName<S>]: TreeView<TreeBranchSelection<S, T, K, BR[K]>>;
@@ -1222,11 +1465,11 @@ export interface TreeViews<S, T extends AnyTreeTables, BR> {
   ) => SubqueryWithSelection<TreeLeafSelection<S, T, K>, `${K}_as_of`>;
 }
 
-/** A head subquery: one `(id, version)` row per node. */
-type HeadSubquery = SubqueryWithSelection<
-  { id: AnyPgColumn; version: SQL.Aliased<unknown> },
-  string
->;
+/** A head subquery: one `(id, version)` row per node (the head, an as-of bound, or a pointer's fact). */
+type HeadSubquery = Subquery & {
+  readonly id: AnyPgColumn;
+  readonly version: SQL.Aliased<unknown>;
+};
 
 /** A runtime view selection, assembled from the tree. */
 type RuntimeSelection = ViewColumns;
@@ -1242,6 +1485,25 @@ interface RuntimeBranchConfig {
   // oxlint-disable-next-line effect/prefer-option-over-null -- the builder's view of `TreeBranchViewConfig`, which is view-builder config and so `?: T | undefined` (packages/core/CLAUDE.md)
   readonly project?: ((leaf: string, columns: Readonly<ViewColumns>) => ViewColumns) | undefined;
 }
+
+/** What an arm adds beyond the leaf chain: a head to read `action` from, a keyed table, trailing columns. */
+interface ArmExtras {
+  readonly actionHead: Option.Option<HeadSubquery>;
+  readonly keyed: Option.Option<PgTable>;
+  readonly tail: RuntimeSelection;
+}
+
+/** Merge selections left to right, a later key winning, into one selection. */
+const mergeSelections = (parts: ReadonlyArray<RuntimeSelection>): RuntimeSelection =>
+  Arr.reduce(parts, noProjection(), (merged, part) => ({ ...merged, ...part }));
+
+/** Views keyed by name, the key widened to `string` for the type-erasure seam. */
+const byName = (
+  entries: ReadonlyArray<readonly [string, PgView]>,
+): Readonly<Record<string, PgView>> => R.fromEntries(entries);
+
+/** An arm with nothing beyond the leaf chain. */
+const noExtras: ArmExtras = { actionHead: Option.none(), keyed: Option.none(), tail: {} };
 
 /** The projection of a view with no per-leaf columns. */
 const noProjection = (): RuntimeSelection => ({});
@@ -1261,6 +1523,16 @@ const noProjection = (): RuntimeSelection => ({});
  * with `action = 'delete'`. Columns follow declaration order: `id`,
  * `version`, `action` (and a branch view's `type`), the identity extras, each
  * level's columns root-most first, `timestamp`, `createdAt`.
+ *
+ * A keyed leaf also gets `${leaf}_${keyed}_view`: the leaf view LEFT JOINed
+ * to its keyed table at the head, one row per key, and one row with a `NULL`
+ * key for a head that carries none. Each leaf `pointers[name]` lists gets
+ * `${leaf}_${name}_view` (and `${leaf}_${keyed}_${name}_view` when keyed):
+ * the leaf view resolved at the version the pointer's effective fact names
+ * (the latest by `seq` whose `at` has arrived), failing closed there, with
+ * `action` read off the head (so a tombstone shows) and the fact's `at` as
+ * `${name}At`. A node whose effective fact names no version, or that has
+ * none, has no row.
  *
  * Every view reads base tables only, never another view, so drizzle-kit's
  * view-on-view DROP ordering can't bite (website #1228). Throws
@@ -1302,11 +1574,14 @@ export const makeTreeViews = <
     never,
     never
   >,
+  const PV extends {
+    readonly [N in keyof PV]: N extends keyof T["pointers"] ? ReadonlyArray<LeafName<S>> : never;
+  } = Record<never, never>,
 >(
   tree: Tree<S, M>,
   tables: T,
-  config: TreeViewsConfig<BR>,
-): TreeViews<S, T, BR> => {
+  config: TreeViewsConfig<BR, PV>,
+): TreeViews<S, T, BR, PV> => {
   const { schema } = config;
   const rootVersion = getTableColumns(tables.root.version);
   const identity = getTableColumns(tables.root.identity);
@@ -1350,6 +1625,7 @@ export const makeTreeViews = <
     cut: string,
     lead: RuntimeSelection,
     project: (columns: RuntimeSelection) => RuntimeSelection,
+    extras: ArmExtras = noExtras,
   ) => {
     const path = [...levelOf(leaf).ancestors, leaf];
     const projected = Arr.take(
@@ -1364,14 +1640,33 @@ export const makeTreeViews = <
     const projection = project(
       R.fromEntries(Arr.flatMap(path, (name) => R.toEntries(levelSelection(name)))),
     );
-    const selection = {
-      ...lead,
-      ...identityExtras,
-      ...R.fromEntries(Arr.flatMap(projected, (name) => R.toEntries(levelSelection(name)))),
-      timestamp: columnOf(rootVersion, "timestamp"),
-      createdAt: sql<Date>`${zeroTimestamp}`.mapWith(zeroTimestamp).as("created_at"),
-      ...projection,
-    };
+    // A pointer arm reads `action` off the real head, so a tombstone hides
+    // the node at every pointed version.
+    const headRow = Option.map(extras.actionHead, () => alias(tables.root.version, "head_row"));
+    const keyedColumns = Option.match(extras.keyed, {
+      onNone: () => ({}),
+      onSome: (table) =>
+        R.map(
+          R.filter(getTableColumns(table), (_, key) => key !== "id" && key !== "version"),
+          (column) => sql`${column}`.mapWith(column).as(column.name),
+        ),
+    });
+    const selection = mergeSelections([
+      lead,
+      Option.match(headRow, {
+        onNone: noProjection,
+        onSome: (row) => ({ action: columnOf(getTableColumns(row), "action") }),
+      }),
+      identityExtras,
+      ...Arr.map(projected, levelSelection),
+      keyedColumns,
+      {
+        timestamp: columnOf(rootVersion, "timestamp"),
+        createdAt: sql<Date>`${zeroTimestamp}`.mapWith(zeroTimestamp).as("created_at"),
+      },
+      extras.tail,
+      projection,
+    ]);
     const atHead = (table: PgTable) => {
       const columns = getTableColumns(table);
       return and(
@@ -1394,7 +1689,27 @@ export const makeTreeViews = <
       joined,
       (q, fact) => q.leftJoin(fact, atHead(fact)),
     );
-    const query = withFacts.innerJoin(
+    const withKeyed = Option.match(extras.keyed, {
+      onNone: () => withFacts,
+      onSome: (table) => withFacts.leftJoin(table, atHead(table)),
+    });
+    const withHead = Option.match(
+      Option.zipWith(extras.actionHead, headRow, (h, row) => [h, row] as const),
+      {
+        onNone: () => withKeyed,
+        onSome: ([actionHead, row]) =>
+          withKeyed
+            .innerJoin(actionHead, eq(head.id, actionHead.id))
+            .innerJoin(
+              row,
+              and(
+                eq(actionHead.id, columnOf(getTableColumns(row), "id")),
+                eq(actionHead.version, columnOf(getTableColumns(row), "version")),
+              ),
+            ),
+      },
+    );
+    const query = withHead.innerJoin(
       versionZero,
       and(
         eq(head.id, columnOf(getTableColumns(versionZero), "id")),
@@ -1424,7 +1739,7 @@ export const makeTreeViews = <
     action: columnOf(rootVersion, "action"),
   };
 
-  const leafView = (leaf: string) =>
+  const leafView = (leaf: string): PgView =>
     schema.view(`${leaf}_view`).as((qb) => {
       const head = headOf(qb, Option.none(), "head");
       return armOf(qb, head, leaf, leaf, leafLead, noProjection).query;
@@ -1446,7 +1761,7 @@ export const makeTreeViews = <
     },
   );
 
-  const branchView = (name: string, entry: RuntimeBranchConfig) => {
+  const branchView = (name: string, entry: RuntimeBranchConfig): PgView => {
     const leaves = levelOf(name).subtreeLeaves;
     const projectFor =
       (leaf: string) =>
@@ -1486,16 +1801,116 @@ export const makeTreeViews = <
     return armOf(qb, head, leaf, leaf, leafLead, noProjection).query.as(`${leaf}_as_of`);
   };
 
+  /** A keyed leaf's key name and table; none for a leaf with no keyed level. */
+  const keyedOf = (leaf: string) =>
+    Option.map(levelOf(leaf).keyed, (keyed) => ({
+      name: keyed.name,
+      table: Option.getOrElse(R.get(tables.keyed, leaf), () =>
+        treeError(`leaf "${leaf}" has no keyed table; were the tables built from this tree?`),
+      ),
+    }));
+  const keyedLeaves = Arr.filter(tree.leaves, (leaf) => Option.isSome(levelOf(leaf).keyed));
+
+  const keyedView = (
+    leaf: string,
+    keyed: { readonly name: string; readonly table: PgTable },
+  ): PgView =>
+    schema.view(`${leaf}_${keyed.name}_view`).as((qb) => {
+      const head = headOf(qb, Option.none(), "head");
+      return armOf(qb, head, leaf, leaf, leafLead, noProjection, {
+        ...noExtras,
+        keyed: Option.some(keyed.table),
+      }).query;
+    });
+
+  /**
+   * The effective fact per node: the latest recorded (`seq`) whose `at` has
+   * arrived. A fact naming no version joins no root row, so it hides the node.
+   */
+  const pointerOf = (qb: QueryBuilder, pointer: string) => {
+    const log = Option.getOrElse(R.get(tables.pointers, pointer), () =>
+      treeError(`pointer "${pointer}" has no log; name it in makeTreeTables' root.pointers`),
+    );
+    const columns = getTableColumns(log);
+    const id = columnOf(columns, "id");
+    return qb
+      .selectDistinctOn([id], {
+        id,
+        version: sql`${columnOf(columns, "version")}`.as("pointer_version"),
+        at: columnOf(columns, "at"),
+      })
+      .from(log)
+      .where(lte(columnOf(columns, "at"), sql`now()`))
+      .orderBy(id, desc(columnOf(columns, "seq")))
+      .as("pointer");
+  };
+
+  const pointerView = (
+    pointer: string,
+    leaf: string,
+    keyed: Option.Option<{ readonly name: string; readonly table: PgTable }>,
+  ): PgView =>
+    schema
+      .view(
+        Option.match(keyed, {
+          onNone: () => `${leaf}_${pointer}_view`,
+          onSome: ({ name }) => `${leaf}_${name}_${pointer}_view`,
+        }),
+      )
+      .as((qb) => {
+        const point = pointerOf(qb, pointer);
+        const head = headOf(qb, Option.none(), "head");
+        return armOf(qb, point, leaf, leaf, leafLead, noProjection, {
+          actionHead: Option.some(head),
+          keyed: Option.map(keyed, ({ table }) => table),
+          tail: {
+            [`${pointer}At`]: sql<Date>`${point.at}`
+              .mapWith(columnOf(getTableColumns(tables.root.version), "timestamp"))
+              .as(`${pointer}_at`),
+          },
+        }).query;
+      });
+
+  const pointerEntries: Readonly<Record<string, ReadonlyArray<string>>> = config.pointers ?? {};
+  const pointerViews = R.map(pointerEntries, (leaves, pointer) => {
+    Arr.forEach(leaves, (leaf) => {
+      if (!Arr.contains(tree.leaves, leaf)) {
+        treeError(`pointers.${pointer} names "${leaf}", which is not a leaf of this tree`);
+      }
+    });
+    return {
+      leaves: R.fromEntries(
+        Arr.map(leaves, (leaf) => [leaf, pointerView(pointer, leaf, Option.none())]),
+      ),
+      keyed: R.fromEntries(
+        Arr.flatMap(leaves, (leaf) =>
+          Arr.fromOption(
+            Option.map(
+              keyedOf(leaf),
+              (keyed) => [leaf, pointerView(pointer, leaf, Option.some(keyed))] as const,
+            ),
+          ),
+        ),
+      ),
+    };
+  });
+
   const derived = {
-    leaves: R.fromEntries(Arr.map(tree.leaves, (leaf) => [leaf, leafView(leaf)])),
-    branches: R.fromEntries(
-      Arr.map(branchConfigs, ([name, entry]) => [name, branchView(name, entry)]),
+    leaves: byName(Arr.map(tree.leaves, (leaf) => [leaf, leafView(leaf)])),
+    keyed: byName(
+      Arr.flatMap(keyedLeaves, (leaf) =>
+        Arr.fromOption(
+          Option.map(keyedOf(leaf), (keyed) => [leaf, keyedView(leaf, keyed)] as const),
+        ),
+      ),
     ),
+    branches: byName(Arr.map(branchConfigs, ([name, entry]) => [name, branchView(name, entry)])),
+    pointers: pointerViews,
     asOf,
   };
   // SAFETY: the type-erasure seam, as in makeTreeTables. Every view was built
   // above from the same tables `T` types, selecting exactly the columns
   // `TreeLeafSelection` / `TreeBranchSelection` name, in that order; only the
   // per-level precision was erased by assembling them from the runtime tree.
-  return derived as TreeViews<S, T, BR>;
+  return derived as TreeViews<S, T, BR, PV>;
 };

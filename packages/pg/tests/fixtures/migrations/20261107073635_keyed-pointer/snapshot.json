@@ -1,0 +1,583 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "f70c5c53-7579-4ef6-bf6d-fc263c85ed24",
+  "prevIds": [
+    "b1dc999f-d8fc-4abc-aeb7-4913b4b1062a"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "essay_locale"
+      ],
+      "writes": [
+        "s|tbl|ontology.essay_locale",
+        "n|tbl|ontology.essay_locale",
+        "e|tbl|ontology.essay_locale",
+        "n|rel|ontology.essay_locale",
+        "n|type|ontology.essay_locale",
+        "n|rel|ontology.essay_locale_pkey"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "live_pointer"
+      ],
+      "writes": [
+        "s|tbl|ontology.live_pointer",
+        "n|tbl|ontology.live_pointer",
+        "e|tbl|ontology.live_pointer",
+        "n|rel|ontology.live_pointer",
+        "n|type|ontology.live_pointer",
+        "n|rel|ontology.live_pointer_pkey"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "ontology",
+        "live_pointer",
+        "live_pointer_id_seq_idx"
+      ],
+      "writes": [
+        "s|idx|ontology.live_pointer_id_seq_idx",
+        "n|idx|ontology.live_pointer_id_seq_idx",
+        "e|idx|ontology.live_pointer_id_seq_idx",
+        "n|rel|ontology.live_pointer_id_seq_idx"
+      ],
+      "reads": [
+        "n|tbl|ontology.live_pointer",
+        "n|sch|ontology",
+        "n|col|ontology.live_pointer.id",
+        "n|col|ontology.live_pointer.seq"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "essay_locale"
+      ],
+      "writes": [
+        "s|fk|ontology.essay_locale.essay_locale_essay_version_fk",
+        "n|fk|ontology.essay_locale.essay_locale_essay_version_fk",
+        "e|fk|ontology.essay_locale.essay_locale_essay_version_fk",
+        "n|con|ontology.essay_locale.essay_locale_essay_version_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.essay_locale",
+        "n|sch|ontology",
+        "n|tbl|ontology.essay_version",
+        "n|sch|ontology",
+        "n|col|ontology.essay_locale.id",
+        "n|col|ontology.essay_locale.version",
+        "n|col|ontology.essay_version.id",
+        "n|col|ontology.essay_version.version",
+        "e|uniqueness|ontology.essay_version.id.version"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "live_pointer"
+      ],
+      "writes": [
+        "s|fk|ontology.live_pointer.live_pointer_id_node_id_fkey",
+        "n|fk|ontology.live_pointer.live_pointer_id_node_id_fkey",
+        "e|fk|ontology.live_pointer.live_pointer_id_node_id_fkey",
+        "n|con|ontology.live_pointer.live_pointer_id_node_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.live_pointer",
+        "n|sch|ontology",
+        "n|tbl|ontology.node",
+        "n|sch|ontology",
+        "n|col|ontology.live_pointer.id",
+        "n|col|ontology.node.id",
+        "e|uniqueness|ontology.node.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "live_pointer"
+      ],
+      "writes": [
+        "s|fk|ontology.live_pointer.live_pointer_node_version_fk",
+        "n|fk|ontology.live_pointer.live_pointer_node_version_fk",
+        "e|fk|ontology.live_pointer.live_pointer_node_version_fk",
+        "n|con|ontology.live_pointer.live_pointer_node_version_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.live_pointer",
+        "n|sch|ontology",
+        "n|tbl|ontology.node_version",
+        "n|sch|ontology",
+        "n|col|ontology.live_pointer.id",
+        "n|col|ontology.live_pointer.version",
+        "n|col|ontology.node_version.id",
+        "n|col|ontology.node_version.version",
+        "e|uniqueness|ontology.node_version.id.version"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "book_live_view"
+      ],
+      "writes": [
+        "s|view|ontology.book_live_view",
+        "n|view|ontology.book_live_view",
+        "e|view|ontology.book_live_view",
+        "n|rel|ontology.book_live_view",
+        "n|type|ontology.book_live_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "essay_live_view"
+      ],
+      "writes": [
+        "s|view|ontology.essay_live_view",
+        "n|view|ontology.essay_live_view",
+        "e|view|ontology.essay_live_view",
+        "n|rel|ontology.essay_live_view",
+        "n|type|ontology.essay_live_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "essay_locale_live_view"
+      ],
+      "writes": [
+        "s|view|ontology.essay_locale_live_view",
+        "n|view|ontology.essay_locale_live_view",
+        "e|view|ontology.essay_locale_live_view",
+        "n|rel|ontology.essay_locale_live_view",
+        "n|type|ontology.essay_locale_live_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "essay_locale_view"
+      ],
+      "writes": [
+        "s|view|ontology.essay_locale_view",
+        "n|view|ontology.essay_locale_view",
+        "e|view|ontology.essay_locale_view",
+        "n|rel|ontology.essay_locale_view",
+        "n|type|ontology.essay_locale_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "essay_locale",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "live_pointer",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "essay_locale",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "essay_locale",
+        "name": "version",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "essay_locale",
+        "name": "locale",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "essay_locale",
+        "name": "abstract",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "live_pointer",
+        "name": "seq",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": {
+          "type": "always",
+          "name": "live_pointer_seq_seq",
+          "increment": "1",
+          "startWith": "1",
+          "minValue": "1",
+          "maxValue": "9223372036854775807",
+          "cache": 1,
+          "cycle": false
+        },
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "live_pointer",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "live_pointer",
+        "name": "version",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "live_pointer",
+        "name": "at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "live_pointer",
+        "name": "actor",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "live_pointer",
+        "name": "recorded_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "live_pointer",
+        "name": "live_pointer_id_seq_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "seq",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "essay_locale",
+        "name": "essay_locale_essay_version_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "version"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "essay_version",
+        "columnsTo": [
+          "id",
+          "version"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "live_pointer",
+        "name": "live_pointer_id_node_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "node",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "live_pointer",
+        "name": "live_pointer_node_version_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "version"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "node_version",
+        "columnsTo": [
+          "id",
+          "version"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "essay_locale",
+        "name": "essay_locale_pkey",
+        "columns": [
+          "id",
+          "version",
+          "locale"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "live_pointer",
+        "name": "live_pointer_pkey",
+        "columns": [
+          "seq"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "book_live_view",
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"head_row\".\"action\", \"ontology\".\"work_version\".\"title\", \"ontology\".\"book_version\".\"pages\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\", \"pointer\".\"at\" as \"live_at\" from (select distinct on (\"ontology\".\"live_pointer\".\"id\") \"id\", \"version\" as \"pointer_version\", \"at\" from \"ontology\".\"live_pointer\" where \"ontology\".\"live_pointer\".\"at\" <= now() order by \"ontology\".\"live_pointer\".\"id\", \"ontology\".\"live_pointer\".\"seq\" desc) \"pointer\" inner join \"ontology\".\"node_version\" on ((\"pointer\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"pointer\".\"pointer_version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"pointer\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"work_version\" on ((\"pointer\".\"id\" = \"ontology\".\"work_version\".\"id\") and (\"pointer\".\"pointer_version\" = \"ontology\".\"work_version\".\"version\")) inner join \"ontology\".\"book_version\" on ((\"pointer\".\"id\" = \"ontology\".\"book_version\".\"id\") and (\"pointer\".\"pointer_version\" = \"ontology\".\"book_version\".\"version\")) inner join (select \"id\", max(\"version\") as \"head_version\" from \"ontology\".\"node_version\" group by \"ontology\".\"node_version\".\"id\") \"head\" on \"pointer\".\"id\" = \"head\".\"id\" inner join \"ontology\".\"node_version\" \"head_row\" on ((\"head\".\"id\" = \"head_row\".\"id\") and (\"head\".\"head_version\" = \"head_row\".\"version\")) inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"pointer\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0))",
+        "with": null,
+        "withNoData": null,
+        "using": null,
+        "tablespace": null,
+        "materialized": false,
+        "entityType": "views"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "essay_live_view",
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"head_row\".\"action\", \"ontology\".\"work_version\".\"title\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\", \"pointer\".\"at\" as \"live_at\" from (select distinct on (\"ontology\".\"live_pointer\".\"id\") \"id\", \"version\" as \"pointer_version\", \"at\" from \"ontology\".\"live_pointer\" where \"ontology\".\"live_pointer\".\"at\" <= now() order by \"ontology\".\"live_pointer\".\"id\", \"ontology\".\"live_pointer\".\"seq\" desc) \"pointer\" inner join \"ontology\".\"node_version\" on ((\"pointer\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"pointer\".\"pointer_version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"pointer\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"work_version\" on ((\"pointer\".\"id\" = \"ontology\".\"work_version\".\"id\") and (\"pointer\".\"pointer_version\" = \"ontology\".\"work_version\".\"version\")) inner join \"ontology\".\"essay_version\" on ((\"pointer\".\"id\" = \"ontology\".\"essay_version\".\"id\") and (\"pointer\".\"pointer_version\" = \"ontology\".\"essay_version\".\"version\")) inner join (select \"id\", max(\"version\") as \"head_version\" from \"ontology\".\"node_version\" group by \"ontology\".\"node_version\".\"id\") \"head\" on \"pointer\".\"id\" = \"head\".\"id\" inner join \"ontology\".\"node_version\" \"head_row\" on ((\"head\".\"id\" = \"head_row\".\"id\") and (\"head\".\"head_version\" = \"head_row\".\"version\")) inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"pointer\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0))",
+        "with": null,
+        "withNoData": null,
+        "using": null,
+        "tablespace": null,
+        "materialized": false,
+        "entityType": "views"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "essay_locale_live_view",
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"head_row\".\"action\", \"ontology\".\"work_version\".\"title\", \"ontology\".\"essay_locale\".\"locale\" as \"locale\", \"ontology\".\"essay_locale\".\"abstract\" as \"abstract\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\", \"pointer\".\"at\" as \"live_at\" from (select distinct on (\"ontology\".\"live_pointer\".\"id\") \"id\", \"version\" as \"pointer_version\", \"at\" from \"ontology\".\"live_pointer\" where \"ontology\".\"live_pointer\".\"at\" <= now() order by \"ontology\".\"live_pointer\".\"id\", \"ontology\".\"live_pointer\".\"seq\" desc) \"pointer\" inner join \"ontology\".\"node_version\" on ((\"pointer\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"pointer\".\"pointer_version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"pointer\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"work_version\" on ((\"pointer\".\"id\" = \"ontology\".\"work_version\".\"id\") and (\"pointer\".\"pointer_version\" = \"ontology\".\"work_version\".\"version\")) inner join \"ontology\".\"essay_version\" on ((\"pointer\".\"id\" = \"ontology\".\"essay_version\".\"id\") and (\"pointer\".\"pointer_version\" = \"ontology\".\"essay_version\".\"version\")) left join \"ontology\".\"essay_locale\" on ((\"pointer\".\"id\" = \"ontology\".\"essay_locale\".\"id\") and (\"pointer\".\"pointer_version\" = \"ontology\".\"essay_locale\".\"version\")) inner join (select \"id\", max(\"version\") as \"head_version\" from \"ontology\".\"node_version\" group by \"ontology\".\"node_version\".\"id\") \"head\" on \"pointer\".\"id\" = \"head\".\"id\" inner join \"ontology\".\"node_version\" \"head_row\" on ((\"head\".\"id\" = \"head_row\".\"id\") and (\"head\".\"head_version\" = \"head_row\".\"version\")) inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"pointer\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0))",
+        "with": null,
+        "withNoData": null,
+        "using": null,
+        "tablespace": null,
+        "materialized": false,
+        "entityType": "views"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "essay_locale_view",
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"work_version\".\"title\", \"ontology\".\"essay_locale\".\"locale\" as \"locale\", \"ontology\".\"essay_locale\".\"abstract\" as \"abstract\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from (select \"id\", max(\"version\") as \"head_version\" from \"ontology\".\"node_version\" group by \"ontology\".\"node_version\".\"id\") \"head\" inner join \"ontology\".\"node_version\" on ((\"head\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"head\".\"head_version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"head\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"work_version\" on ((\"head\".\"id\" = \"ontology\".\"work_version\".\"id\") and (\"head\".\"head_version\" = \"ontology\".\"work_version\".\"version\")) inner join \"ontology\".\"essay_version\" on ((\"head\".\"id\" = \"ontology\".\"essay_version\".\"id\") and (\"head\".\"head_version\" = \"ontology\".\"essay_version\".\"version\")) left join \"ontology\".\"essay_locale\" on ((\"head\".\"id\" = \"ontology\".\"essay_locale\".\"id\") and (\"head\".\"head_version\" = \"ontology\".\"essay_locale\".\"version\")) inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"head\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0))",
+        "with": null,
+        "withNoData": null,
+        "using": null,
+        "tablespace": null,
+        "materialized": false,
+        "entityType": "views"
+      }
+    }
+  ]
+}

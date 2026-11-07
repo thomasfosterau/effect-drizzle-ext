@@ -39,6 +39,20 @@ export type LevelKind = "plain" | "fact-scoped";
 
 /* oxlint-disable effect/prefer-option-over-null -- a declaration literal threaded into the table derivation, like DbColumn: every member is read once at module load and converted to `Option` on the derived TreeLevel */
 /**
+ * A leaf's **keyed fact level**: columns held once per `(id, version, key)`
+ * rather than once per version, such as a localised leaf's translated
+ * columns keyed by locale tag. `name` names the key column and the level (a
+ * `${leaf}_${name}` table); `columns` are `dbColumn`-annotated fields, kept
+ * out of the leaf's own (shared) columns.
+ */
+export interface KeyedSpec {
+  /** The key column's name and the level's table suffix (`locale`, say). */
+  readonly name: string;
+  /** The keyed columns: `dbColumn`-annotated fields, one value per key. */
+  readonly columns: Schema.Struct.Fields;
+}
+
+/**
  * One level's declaration, generic in the names its `parent` may take and in
  * the leaf payload. Optional members are `?: T | undefined` so a caller can
  * forward its own optional.
@@ -56,6 +70,8 @@ export interface LevelSpec<Parent extends string = string, Leaf = unknown> {
   readonly columns?: Schema.Struct.Fields | undefined;
   /** The leaf payload. Present: a concrete leaf; absent: a marker level. */
   readonly leaf?: Leaf | undefined;
+  /** A leaf's keyed fact level (see {@link KeyedSpec}); a marker can't carry one. */
+  readonly keyed?: KeyedSpec | undefined;
 }
 /* oxlint-enable effect/prefer-option-over-null */
 
@@ -115,6 +131,11 @@ export interface TreeLevel<S> {
   readonly levelColumns: Readonly<Record<string, DbColumn>>;
   /** A leaf's own domain columns, keyed by field, in order; empty for a marker. */
   readonly leafColumns: Readonly<Record<string, DbColumn>>;
+  /** A leaf's keyed fact level: its key name and columns; none for most leaves. */
+  readonly keyed: Option.Option<{
+    readonly name: string;
+    readonly columns: Readonly<Record<string, DbColumn>>;
+  }>;
 }
 
 /**
@@ -302,13 +323,40 @@ export const buildTree = <
       onNone: () => ({}),
       onSome: (leaf) => reader.leafColumns(leaf, name),
     });
+  const keyedOf = (name: LevelName<S>) =>
+    Option.map(Option.fromUndefinedOr(entryOf(name).keyed), (keyed) => {
+      if (!isLeafName(name)) {
+        treeError(`marker level "${name}" declares a keyed level; only a leaf can carry one`);
+      }
+      if (keyed.name === "") treeError(`leaf "${name}" declares a keyed level with an empty name`);
+      const columns = reader.levelColumns(keyed.columns);
+      const bare = Arr.filter(R.keys(keyed.columns), (key) => !R.has(columns, key));
+      if (Arr.isReadonlyArrayNonEmpty(bare)) {
+        treeError(
+          `leaf "${name}" declares keyed columns with no dbColumn annotation (${bare.join(", ")})`,
+        );
+      }
+      if (!Arr.isReadonlyArrayNonEmpty(R.keys(columns))) {
+        treeError(`leaf "${name}"'s keyed level "${keyed.name}" declares no columns`);
+      }
+      return { name: keyed.name, columns };
+    });
   const ownColumnsFor = (name: LevelName<S>) => {
     const levelColumns = levelColumnsOf(name);
     const leafColumns = leafColumnsOf(name);
-    const path: ReadonlyArray<PathColumn> = Arr.map(
-      [...R.toEntries(levelColumns), ...R.toEntries(leafColumns)],
-      ([key, meta]) => ({ level: name, key, column: meta.column }),
-    );
+    const keyed = keyedOf(name);
+    const toPath = (columns: Readonly<Record<string, DbColumn>>): ReadonlyArray<PathColumn> =>
+      Arr.map(R.toEntries(columns), ([key, meta]) => ({ level: name, key, column: meta.column }));
+    // A keyed level's key column and its columns reach the keyed views, so
+    // they share the path's namespace.
+    const path: ReadonlyArray<PathColumn> = [
+      ...toPath(levelColumns),
+      ...toPath(leafColumns),
+      ...Option.match(keyed, {
+        onNone: (): ReadonlyArray<PathColumn> => [],
+        onSome: ({ name: key, columns }) => [{ level: name, key, column: key }, ...toPath(columns)],
+      }),
+    ];
     Arr.forEach(path, ({ key, column }) => {
       if (Arr.contains(RESERVED_COLUMN_NAMES, key) || Arr.contains(RESERVED_COLUMN_NAMES, column)) {
         treeError(
@@ -316,7 +364,7 @@ export const buildTree = <
         );
       }
     });
-    return { levelColumns, leafColumns, path };
+    return { levelColumns, leafColumns, keyed, path };
   };
   // Read and check every level's own columns once, in declaration order,
   // before any path is compared.
@@ -324,7 +372,7 @@ export const buildTree = <
   const ownOf = (name: LevelName<S>) =>
     Option.getOrElse(
       Arr.findFirst(ownColumns, (own) => own.name === name),
-      () => ({ name, levelColumns: {}, leafColumns: {}, path: [] }),
+      () => ({ name, levelColumns: {}, leafColumns: {}, keyed: Option.none(), path: [] }),
     );
 
   // Every view joins a leaf's whole root-to-leaf path, so a key or column name
@@ -351,6 +399,7 @@ export const buildTree = <
     branch: Option.getOrElse(Arr.head(ancestorsFor(name)), () => name),
     levelColumns: ownOf(name).levelColumns,
     leafColumns: ownOf(name).leafColumns,
+    keyed: ownOf(name).keyed,
   }));
   return {
     spec,

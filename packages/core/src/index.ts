@@ -65,6 +65,7 @@ export { DerivationError };
 export type {
   AnyTreeColumnsMeta,
   CheckedTreeSpec,
+  KeyedSpec,
   LevelColumnsMeta,
   LeafName,
   LevelKind,
@@ -596,15 +597,26 @@ type EntryFields<E, K extends "columns" | "leaf"> = E extends { readonly [P in K
     : Record<never, never>
   : Record<never, never>;
 
+/** The fields an entry's keyed level declares; `{}` when it has none. */
+export type EntryKeyedFields<E> = E extends { readonly keyed?: infer K }
+  ? Exclude<K, undefined> extends { readonly columns: infer F }
+    ? F extends Schema.Struct.Fields
+      ? F
+      : Record<never, never>
+    : Record<never, never>
+  : Record<never, never>;
+
 /**
  * The typed column metadata of a {@link defineTree} declaration `S`: per level,
- * the `DbColumn` maps its level columns and its leaf fields carry. The phantom
+ * the `DbColumn` maps its level columns, its leaf fields and its keyed level
+ * carry. The phantom
  * a `Tree` built by `defineTree` holds for the table derivation.
  */
 export type FieldsTreeMeta<S> = {
   readonly [K in keyof S]: {
     readonly level: FieldColumnsMetaOf<EntryFields<S[K], "columns">>;
     readonly leaf: FieldColumnsMetaOf<EntryFields<S[K], "leaf">>;
+    readonly keyed: FieldColumnsMetaOf<EntryKeyedFields<S[K]>>;
   };
 };
 
