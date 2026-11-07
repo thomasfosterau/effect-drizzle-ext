@@ -183,6 +183,8 @@ The version-chain discipline, Drizzle-concrete, over the tables core's `makeTree
 | `restoreVersion(id, n, { actor, ... })` | Reads the whole snapshot at `n` (every level) first, and fails `VersionNotFound` before writing anything if any level is missing. Then it appends that snapshot as an `update`. |
 | `getVersion(id, n)` / `history(id, limit?)` | One version's `{ version, action, timestamp, state }`. The chain oldest first, capped at `MAX_HISTORY_LIMIT` (1000). |
 
+**A keyed leaf** (core's `keyed: { name, columns }`, such as a localised leaf's locales) also writes its keyed level on every append. `create` takes `keyed`, the whole level. `update` / `restore` take `keyed`, a per-key tri-state patch: a patch updates a key, `null` drops it, and an absent key carries it forward. `delete` and `restoreVersion` carry or restore every key, and `getVersion` returns them as `keyed`, keyed by key (`{}` for none).
+
 **The expected-version precondition.** Every write to an existing node takes `expectedVersion`, the head its caller last read. A moved head fails `StaleVersion { expected, current }` and nothing is written. A writer racing between its read and its append loses the root's `(id, version)` primary key and fails `VersionConflict`; the transaction is aborted for the caller to roll back. `actor` is a required `string | undefined`, so every caller states it. State is keyed by field across the leaf's whole path. The error classes (`NodeNotFound`, `VersionNotFound`, `NodeAlreadyExists`, `VersionConflict`, `StaleVersion`, and `BrokenChain` as a defect) carry pulpit's names and fields.
 
 ```ts
