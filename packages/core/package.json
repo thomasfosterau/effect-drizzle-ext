@@ -102,6 +102,9 @@
     },
     "access": "public"
   },
+  "dependencies": {
+    "@thomasfosterau/effect-ext": "catalog:"
+  },
   "devDependencies": {
     "@effect/language-service": "catalog:",
     "@thomasfosterau/effect-jsonapi": "catalog:",
