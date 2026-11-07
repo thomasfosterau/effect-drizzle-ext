@@ -142,6 +142,7 @@ export interface ChainTables {
     Record<string, { readonly stable: PgTable; readonly version: PgTable }>
   >;
   readonly facts: Readonly<Record<string, Readonly<Record<string, PgTable>>>>;
+  readonly keyed: Readonly<Record<string, PgTable>>;
 }
 
 /** The tree facts the chain reads (a `defineTree` result satisfies it). */
@@ -151,6 +152,7 @@ export interface ChainTree<S> {
   readonly levels: ReadonlyArray<{
     readonly name: string;
     readonly ancestors: ReadonlyArray<string>;
+    readonly keyed: Option.Option<{ readonly name: string }>;
   }>;
 }
 
@@ -232,6 +234,41 @@ export type ChainPatch<S, T extends ChainTables, K> = {
 /** Leaf `K`'s state at version 0: every required column, the rest optional. */
 export type ChainCreateState<S, T extends ChainTables, K> = Simplify<PathCreate<T, PathOf<S, K>>>;
 
+/** The key column's name a leaf entry's keyed level declares; `never` when it has none. */
+type KeyedNameOf<E> = E extends { readonly keyed?: infer K }
+  ? Exclude<K, undefined> extends { readonly name: infer N extends string }
+    ? N
+    : never
+  : never;
+
+/**
+ * One key's columns in leaf `K`'s keyed level (a locale's translated
+ * columns); `never` for a leaf with no keyed level.
+ */
+export type ChainKeyedState<S, T extends ChainTables, K> = K extends keyof T["keyed"]
+  ? Simplify<Omit<RowOf<T["keyed"][K]>, "id" | "version" | KeyedNameOf<MemberOf<S, K>>>>
+  : never;
+
+/**
+ * Leaf `K`'s keyed level at one version: each key it carries, and that key's
+ * columns. A version that carries none is `{}`.
+ */
+export type ChainKeyedLevel<S, T extends ChainTables, K> = {
+  readonly [key: string]: ChainKeyedState<S, T, K>;
+};
+
+/**
+ * A per-key tri-state patch over a {@link ChainKeyedLevel}: a key's patch
+ * updates its columns (from none for a key the head lacks), `null` drops the
+ * key, and an absent or `undefined` key carries it forward.
+ */
+export type ChainKeyedPatch<S, T extends ChainTables, K> = {
+  readonly [key: string]:
+    | { readonly [F in keyof ChainKeyedState<S, T, K>]?: ChainKeyedState<S, T, K>[F] | undefined }
+    | null
+    | undefined;
+};
+
 /** The root identity table's injected extras (`slug`, say), as written at create. */
 export type ChainIdentityExtras<T extends ChainTables> = Omit<
   InsertOf<T["root"]["identity"]>,
@@ -267,21 +304,29 @@ export interface ChainPrecondition {
 }
 
 /** The input to {@link LeafChain.create}. */
-export interface ChainCreateInput<State, IE, VE> extends ChainActor<VE> {
+export interface ChainCreateInput<State, IE, VE, KL = never> extends ChainActor<VE> {
   /** A caller-supplied node id; minted (`gen_random_uuid()`) when absent. */
   readonly id?: string | undefined;
   /** The leaf's full state at version 0. */
   readonly state: State;
+  /** A keyed leaf's keyed level at version 0 (every key it carries); absent, none. */
+  readonly keyed?: KL | undefined;
   /** The root identity table's injected extras. */
   readonly identity?: IE | undefined;
 }
 
 /** The input to {@link LeafChain.update} and {@link LeafChain.restore}. */
-export interface ChainUpdateInput<Patch, VE> extends ChainActor<VE>, ChainPrecondition {
+export interface ChainUpdateInput<Patch, VE, KP = never> extends ChainActor<VE>, ChainPrecondition {
   /** The node to append to. */
   readonly id: string;
   /** The tri-state patch over the head's state. */
   readonly patch: Patch;
+  /**
+   * A keyed leaf's per-key patch ({@link ChainKeyedPatch}); absent, every key
+   * carries forward. A write touching one key still appends one version of
+   * the whole node.
+   */
+  readonly keyed?: KP | undefined;
 }
 
 /** The options {@link LeafChain.delete} and {@link LeafChain.restoreVersion} take. */
@@ -295,15 +340,27 @@ export interface ChainWrite {
 }
 
 /** One version's reconstructed state: the root entry plus every level's columns. */
-export interface ChainSnapshot<State> extends VersionChainEntry {
+export interface ChainSnapshot<State, KL = Record<never, never>> extends VersionChainEntry {
   readonly state: State;
+  /** A keyed leaf's keyed level at this version; `{}` for none (and for a leaf with no keyed level). */
+  readonly keyed: KL;
 }
 
 /** The chain operations for one leaf. `E` is the driver's query failure; `I` the `CurrentTransaction` key. */
-export interface LeafChain<State, CreateState, Patch, IE, VE, E, I> {
+export interface LeafChain<
+  State,
+  CreateState,
+  Patch,
+  IE,
+  VE,
+  E,
+  I,
+  KL = Record<never, never>,
+  KP = never,
+> {
   /** Insert the node and version 0 (`create`) at every level. Fails {@link NodeAlreadyExists} on a taken id. */
   readonly create: (
-    input: ChainCreateInput<CreateState, IE, VE>,
+    input: ChainCreateInput<CreateState, IE, VE, KL>,
   ) => Effect.Effect<ChainWrite, E | NodeAlreadyExists | VersionConflict, I>;
   /**
    * Append an `update` version carrying the patch over the head's state.
@@ -311,11 +368,11 @@ export interface LeafChain<State, CreateState, Patch, IE, VE, E, I> {
    * {@link StaleVersion} when `expectedVersion` is not the head.
    */
   readonly update: (
-    input: ChainUpdateInput<Patch, VE>,
+    input: ChainUpdateInput<Patch, VE, KP>,
   ) => Effect.Effect<ChainWrite, E | NodeNotFound | StaleVersion | VersionConflict, I>;
   /** {@link update}, except a tombstone does not fail: the explicit restore surface (`VERSION-CHAIN-006`). */
   readonly restore: (
-    input: ChainUpdateInput<Patch, VE>,
+    input: ChainUpdateInput<Patch, VE, KP>,
   ) => Effect.Effect<ChainWrite, E | NodeNotFound | StaleVersion | VersionConflict, I>;
   /**
    * Append a `delete` version carrying every column forward. Idempotent: on a
@@ -345,7 +402,7 @@ export interface LeafChain<State, CreateState, Patch, IE, VE, E, I> {
   readonly getVersion: (
     id: string,
     version: bigint,
-  ) => Effect.Effect<ChainSnapshot<State>, E | VersionNotFound, I>;
+  ) => Effect.Effect<ChainSnapshot<State, KL>, E | VersionNotFound, I>;
   /**
    * The chain, oldest first, at most `limit` entries (default and cap
    * {@link MAX_HISTORY_LIMIT}). Fails {@link NodeNotFound} when the id has no
@@ -366,13 +423,54 @@ export type VersionChain<S, T extends ChainTables, E, I> = {
     ChainIdentityExtras<T>,
     ChainVersionExtras<T>,
     E,
-    I
+    I,
+    ChainKeyedLevel<S, T, K>,
+    ChainKeyedPatch<S, T, K>
   >;
 };
 
 /** A runtime row: column values keyed by field. */
 // oxlint-disable-next-line effect/no-unsafe-dictionary-type -- a Drizzle row seam: values are whatever the consumer's column builders decode; the typed surface is `ChainState`
 type Row = Readonly<Record<string, unknown>>;
+
+/** A keyed level as the runtime holds it: each key's columns, keyed by key. */
+// oxlint-disable-next-line effect/no-unsafe-dictionary-type -- the runtime form of `ChainKeyedLevel`: each key's `Row`, typed per leaf on the surface
+type KeyedRows = Readonly<Record<string, Row>>;
+
+// oxlint-disable-next-line effect/prefer-option-over-null, effect/no-unsafe-dictionary-type -- the runtime form of `ChainKeyedPatch`: `null` drops a key, `undefined` carries it, each key's `Row` typed per leaf on the surface
+type KeyedPatchRows = Readonly<Record<string, Row | null | undefined>>;
+
+/** What one version stores: the shared state and the keyed level. */
+interface Content {
+  readonly state: Row;
+  readonly keyed: KeyedRows;
+}
+
+/**
+ * Apply a per-key patch: a key's patch updates its columns (from none for a
+ * new key), `null` drops the key, `undefined` carries it forward.
+ */
+const applyKeyedPatch = (level: KeyedRows, patch: Option.Option<KeyedPatchRows>): KeyedRows =>
+  R.reduce(
+    Option.getOrElse(patch, (): KeyedPatchRows => ({})),
+    level,
+    (acc, change, key) =>
+      change === undefined
+        ? acc
+        : change === null
+          ? R.remove(acc, key)
+          : {
+              ...acc,
+              [key]: { ...Option.getOrElse(R.get(acc, key), () => ({})), ...present(change) },
+            },
+  );
+
+/** A create's keyed level: each key's present columns, `{}` when absent. */
+const initialKeyed = (level: Option.Option<KeyedRows>): KeyedRows =>
+  R.map(
+    Option.getOrElse(level, (): KeyedRows => ({})),
+    (values) => present(values),
+  );
 
 /** A root version row as the chain reads it: decoded at the driver boundary. */
 const ChainEntryRow = Schema.Struct({
@@ -441,6 +539,14 @@ const onUniqueViolation =
  * row and every level's stable row, `type` set to the leaf. State is keyed by
  * field across the whole path (the tree rejects a key two levels of one path
  * share).
+ *
+ * A keyed leaf (core's `keyed: { name, columns }`) also writes its keyed
+ * level on every append: one `${leaf}_${name}` row per key. `create` takes the
+ * whole level (`keyed`), `update` / `restore` a per-key tri-state patch (a
+ * patch updates a key, `null` drops it, an absent key carries it forward),
+ * `delete` and `restoreVersion` carry or restore every key, and a snapshot
+ * reads it back as `keyed`, keyed by key (`{}` for none), pulpit#56's
+ * `LocaleStates`.
  *
  * Throws `DerivationError` at module load when the tables don't carry the
  * columns `makeTreeTables` derives. Query failures travel in the Effect error
@@ -517,6 +623,22 @@ export const makeVersionChain = <
       },
     );
     const path = [...ancestors, leaf];
+    // A keyed leaf's key name, table and keyed columns.
+    const keyed = Option.flatMap(
+      Arr.findFirst(tree.levels, (level) => level.name === leaf),
+      (level) =>
+        Option.map(level.keyed, ({ name }) => {
+          const table = Option.getOrElse(R.get(tables.keyed, leaf), () =>
+            tablesError(`leaf "${leaf}" has no keyed table; were the tables built from this tree?`),
+          );
+          return {
+            name,
+            table,
+            keyColumn: columnOf(table, name),
+            columns: Arr.filter(columnKeys(table), (key) => key !== name),
+          };
+        }),
+    );
     const levels = Arr.map(path, (name) => ({
       name,
       ...levelTables(name),
@@ -572,7 +694,7 @@ export const makeVersionChain = <
       )
         .where(and(eq(root.id, id), eq(root.version, version), eq(identityType, leaf)))
         .limit(1);
-      return yield* Effect.orDie(
+      const found = yield* Effect.orDie(
         Effect.transposeOption(
           Option.map(Arr.head(rows), ({ version: v, action, timestamp, ...state }) =>
             Effect.map(decodeEntry({ version: v, action, timestamp }), (entry) => ({
@@ -582,6 +704,24 @@ export const makeVersionChain = <
           ),
         ),
       );
+      if (Option.isNone(found)) return Option.none();
+      return Option.some({ ...found.value, keyed: yield* keyedAt(id, version) });
+    });
+
+    /** The keyed level at `(id, version)`: each key's columns, keyed by key. */
+    const keyedAt = Effect.fn(`${leaf}.keyedAt`)(function* (id: string, version: bigint) {
+      if (Option.isNone(keyed)) return R.empty<string, Row>();
+      const tx = yield* CurrentTransaction;
+      const { table, keyColumn, columns } = keyed.value;
+      const rows: ReadonlyArray<Row> = yield* tx
+        .select({
+          key: keyColumn,
+          ...R.fromEntries(Arr.map(columns, (key) => [key, columnOf(table, key)] as const)),
+        })
+        .from(table)
+        .where(and(eq(columnOf(table, "id"), id), eq(columnOf(table, "version"), version)))
+        .orderBy(asc(keyColumn));
+      return R.fromEntries(Arr.map(rows, ({ key, ...values }) => [String(key), values] as const));
     });
 
     /** The head's snapshot; a head with no snapshot is a broken chain (a defect). */
@@ -601,6 +741,7 @@ export const makeVersionChain = <
       version: bigint,
       action: VersionAction,
       state: Row,
+      keyedLevel: KeyedRows,
       who: ChainActor<Row>,
     ) {
       const tx = yield* CurrentTransaction;
@@ -629,6 +770,15 @@ export const makeVersionChain = <
           }),
         { concurrency: 1, discard: true },
       );
+      yield* Option.match(keyed, {
+        onNone: () => Effect.void,
+        onSome: ({ name, table }) =>
+          Effect.forEach(
+            R.toEntries(keyedLevel),
+            ([key, values]) => tx.insert(table).values({ ...values, id, version, [name]: key }),
+            { concurrency: 1, discard: true },
+          ),
+      });
     });
 
     /** Append at `previous + 1` after checking the precondition against that same head. */
@@ -636,7 +786,7 @@ export const makeVersionChain = <
       id: string,
       previous: VersionChainEntry,
       action: VersionAction,
-      state: Row,
+      content: Content,
       options: ChainWriteOptions<Row>,
     ) =>
       options.expectedVersion !== undefined && options.expectedVersion !== previous.version
@@ -648,10 +798,13 @@ export const makeVersionChain = <
               current: previous.version,
             }),
           )
-        : Effect.as(writeVersion(id, previous.version + 1n, action, state, options), {
-            id,
-            version: previous.version + 1n,
-          });
+        : Effect.as(
+            writeVersion(id, previous.version + 1n, action, content.state, content.keyed, options),
+            {
+              id,
+              version: previous.version + 1n,
+            },
+          );
 
     const mintId = Effect.fn(`${leaf}.mintId`)(function* () {
       const tx = yield* CurrentTransaction;
@@ -661,7 +814,9 @@ export const makeVersionChain = <
       );
     });
 
-    const create = Effect.fn(`${leaf}.create`)(function* (input: ChainCreateInput<Row, Row, Row>) {
+    const create = Effect.fn(`${leaf}.create`)(function* (
+      input: ChainCreateInput<Row, Row, Row, KeyedRows>,
+    ) {
       const tx = yield* CurrentTransaction;
       const id = input.id ?? (yield* mintId());
       if (input.id !== undefined && Option.isSome(yield* headAnyType(id))) {
@@ -682,7 +837,14 @@ export const makeVersionChain = <
         concurrency: 1,
         discard: true,
       });
-      yield* writeVersion(id, 0n, "create", present(input.state), input);
+      yield* writeVersion(
+        id,
+        0n,
+        "create",
+        present(input.state),
+        initialKeyed(Option.fromUndefinedOr(input.keyed)),
+        input,
+      );
       return { id, version: 0n };
     });
 
@@ -697,7 +859,7 @@ export const makeVersionChain = <
       return Arr.head(rows);
     });
 
-    const merge = (input: ChainUpdateInput<Row, Row>, allowDeleted: boolean) =>
+    const merge = (input: ChainUpdateInput<Row, Row, KeyedPatchRows>, allowDeleted: boolean) =>
       Effect.gen(function* () {
         const found = yield* current(input.id);
         if (Option.isNone(found) || (found.value.action === "delete" && !allowDeleted)) {
@@ -707,16 +869,23 @@ export const makeVersionChain = <
           input.id,
           found.value,
           "update",
-          { ...found.value.state, ...present(input.patch) },
+          {
+            state: { ...found.value.state, ...present(input.patch) },
+            keyed: applyKeyedPatch(found.value.keyed, Option.fromUndefinedOr(input.keyed)),
+          },
           input,
         );
       });
 
-    const update = Effect.fn(`${leaf}.update`)(function* (input: ChainUpdateInput<Row, Row>) {
+    const update = Effect.fn(`${leaf}.update`)(function* (
+      input: ChainUpdateInput<Row, Row, KeyedPatchRows>,
+    ) {
       return yield* merge(input, false);
     });
 
-    const restore = Effect.fn(`${leaf}.restore`)(function* (input: ChainUpdateInput<Row, Row>) {
+    const restore = Effect.fn(`${leaf}.restore`)(function* (
+      input: ChainUpdateInput<Row, Row, KeyedPatchRows>,
+    ) {
       return yield* merge(input, true);
     });
 
@@ -729,7 +898,7 @@ export const makeVersionChain = <
       if (found.value.action === "delete") {
         return { id, version: found.value.version, alreadyDeleted: true };
       }
-      const written = yield* appendNext(id, found.value, "delete", found.value.state, options);
+      const written = yield* appendNext(id, found.value, "delete", found.value, options);
       return { ...written, alreadyDeleted: false };
     });
 
@@ -753,7 +922,7 @@ export const makeVersionChain = <
       // `update`, not a fourth action: a restore is an ordinary edit whose
       // content came from history, and `action` stays the currency /
       // tombstone axis every fail-closed view reads.
-      return yield* appendNext(id, latest.value, "update", found.value.state, options);
+      return yield* appendNext(id, latest.value, "update", found.value, options);
     });
 
     const history = Effect.fn(`${leaf}.history`)(function* (

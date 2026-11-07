@@ -505,3 +505,77 @@ describe("the concurrent-writer race", () => {
     expect(history.map((entry) => entry.version)).toEqual([0n, 1n]);
   });
 });
+
+describe("a keyed (localised) leaf's keyed level", () => {
+  const ESSAY = "00000000-0000-4000-8000-0000000000a3";
+  const createEssay = chain.essay.create({
+    id: ESSAY,
+    state: { title: "On Sand" },
+    keyed: { en: { abstract: "Hello" }, fr: { abstract: "Bonjour" } },
+    actor: ACTOR,
+  });
+
+  it("writes the keyed level at create and reads it in the snapshot", async () => {
+    await run(
+      Effect.gen(function* () {
+        yield* createEssay;
+        const snapshot = yield* chain.essay.getVersion(ESSAY, 0n);
+        expect(snapshot.keyed).toEqual({ en: { abstract: "Hello" }, fr: { abstract: "Bonjour" } });
+        expect((yield* chain.book.create({ state: { title: "x" }, actor: ACTOR })).version).toBe(
+          0n,
+        );
+      }),
+    );
+  });
+
+  it("carries untouched keys forward, updates a patched key, drops a null one, adds a new one", async () => {
+    await run(
+      Effect.gen(function* () {
+        yield* createEssay;
+        yield* chain.essay.update({
+          id: ESSAY,
+          patch: {},
+          keyed: { en: { abstract: "Hi" }, fr: null, de: { abstract: "Hallo" } },
+          actor: ACTOR,
+        });
+        expect((yield* chain.essay.getVersion(ESSAY, 1n)).keyed).toEqual({
+          de: { abstract: "Hallo" },
+          en: { abstract: "Hi" },
+        });
+        yield* chain.essay.update({ id: ESSAY, patch: { title: "On Dunes" }, actor: ACTOR });
+        const carried = yield* chain.essay.getVersion(ESSAY, 2n);
+        expect([carried.state, carried.keyed]).toEqual([
+          { title: "On Dunes" },
+          { de: { abstract: "Hallo" }, en: { abstract: "Hi" } },
+        ]);
+      }),
+    );
+  });
+
+  it("carries every key through a tombstone and restores them with restoreVersion", async () => {
+    await run(
+      Effect.gen(function* () {
+        yield* createEssay;
+        yield* chain.essay.update({ id: ESSAY, patch: {}, keyed: { fr: null }, actor: ACTOR });
+        yield* chain.essay.delete(ESSAY, { actor: ACTOR });
+        expect((yield* chain.essay.getVersion(ESSAY, 2n)).keyed).toEqual({
+          en: { abstract: "Hello" },
+        });
+        yield* chain.essay.restoreVersion(ESSAY, 0n, { actor: ACTOR });
+        expect((yield* chain.essay.getVersion(ESSAY, 3n)).keyed).toEqual({
+          en: { abstract: "Hello" },
+          fr: { abstract: "Bonjour" },
+        });
+      }),
+    );
+  });
+
+  it("reads `{}` for a version that carries no key", async () => {
+    await run(
+      Effect.gen(function* () {
+        yield* chain.essay.create({ id: ESSAY, state: { title: "Bare" }, actor: ACTOR });
+        expect((yield* chain.essay.getVersion(ESSAY, 0n)).keyed).toEqual({});
+      }),
+    );
+  });
+});
