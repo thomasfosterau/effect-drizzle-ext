@@ -109,6 +109,12 @@ describe("makeSubtypeTables", () => {
     expect(
       versionCfg.foreignKeys.some((fk) => fk.getName() === "widget_version_entity_version_fk"),
     ).toBe(true);
+    // ...which cascades on delete, so erasing a node removes the whole chain
+    // (effect-drizzle-ext#145)
+    expect(
+      versionCfg.foreignKeys.find((fk) => fk.getName() === "widget_version_entity_version_fk")
+        ?.onDelete,
+    ).toBe("cascade");
     // the stable row's own `id` → parent stable `id` FK — resolving its name
     // forces the lazily-deferred `.references()` callback to run, not just
     // be declared.

@@ -321,11 +321,15 @@ export const makeSubtypeTables =
             name: `${name}_version_pkey`,
             columns: [table.id, table.version],
           }),
+          // Cascade on delete, as the stable `id` FK does: erasing a node
+          // deletes its root version rows, and without the cascade this arc's
+          // check would refuse it before the stable cascade reached the level
+          // version rows (effect-drizzle-ext#145).
           foreignKey({
             name: `${name}_version_${getTableName(parentVersion)}_fk`,
             columns: [table.id, table.version],
             foreignColumns: [parentVersion.id, parentVersion.version],
-          }),
+          }).onDelete("cascade"),
         ];
         return extraConstraints ? [...constraints, ...extraConstraints(table)] : constraints;
       },

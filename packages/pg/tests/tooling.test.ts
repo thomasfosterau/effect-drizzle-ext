@@ -63,7 +63,7 @@ describe("checkMigrationDrift", () => {
     const report = await run(
       checkMigrationDrift({ schema: fixtureSchema, migrationsDir: FIXTURE_MIGRATIONS }),
     );
-    expect(report).toEqual({ snapshots: 4, baseRef: Option.none() });
+    expect(report).toEqual({ snapshots: 5, baseRef: Option.none() });
   });
 
   it("treats an explicit `base: undefined` as an absent base", async () => {
@@ -74,7 +74,7 @@ describe("checkMigrationDrift", () => {
         base: undefined,
       }),
     );
-    expect(report).toEqual({ snapshots: 4, baseRef: Option.none() });
+    expect(report).toEqual({ snapshots: 5, baseRef: Option.none() });
   });
 
   it("reads a full v8 snapshot as the latest state", async () => {
@@ -105,7 +105,7 @@ describe("checkMigrationDrift", () => {
     if (!(error instanceof MigrationDriftError)) throw error;
     expect(error.issues).toHaveLength(1);
     expect(error.issues[0]).toMatch(/Schema drift detected/);
-    expect(error.issues[0]).toMatch(/20261107070600_ontology-views\/snapshot\.json/);
+    expect(error.issues[0]).toMatch(/20261107072244_version-fk-cascade\/snapshot\.json/);
     expect(error.issues[0]).toMatch(/CREATE TABLE "fixture"\."gadget"/);
   });
 
@@ -273,9 +273,10 @@ describe("readBaseMigrations", () => {
       "20260925111541_widget-retired-at",
       "20261105002649_ontology-tree",
       "20261107070600_ontology-views",
+      "20261107072244_version-fk-cascade",
     ]);
     expect(Option.map(base.head, (h) => h.snapshot.id)).toEqual(
-      Option.some("b70f123e-31af-45d9-a245-53cb359a3b39"),
+      Option.some("b1dc999f-d8fc-4abc-aeb7-4913b4b1062a"),
     );
   });
 });
