@@ -181,6 +181,7 @@ The version-chain discipline, Drizzle-concrete, over the tables core's `makeTree
 | `restore(...)` | `update`, but allowed over a tombstone: the explicit resurrection surface. |
 | `delete(id, { actor, expectedVersion?, root? })` | A tombstone carrying every column forward. Idempotent: on a tombstone it returns `alreadyDeleted: true` and writes nothing. |
 | `restoreVersion(id, n, { actor, ... })` | Reads the whole snapshot at `n` (every level) first, and fails `VersionNotFound` before writing anything if any level is missing. Then it appends that snapshot as an `update`. |
+| `head(id)` | The node's head entry (`version`, `action`, `timestamp`), or `Option.none()` for an id with no versions of this leaf. Read it to pin a write's `expectedVersion`. |
 | `getVersion(id, n)` / `history(id, limit?)` | One version's `{ version, action, timestamp, state }`. The chain oldest first, capped at `MAX_HISTORY_LIMIT` (1000). |
 
 **A keyed leaf** (core's `keyed: { name, columns }`, such as a localised leaf's locales) also writes its keyed level on every append. `create` takes `keyed`, the whole level. `update` / `restore` take `keyed`, a per-key tri-state patch: a patch updates a key, `null` drops it, and an absent key carries it forward. `delete` and `restoreVersion` carry or restore every key, and `getVersion` returns them as `keyed`, keyed by key (`{}` for none).
