@@ -579,3 +579,23 @@ describe("a keyed (localised) leaf's keyed level", () => {
     );
   });
 });
+
+describe("head", () => {
+  it("reads the head entry, a tombstone's included, and none for an unknown id or another leaf's node", async () => {
+    await run(
+      Effect.gen(function* () {
+        expect(yield* chain.book.head(ID)).toEqual(Option.none());
+        yield* createBook;
+        yield* chain.book.update({ id: ID, patch: {}, actor: ACTOR });
+        expect(
+          Option.map(yield* chain.book.head(ID), (entry) => [entry.version, entry.action]),
+        ).toEqual(Option.some([1n, "update"]));
+        yield* chain.book.delete(ID, { actor: ACTOR });
+        expect(
+          Option.map(yield* chain.book.head(ID), (entry) => [entry.version, entry.action]),
+        ).toEqual(Option.some([2n, "delete"]));
+        expect(yield* chain.essay.head(ID)).toEqual(Option.none());
+      }),
+    );
+  });
+});
