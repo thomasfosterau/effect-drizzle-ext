@@ -42,7 +42,7 @@ catalog:
   # `pnpm install` itself. Read the `components` table in
   # node_modules/@effect/tsgo/dist/effect-tsgo.cjs before bumping any of the
   # three.
-  "@effect/tsgo": 0.67.4
+  "@effect/tsgo": 0.67.5
   "@effect/sql-pg": 4.1.2
   # The Node `FileSystem` / `Path` / `ChildProcessSpawner` layer the pg
   # package's tests provide to `./migrations`, `./testing`'s provisioning and
