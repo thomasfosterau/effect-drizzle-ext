@@ -1,5 +1,36 @@
 # @thomasfosterau/effect-drizzle-ext
 
+## 0.2.0
+
+### Minor Changes
+
+- [#148](https://github.com/thomasfosterau/effect-drizzle-ext/pull/148) [`9b9db79`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/9b9db7967a1d773173b9ba83d693134ac648e702) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - Pointer and keyed-fact levels for a tree (effect-drizzle-ext#116):
+  
+  - **Keyed fact level.** A leaf entry in `defineTree` / `defineResourceTree` can declare `keyed: { name, columns }`: columns held once per `(id, version, key)`, such as a localised leaf's translated columns keyed by locale. `makeTreeTables` derives a `${leaf}_${name}` table keyed `(id, version, name)`, foreign-keyed to the leaf's version table, and `makeTreeViews` derives `${leaf}_${name}_view`: one row per key the head carries, and one row with a `NULL` key for a head that carries none. The shared leaf view stays one row per node. Throws `DerivationError` at module load for a keyed level on a marker, an empty name, a reserved or colliding key or column, or no columns.
+  - **Named pointers.** `makeTreeTables(tree, { root: { pointers: ["live"] } })` derives an append-only `${name}_pointer` log per name: `seq`, `id`, a nullable `version` foreign-keyed to the root version table, `at`, the actor, and `recorded_at`. Writing a pointer never appends a version. `makeTreeViews(..., { pointers: { live: ["book"] } })` derives `${leaf}_${name}_view` (plus `${leaf}_${keyed}_${name}_view` for a keyed leaf). It resolves the leaf view at the version named by the node's effective fact (the latest by `seq` whose `at` has arrived), fails closed there, reads `action` off the head, and projects the fact's `at` as `${name}At`. A cleared or absent pointer has no row.
+  
+  `TreeTables` gains `keyed` and `pointers` members, and `AnyTreeTables` requires them. A hand-written `AnyTreeTables` value needs both, so the change is minor rather than patch.
+
+- [#144](https://github.com/thomasfosterau/effect-drizzle-ext/pull/144) [`6a1c5ee`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/6a1c5ee91a9275672d6c56c1471aca68a24ad436) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - `./versioned-chain` gains `makeTreeViews(tree, tables, { schema, branches })`, which derives a tree's read views from its `makeTreeTables` output (effect-drizzle-ext#115):
+  
+  - **A fail-closed current-version view per leaf** (`${leaf}_view`). It resolves the head from the root version table, then INNER JOINs every level's version table from the branch root down to the leaf at that `(id, version)`, so ancestor level columns appear with no per-anchor factory. It projects `id`, `version`, `action`, the identity extras, each level's columns root-most first (a fact-scoped level's facts LEFT JOINed and nullable), `timestamp` and `createdAt` (the version-0 timestamp). A node whose head advanced past any level yields no row.
+  - **Branch views** (`${level}_view`) for the marker levels named in `branches`. Each is a `UNION ALL` over the marker's subtree leaves that projects `type` and the marker's own and inherited columns. An optional per-leaf `project` adds columns to every arm, for a search union.
+  - **`asOf(leaf, { version } | { at })`**: the leaf view resolved at the latest version at or below `version`, or written at or before `at`, as a subquery to select from. It fails closed in the same way.
+  
+  Every derived view reads base tables only, never another view. Each view's row type is derived from the tree.
+
+### Patch Changes
+
+- [#136](https://github.com/thomasfosterau/effect-drizzle-ext/pull/136) [`54ba05f`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/54ba05f526f5f0c852c15d2ee9ff3d6677c78b09) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - Depend on `@thomasfosterau/effect-ext` for the pure Schema helpers instead of keeping local copies (effect-drizzle-ext#135). `resourceAttributeProjections` (`./jsonapi`) reads each attribute's `optional` / `nullable` / `array` / `date` traits with effect-ext's `Ast` predicates, the same JSON-codec decode probes as before, and the version table's `action` values are a `LiteralExact.tuple` checked against `VersionAction`. No behaviour or type changes. `@thomasfosterau/effect-ext` (`^0.1.0`) is a regular dependency; its one required peer, `effect ^4.0.0`, is already a peer of this package.
+
+- [#143](https://github.com/thomasfosterau/effect-drizzle-ext/pull/143) [`5176714`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/517671487e285b77d6fc436f029b82e3a18131a9) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - The published tarballs now include `CHANGELOG.md`, so the release notes can be read from `node_modules` (effect-drizzle-ext#142). npm adds only `package.json`, the README and the licence on its own, and each package's `files` list didn't name the changelog Changesets writes.
+
+- [#139](https://github.com/thomasfosterau/effect-drizzle-ext/pull/139) [`e8696df`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/e8696df5ad51b60e3c50168251344122150e9ec1) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - `numericBounds` (and the CHECK constraints derived from it) no longer reads `Schema.isInt()`'s safe-integer range as a declared bound (effect-drizzle-ext#138). Since effect 4.0.5 that check's JSON Schema carries `minimum: Number.MIN_SAFE_INTEGER` / `maximum: Number.MAX_SAFE_INTEGER`. That turned every `Schema.Int` column's `_non_negative` / `_min` / `_max` CHECK into a `BETWEEN … _range`, gave an unbounded `Schema.Int` a CHECK it never declared, and dropped the `> 0` of an `Int.check(isGreaterThan(0), isLessThanOrEqualTo(n))`. A user-declared bound still applies, including the range of `Schema.isInt32()` / `isUint32()`.
+
+- [#141](https://github.com/thomasfosterau/effect-drizzle-ext/pull/141) [`daa16d2`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/daa16d2ad6532d93d4f2ca4d6b1054c2e8a987c2) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - `engines.node` is now `>=22.18`, the floor of the `@thomasfosterau/effect-ext` dependency core gained in effect-drizzle-ext#136 (pg reaches it through core). Before this, both packages declared `>=22` while depending on a package that declares `>=22.18`, so Node 22.0–22.17 installs warned (`EBADENGINE`) or, under `engine-strict`, failed inside the dependency (effect-drizzle-ext#140).
+
+- [#147](https://github.com/thomasfosterau/effect-drizzle-ext/pull/147) [`6b9f155`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/6b9f15562eb57f078241bf221a0f8c57c2e8c664) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - `makeSubtypeTables` (and so `makeTreeTables`) now gives each version table's `(id, version)` → parent-version foreign key `ON DELETE CASCADE` (effect-drizzle-ext#145). Before this, deleting a node whose leaf sits two or more levels deep failed on that FK, because its NO ACTION check ran before the stable-table cascade reached the level's version rows. So erasing a node's whole chain (`DELETE` of its identity row) only worked for a leaf directly under the root. Regenerating a consumer's migrations emits one `ALTER TABLE … DROP CONSTRAINT … ADD CONSTRAINT … ON DELETE CASCADE` per level version table.
+
 ## 0.1.0
 
 ### Minor Changes
