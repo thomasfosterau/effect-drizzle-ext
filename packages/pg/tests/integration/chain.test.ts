@@ -477,7 +477,10 @@ describe("the concurrent-writer race", () => {
             expectedVersion: 0n,
           });
           wrote();
-          yield* Effect.tryPromise(() => release);
+          yield* Effect.tryPromise({
+            try: () => release,
+            catch: () => "release rejected" as const,
+          });
           return written;
         }),
       ),
