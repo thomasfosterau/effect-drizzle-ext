@@ -1,7 +1,9 @@
-import { sql } from "drizzle-orm";
+import { Column, getColumnFromDecoder, is, SQL, sql } from "drizzle-orm";
 import {
   getViewConfig,
   integer,
+  timestamp,
+  type AnyPgColumn,
   PgDialect,
   pgSchema,
   text,
@@ -9,6 +11,7 @@ import {
 } from "drizzle-orm/pg-core";
 import * as Arr from "effect/Array";
 import * as DateTime from "effect/DateTime";
+import * as Order from "effect/Order";
 import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
 import { describe, expect, expectTypeOf, it } from "vite-plus/test";
@@ -143,8 +146,31 @@ describe("makeTreeViews: leaf views", () => {
   });
 });
 
+/** A view selection, as a branch `project` receives it. */
+type Columns = Readonly<Record<string, AnyPgColumn | SQL | SQL.Aliased>>;
+
+/** Each leaf's own `label`. */
+const projectLabel = (_leaf: string, columns: Columns) => ({
+  label: columns["label"] ?? sql`null`.as("label"),
+});
+
+/** Each leaf's stable `seenAt`, wrapped. */
+const seenAt = (_leaf: string, columns: Columns) => ({
+  seen: sql`${columns["seenAt"]}`.as("seen"),
+});
+
+/** A computed value decoded with book's `seenAt`, but essay's `title`. */
+const decoded = (leaf: string, columns: Columns) => {
+  const decoder = columns[leaf === "book" ? "seenAt" : "title"];
+  return {
+    seen: is(decoder, Column)
+      ? sql`coalesce(null)`.mapWith(decoder).as("seen")
+      : sql`null`.as("seen"),
+  };
+};
+
 describe("makeTreeViews: branch views", () => {
-  it("unions every subtree leaf, projecting the marker's path and `type`", () => {
+  it("drives one SELECT from the marker's version table, projecting its path and `type`", () => {
     const view = frbrViews.branches.work;
     expect(getViewConfig(view).name).toBe("work_view");
     expect(keysOf(view)).toEqual([
@@ -159,13 +185,20 @@ describe("makeTreeViews: branch views", () => {
       "createdAt",
     ]);
     const query = sqlOf(view);
-    expect(query.match(/union all/g)?.length).toBe(1);
-    // Each arm drives from its own leaf, with its own anti-join, so it fails closed.
-    expect(query).toContain(`from "ontology"."book_version" inner join`);
-    expect(query).toContain(`from "ontology"."essay_version" inner join`);
-    expect(query).toContain(`("newer"."id" = "ontology"."book_version"."id")`);
-    expect(query).toContain(`("newer"."id" = "ontology"."essay_version"."id")`);
-    expect(query.match(/where not exists/g)?.length).toBe(2);
+    // One driver, not a union of per-leaf arms (effect-drizzle-ext#200).
+    expect(query).not.toContain("union all");
+    expect(query).toContain(`from "ontology"."work_version" inner join "ontology"."node_version"`);
+    expect(query.match(/not exists/g)?.length).toBe(1);
+    expect(query).toContain(`("newer"."id" = "ontology"."work_version"."id")`);
+    // Each subtree leaf LEFT JOINs at the driver's (id, version), in declaration order.
+    const bookJoin = query.indexOf(`left join "ontology"."book_version"`);
+    const essayJoin = query.indexOf(`left join "ontology"."essay_version"`);
+    expect(bookJoin).toBeGreaterThan(0);
+    expect(essayJoin).toBeGreaterThan(bookJoin);
+    // Fail closed: the row's `type` must name a leaf whose row joined.
+    expect(query).toContain(
+      `((("ontology"."node"."type" = 'book') and (("ontology"."book_version"."id" is not null)))) or ((("ontology"."node"."type" = 'essay') and (("ontology"."essay_version"."id" is not null))))`,
+    );
     type Work = typeof view.$inferSelect;
     expectTypeOf<Work["type"]>().toEqualTypeOf<string>();
     expectTypeOf<Work["title"]>().toEqualTypeOf<string>();
@@ -182,6 +215,121 @@ describe("makeTreeViews: branch views", () => {
     });
     expect(keysOf(views.branches.work).at(-1)).toBe("searchText");
     expectTypeOf<(typeof views.branches.work.$inferSelect)["searchText"]>().toEqualTypeOf<string>();
+    // One CASE over the row's `type`, one arm per leaf, under the leaf's alias.
+    expect(sqlOf(views.branches.work)).toContain(
+      `case "ontology"."node"."type" when 'book' then 'book' when 'essay' then 'essay' end as "search_text"`,
+    );
+  });
+
+  it("projects a leaf column through a CASE on `type`, under the column's name and decoder", () => {
+    const views = makeTreeViews(frbrTree, frbrTables, {
+      schema,
+      branches: {
+        work: {
+          project: (leaf, columns) => ({
+            note:
+              leaf === "book"
+                ? columns.pages
+                : sql`length(${columns.title})`.mapWith(Number).as("pages"),
+          }),
+        },
+      },
+    });
+    const query = sqlOf(views.branches.work);
+    expect(query).toContain(
+      `case "ontology"."node"."type" when 'book' then "ontology"."book_version"."pages" when 'essay' then length("ontology"."work_version"."title") end as "pages"`,
+    );
+    const note = getViewConfig(views.branches.work).selectedFields["note"];
+    expect(note).toBeInstanceOf(SQL.Aliased);
+    // Decoded as the first leaf's column.
+    expect(is(note, SQL.Aliased) ? getColumnFromDecoder(note)?.name : undefined).toBe("pages");
+  });
+
+  it("selects a column every leaf projects as itself bare, with no CASE", () => {
+    const views = makeTreeViews(frbrTree, frbrTables, {
+      schema,
+      branches: { work: { project: (_leaf, columns) => ({ heading: columns.url }) } },
+    });
+    expect(sqlOf(views.branches.work)).not.toContain("case");
+  });
+
+  it("keeps a non-column projection's own decoder", () => {
+    const views = makeTreeViews(frbrTree, frbrTables, {
+      schema,
+      branches: {
+        work: { project: (leaf) => ({ size: sql`length(${leaf})`.mapWith(Number).as("size") }) },
+      },
+    });
+    const size = getViewConfig(views.branches.work).selectedFields["size"];
+    expect(is(size, SQL.Aliased) ? size.sql : undefined).toMatchObject({
+      decoder: { mapFromDriverValue: Number },
+    });
+  });
+
+  it("throws at module load for leaves projecting one key as different SQL types", () => {
+    const tree = defineTree({
+      work: { columns: { title: textColumn("title") } },
+      book: { parent: "work", leaf: { label: textColumn("label") } },
+      essay: {
+        parent: "work",
+        leaf: {
+          label: dbColumn(Schema.Finite, { column: "label", pg: "integer", notNull: false }),
+        },
+      },
+    });
+    const tables = makeTreeTables(tree, { schema, builders });
+    expect(() =>
+      makeTreeViews(tree, tables, { schema, branches: { work: { project: projectLabel } } }),
+    ).toThrow(DerivationError);
+    expect(() =>
+      makeTreeViews(tree, tables, { schema, branches: { work: { project: projectLabel } } }),
+    ).toThrow(
+      /branch "work"'s project returns "label" as integer for "essay" but as text for "book"/,
+    );
+  });
+
+  it("throws for timestamptz against timestamp, and for a mapWith column of another type", () => {
+    const tree = defineTree({
+      work: { columns: { title: textColumn("title") } },
+      book: { parent: "work", leaf: {} },
+      essay: { parent: "work", leaf: {} },
+    });
+    const tables = makeTreeTables(tree, {
+      schema,
+      builders,
+      levels: {
+        book: { stableColumns: { seenAt: timestamp("seen_at", { withTimezone: true }) } },
+        essay: { stableColumns: { seenAt: timestamp("seen_at") } },
+      },
+    });
+    expect(() =>
+      makeTreeViews(tree, tables, { schema, branches: { work: { project: seenAt } } }),
+    ).toThrow(/returns "seen" as timestamp for "essay" but as timestamp with time zone for "book"/);
+    expect(() =>
+      makeTreeViews(tree, tables, { schema, branches: { work: { project: decoded } } }),
+    ).toThrow(/returns "seen" as text for "essay" but as timestamp with time zone for "book"/);
+  });
+
+  it("does not compare computed projections that name no column", () => {
+    expect(() =>
+      makeTreeViews(frbrTree, frbrTables, {
+        schema,
+        branches: {
+          work: {
+            project: (leaf) => ({ v: (leaf === "book" ? sql`1` : sql`'x'`).as("v") }),
+          },
+        },
+      }),
+    ).not.toThrow();
+  });
+
+  it("throws at module load for an unaliased projected expression", () => {
+    expect(() =>
+      makeTreeViews(frbrTree, frbrTables, {
+        schema,
+        branches: { work: { project: () => ({ bare: sql`1` }) } },
+      }),
+    ).toThrow(/branch "work"'s project returns an unaliased expression for "bare"/);
   });
 
   it("throws at module load for a projection whose columns differ between leaves", () => {
@@ -196,6 +344,55 @@ describe("makeTreeViews: branch views", () => {
         },
       }),
     ).toThrow(/project returns columns \(b\) for "essay" but \(a\) for "book"/);
+  });
+
+  it("LEFT JOINs each marker below the branch once, and requires the leaf's markers", () => {
+    const tables = makeTreeTables(bfoTree, { schema, builders });
+    const views = makeTreeViews(bfoTree, tables, {
+      schema,
+      branches: { continuant: true, independent_continuant: true },
+    });
+    // The selection stops at the branch: no marker or leaf column below it.
+    expect(keysOf(views.branches.continuant)).toEqual([
+      "id",
+      "version",
+      "action",
+      "type",
+      "label",
+      "timestamp",
+      "createdAt",
+    ]);
+    const query = sqlOf(views.branches.continuant);
+    const joins = Arr.map(
+      [
+        `left join "ontology"."independent_continuant_version"`,
+        `left join "ontology"."material_entity_version"`,
+        `left join "ontology"."dependent_continuant_version"`,
+        `left join "ontology"."plant_version"`,
+        `left join "ontology"."bed_version"`,
+        `left join "ontology"."document_version"`,
+      ],
+      (join) => {
+        expect(query.split(join).length - 1, `once: ${join}`).toBe(1);
+        return query.indexOf(join);
+      },
+    );
+    // Markers in declaration order, then leaves in declaration order.
+    expect(joins).toEqual(Arr.sort(joins, Order.Number));
+    expect(query).toContain(
+      `("ontology"."node"."type" = 'plant') and (("ontology"."independent_continuant_version"."id" is not null)) and (("ontology"."material_entity_version"."id" is not null)) and (("ontology"."plant_version"."id" is not null))`,
+    );
+    expect(query).toContain(
+      `("ontology"."node"."type" = 'document') and (("ontology"."dependent_continuant_version"."id" is not null)) and (("ontology"."document_version"."id" is not null))`,
+    );
+    // A nested branch INNER JOINs the levels above it and drives from its own.
+    const nested = sqlOf(views.branches.independent_continuant);
+    expect(nested).toContain(`from "ontology"."independent_continuant_version" inner join`);
+    expect(nested).toContain(`inner join "ontology"."continuant_version"`);
+    expect(nested).not.toContain(`"ontology"."document_version"`);
+    expect(keysOf(views.branches.independent_continuant)).toEqual(
+      keysOf(views.branches.continuant),
+    );
   });
 
   it("throws at module load for a branch naming a leaf", () => {
@@ -271,7 +468,7 @@ describe("makeTreeViews: a column key two sources share (effect-drizzle-ext#164)
         schema,
         branches: { work: { project: () => ({ title: sql<string>`'x'`.as("title") }) } },
       }),
-    ).toThrow(/view "work_view" \(arm "book"\) selects "title" from both level "work" and project/);
+    ).toThrow(/view "work_view" selects "title" from both level "work" and project/);
   });
 
   it("passes once the clash is renamed, or projected under another key", () => {

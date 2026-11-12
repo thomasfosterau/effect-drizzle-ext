@@ -4,7 +4,7 @@
  * the head with every ancestor level's columns and the birth row's
  * timestamp; a node whose head advanced past a level yields no row (fail
  * closed); a tombstone yields its row with `action = 'delete'`; a fact-scoped
- * level's missing fact reads as `NULL`; the branch view unions its leaves; and
+ * level's missing fact reads as `NULL`; the branch view carries each leaf's rows; and
  * `asOf` resolves an older version by number or by time.
  *
  * @module packages/pg/tests/integration/tree-views

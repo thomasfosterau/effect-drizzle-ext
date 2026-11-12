@@ -17,37 +17,37 @@
  *   leaf, branch, keyed and pointer views; `asOf` before the move or delete
  *   returns the old row.
  * - **Plans.** A leaf view's paged list uses the leaf's index with no
- *   aggregate over the root version table; a branch view's paged list and a
- *   keyed lookup run no aggregate either.
+ *   aggregate over the root version table; a branch view's paged list uses
+ *   the branch level's index with no Sort (effect-drizzle-ext#200), and it and
+ *   a keyed lookup run no aggregate either.
+ *
+ * The branch views' own single-driver equivalence (against their `UNION ALL`
+ * form) is `tree-branch-views.test.ts`.
  *
  * @module packages/pg/tests/integration/tree-view-heads
  */
 
-import * as NodeServices from "@effect/platform-node/NodeServices";
-import { executeRows } from "@thomasfosterau/effect-drizzle-ext/query";
-import { sql, type SQL } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import * as Arr from "effect/Array";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
 import * as R from "effect/Record";
-import * as Schema from "effect/Schema";
 import * as Str from "effect/String";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { integrationDatabaseLayer } from "./database-url.ts";
+import { aggregates, viewOracle, viewsBefore } from "./view-oracle.ts";
 import { makePgDatabase } from "../../src/index.ts";
-import { readMigrations } from "../../src/migrations.ts";
 import { makeTestTransaction } from "../../src/testing.ts";
 import { ontologyViews } from "../fixtures/schema.ts";
 
 const database = makePgDatabase({ relations: {}, key: "Database" });
 const { CurrentTransaction } = database;
+const { difference, execAll, explain } = viewOracle(database);
 
 const runtime = ManagedRuntime.make(integrationDatabaseLayer(database));
 const { runInTestTransaction } = makeTestTransaction(database);
-
-const FIXTURE_MIGRATIONS = `${import.meta.dirname}/../fixtures/migrations`;
 
 /** The migration that replaced the `max` head with the anti-join. */
 const ANTI_JOIN_MIGRATION = "20261112160706_view-head-antijoin";
@@ -63,22 +63,7 @@ const MAX_HEAD = `from "ontology"."node_version" group by "ontology"."node_versi
 let trunkViews: Readonly<Record<string, string>> = {};
 
 beforeAll(async () => {
-  const files = ManagedRuntime.make(NodeServices.layer);
-  const migrations = await files.runPromise(readMigrations(FIXTURE_MIGRATIONS));
-  await files.dispose();
-  const before = Arr.takeWhile(migrations, (migration) => migration.name !== ANTI_JOIN_MIGRATION);
-  trunkViews = R.fromEntries(
-    Arr.flatMap(before, (migration) =>
-      Arr.flatMap(migration.statements, (statement) =>
-        Arr.fromOption(
-          Option.map(
-            Option.fromNullishOr(/^CREATE VIEW "ontology"\."(\w+)" AS (.*);$/s.exec(statement)),
-            (match): [string, string] => [match[1] ?? "", match[2] ?? ""],
-          ),
-        ),
-      ),
-    ),
-  );
+  trunkViews = await viewsBefore(ANTI_JOIN_MIGRATION);
 });
 
 afterAll(() => runtime.dispose());
@@ -98,28 +83,6 @@ const trunkAsOf = (leaf: string, where: string): string => {
     `from "ontology"."node_version" where ${where} group by "ontology"."node_version"."id"`,
   )(view);
 };
-
-const exec = Effect.fn("viewHeads.exec")(function* (statement: string) {
-  const tx = yield* CurrentTransaction;
-  yield* tx.execute(sql.raw(statement));
-});
-
-const execAll = (statements: ReadonlyArray<string>) =>
-  Effect.forEach(statements, exec, { concurrency: 1, discard: true });
-
-/** The rows of `query` missing from `oracle`, plus those of `oracle` missing from `query`. */
-const difference = Effect.fn("viewHeads.difference")(function* (query: SQL, oracle: string) {
-  const tx = yield* CurrentTransaction;
-  const count = (sqlText: SQL) =>
-    Effect.map(
-      tx.execute<{ readonly n: number }>(sql`select count(*)::int as n from (${sqlText}) d`),
-      (result) => Arr.map(result.rows, (row) => Number(row.n)),
-    );
-  const [rows] = yield* count(query);
-  const [missing] = yield* count(sql`${query} except all ${sql.raw(oracle)}`);
-  const [extra] = yield* count(sql`${sql.raw(oracle)} except all ${query}`);
-  return { rows, missing, extra };
-});
 
 /** `n`th id of this file's fixed nodes (`…-8000-0000000003nn`), clear of the other specs'. */
 const idOf = (n: number) => `00000000-0000-4000-8000-0000000003${String(n).padStart(2, "0")}`;
@@ -485,41 +448,6 @@ describe("view heads: behaviour", () => {
 
 // ── Plans ────────────────────────────────────────────────────────────────
 
-/** One node of `EXPLAIN (FORMAT JSON)`'s plan tree: the fields the plan specs read. */
-interface PlanNode {
-  readonly "Node Type": string;
-  readonly "Relation Name"?: string;
-  readonly "Index Name"?: string;
-  readonly Plans?: ReadonlyArray<PlanNode>;
-}
-
-const PlanNode: Schema.Codec<PlanNode> = Schema.Struct({
-  "Node Type": Schema.String,
-  "Relation Name": Schema.optionalKey(Schema.String),
-  "Index Name": Schema.optionalKey(Schema.String),
-  Plans: Schema.optionalKey(Schema.Array(Schema.suspend((): Schema.Codec<PlanNode> => PlanNode))),
-});
-
-/** `EXPLAIN (FORMAT JSON)`'s one row: a one-element array holding the plan. */
-const ExplainRow = Schema.Struct({
-  "QUERY PLAN": Schema.Array(Schema.Struct({ Plan: PlanNode })),
-});
-
-/** Every node of a plan tree, depth first. */
-const planNodes = (plan: PlanNode): ReadonlyArray<PlanNode> => [
-  plan,
-  ...Arr.flatMap(plan.Plans ?? [], planNodes),
-];
-
-/** The plan PostgreSQL picks for `query`, as its node list. */
-const explain = Effect.fn("viewHeads.explain")(function* (query: string) {
-  const tx = yield* CurrentTransaction;
-  const rows = yield* executeRows(tx, sql.raw(`EXPLAIN (FORMAT JSON) ${query}`), ExplainRow);
-  return Arr.flatMap(rows, (result) =>
-    Arr.flatMap(result["QUERY PLAN"], (explained) => planNodes(explained.Plan)),
-  );
-});
-
 const PROBE_INDEX = "work_version_title_probe";
 
 /**
@@ -542,9 +470,6 @@ const seedVolume = execAll([
   `ANALYZE ontology.node, ontology.node_version, ontology.work, ontology.work_version, ontology.book, ontology.book_version, ontology.essay, ontology.essay_version, ontology.essay_locale`,
 ]);
 
-const aggregates = (nodes: ReadonlyArray<PlanNode>) =>
-  Arr.filter(nodes, (n) => Str.includes("Aggregate")(n["Node Type"]));
-
 describe("view heads: plans", () => {
   // The integration suite runs in CI's single `ci` job, against its
   // `pgvector/pgvector:pg17` service container (`.github/workflows/ci.yml`).
@@ -564,17 +489,20 @@ describe("view heads: plans", () => {
     );
   });
 
-  it("pages a branch view and looks up a keyed view with no aggregate", async () => {
+  it("pages a branch view through the branch level's index, and looks up a keyed view, with no aggregate", async () => {
     await runInTestTransaction(
       runtime,
       Effect.gen(function* () {
         yield* seedVolume;
-        // A UNION ALL of arms with joins stays a subquery per arm, so the
-        // page sorts the union; each arm reads no aggregate.
+        // One SELECT driven from `work_version` (effect-drizzle-ext#200), so
+        // the index on the branch level supplies the order and the LIMIT
+        // stops early; the UNION ALL of per-leaf arms sorted every row.
         const branch = yield* explain(
           "SELECT * FROM ontology.work_view ORDER BY title, id LIMIT 20",
         );
         expect(aggregates(branch)).toEqual([]);
+        expect(Arr.some(branch, (n) => n["Index Name"] === PROBE_INDEX)).toBe(true);
+        expect(Arr.some(branch, (n) => n["Node Type"] === "Sort")).toBe(false);
         const keyed = yield* explain(
           "SELECT * FROM ontology.essay_locale_view WHERE id = '00000000-0000-4000-9000-000000003100'",
         );
