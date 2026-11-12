@@ -23,7 +23,7 @@ This library **extends** drizzle-orm's own Effect integration (`drizzle-orm/effe
 | Subpath | Drizzle? | Contents |
 | --- | --- | --- |
 | `.` | no | The `dbColumn` / `dbTable` annotation vocabulary, phantoms, `Option` readers, numeric bounds, struct-field projection, and `defineTree`, the Drizzle-free ontology declaration. |
-| `./derive` | yes | The builder registry, `makeDeriveColumns`, CHECK derivation from bounds, `DerivationError`. |
+| `./derive` | yes | The builder registry, `deriveColumnsWith`, CHECK derivation from bounds, `DerivationError`. |
 | `./references` | yes | The lazy FK-reference registry a `resolveReference` hook is built from. |
 | `./constraints` | yes | `enumCheck` and the threaded `type`-discriminator toolkit. |
 | `./columns` | yes | `bytea`, `tsvector`, `jsonbSchema`, `timestamps`, the hex codec. |
@@ -63,17 +63,17 @@ export const Article = Schema.Struct({
 });
 ```
 
-A builder registry supplies the Drizzle column for each `pg` kind, and `makeDeriveColumns` interprets the annotations against it:
+A builder registry supplies the Drizzle column for each `pg` kind, and `deriveColumnsWith` interprets the annotations against it:
 
 ```ts
 import { boolean, integer, text, timestamp } from "drizzle-orm/pg-core";
-import { makeDeriveColumns, type ColumnBuilders } from "@thomasfosterau/effect-drizzle-ext/derive";
+import { deriveColumnsWith, type ColumnBuilders } from "@thomasfosterau/effect-drizzle-ext/derive";
 import { makeReferenceRegistry } from "@thomasfosterau/effect-drizzle-ext/references";
 import type { PgKind } from "./db-annotation.ts";
 
 export const references = makeReferenceRegistry();
 const builders: ColumnBuilders<PgKind> = { text, integer, boolean, timestamp };
-export const { fromFields } = makeDeriveColumns(builders, { resolveReference: references.resolve });
+export const { fromFields } = deriveColumnsWith(builders, { resolveReference: references.resolve });
 ```
 
 The table factory spreads `fromFields(...)` for the columns and `deriveFieldCheckConstraints(...)` for the numeric-bound CHECKs the model's own `Schema.isGreaterThanOrEqualTo` / `isBetween` checks imply:
@@ -153,7 +153,7 @@ export const tree = defineTree({
 
 ## `./derive`
 
-Reads the `DbColumn` metadata a schema declaration carries — via `fieldColumns`, or any other projection yielding a `Record<string, DbColumn>` (the `./jsonapi/derive` entry is one) — and emits the matching Drizzle column builders. `makeDeriveColumns(builders, options)` binds a derivation to a consumer's own kind → builder registry and returns `{ fromFields, fromMeta }`: `fromFields` takes a `Schema.Struct`'s fields directly, `fromMeta` an already-projected metadata map.
+Reads the `DbColumn` metadata a schema declaration carries — via `fieldColumns`, or any other projection yielding a `Record<string, DbColumn>` (the `./jsonapi/derive` entry is one) — and emits the matching Drizzle column builders. `deriveColumnsWith(builders, options)` binds a derivation to a consumer's own kind → builder registry and returns `{ fromFields, fromMeta }`: `fromFields` takes a `Schema.Struct`'s fields directly, `fromMeta` an already-projected metadata map.
 
 Failures here are **thrown**, never Effect failures — this module runs at _module load_, while a consumer's table modules are being evaluated, before any Effect runtime exists to fail an Effect in. A missing builder, a `references` annotation with no `resolveReference` hook, or numeric bounds on a column the table does not carry each throw `DerivationError`, a `Schema.TaggedError`. Runtime query failures are the opposite and are never thrown: see `./errors`.
 
@@ -172,7 +172,7 @@ A nullable column's expression is guarded with `col IS NULL OR …`.
 export class DerivationError extends Schema.TaggedError<DerivationError>()("DerivationError", {
   message: Schema.String,
 }) {}
-export const makeDeriveColumns: <B extends ColumnBuilders>(
+export const deriveColumnsWith: <B extends ColumnBuilders>(
   builders: B,
   options?: DeriveOptions,
 ) => {
@@ -211,7 +211,7 @@ export const makeReferenceRegistry: () => ReferenceRegistry;
 
 `enumCheck(name, column, values)` emits `CHECK (column IN ('a', 'b', …))` — a vocabulary declared once as a model's `Schema.Literals` also constrains the database, with no Postgres enum type (so growing the vocabulary is one `ALTER … DROP/ADD CONSTRAINT`, not an `ALTER TYPE … ADD VALUE` that cannot run inside a transaction). A `NULL` in the column **passes**: `NULL IN (...)` is unknown, which CHECK accepts, so the same constraint serves a nullable vocabulary with no extra `IS NULL OR` guard — nullability is the column's own `NOT NULL` to declare.
 
-`makeDiscriminatorConstraints({ leaves, names? })` builds a `DiscriminatorToolkit<Level>` for one hierarchy: the three constraints that thread a `type` discriminator up a tree of stable tables and make a sibling-subtype chimera unrepresentable.
+`discriminatorConstraintsFor({ leaves, names? })` builds a `DiscriminatorToolkit<Level>` for one hierarchy: the three constraints that thread a `type` discriminator up a tree of stable tables and make a sibling-subtype chimera unrepresentable.
 
 - `typeUnique` — `UNIQUE(id, type)`, the target every child's composite FK points at.
 - `typeParentFk` — the composite `(id, type)` → parent `(id, type)` foreign key (a child can only exist under a parent carrying the same `type`); `onUpdate: "cascade"` (via `typeConstraints`' `refinable: true`) makes a bare parent row **refinable** — a `type` flip cascades down the pre-existing chain before the concrete rows are inserted, with no `DEFERRABLE` constraint needed.
@@ -224,7 +224,7 @@ export const enumCheck: (
   column: ExtraConfigColumn,
   values: readonly string[],
 ) => PgTableExtraConfigValue;
-export const makeDiscriminatorConstraints: <Level extends string>(options: {
+export const discriminatorConstraintsFor: <Level extends string>(options: {
   readonly leaves: (level: Level) => ReadonlyArray<string>;
   readonly names?: DiscriminatorNames | undefined;
 }) => DiscriminatorToolkit<Level>;
@@ -500,9 +500,9 @@ dbTable(Article, { name: "article", level: "work" });
 ```
 
 ```ts
-import { makeDeriveResourceColumns } from "@thomasfosterau/effect-drizzle-ext/jsonapi/derive";
+import { deriveResourceColumnsWith } from "@thomasfosterau/effect-drizzle-ext/jsonapi/derive";
 
-const deriveResourceColumns = makeDeriveResourceColumns(builders, {
+const deriveResourceColumns = deriveResourceColumnsWith(builders, {
   resolveReference: references.resolve,
 });
 export const articleColumns = deriveResourceColumns(Article);
@@ -533,7 +533,7 @@ export interface ResourceAttributeProjection {
 export const resourceAttributeProjections: (
   resource: AnyResource,
 ) => ReadonlyArray<ResourceAttributeProjection>;
-export const makeDeriveResourceColumns: <B extends ColumnBuilders>(
+export const deriveResourceColumnsWith: <B extends ColumnBuilders>(
   builders: B,
   options?: DeriveOptions,
 ) => <R extends AnyResource>(resource: R) => DerivedResourceColumns<R, B>;

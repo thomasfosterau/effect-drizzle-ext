@@ -61,7 +61,34 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup
+      # Vite+ at the catalog's `vite-plus` pin (auto-detected), its managed
+      # Node and pnpm, and the dependency cache. The install is the next step,
+      # so it can retry.
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1.22.0
+        with:
+          cache: true
+          run-install: false
+      # Retried up to three times: pnpm's linker has raced itself transiently
+      # on a cold store (gardeneria CI, 2026-07-26), failing a run before any
+      # check ran. Safe because the install reconciles node_modules against
+      # the committed lockfile on every attempt; `--frozen-lockfile`, install
+      # scripts and the supply-chain policy check still run each time, so a
+      # deterministic failure still turns the job red.
+      - name: Install dependencies
+        run: |
+          for attempt in 1 2 3; do
+            if vp install --frozen-lockfile; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::vp install failed after 3 attempts"
+              exit 1
+            fi
+            delay=$((attempt * 15))
+            echo "::warning::vp install failed (attempt ${attempt}/3); retrying in ${delay}s"
+            sleep "$delay"
+          done
       - name: Restore the Vite+ task cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -70,17 +97,17 @@ jobs:
           restore-keys: |
             vp-task-v1-${{ runner.os }}-
       - name: Format and lint
-        run: pnpm exec vp check
+        run: vp check
       - name: Type gates (packages + emitted declarations)
-        run: pnpm exec vp run --concurrency-limit 2 check
+        run: vp run --concurrency-limit 2 check
       - name: Unit tests
-        run: pnpm exec vp run -r test:unit
+        run: vp run -r test:unit
       - name: Integration tests
-        run: pnpm exec vp run test:integration
+        run: vp run test:integration
       - name: Build
-        run: pnpm exec vp run -r build
+        run: vp run -r build
       # Type-checks AND runs every JSDoc @example (docgen, runExamples).
       - name: Verify documentation examples (docgen)
-        run: pnpm exec vp run docgen
+        run: vp run docgen
       - name: Audit
         run: pnpm audit --audit-level high
