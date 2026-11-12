@@ -1,5 +1,67 @@
 # @thomasfosterau/effect-drizzle-ext
 
+## 0.4.0
+
+### Minor Changes
+
+- [#205](https://github.com/thomasfosterau/effect-drizzle-ext/pull/205) [`9e2f3b2`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/9e2f3b2a8acfdacd4c7198f59561ab08f7e70be2) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - Fail a `makeTreeViews` branch view closed with a `CASE` on `type` instead of a LEFT JOIN per leaf (effect-drizzle-ext#204). The single-driver branch view (effect-drizzle-ext#200) LEFT JOINed every marker below the branch and every subtree leaf, and its planning time grew with those nullable joins: a paged list planned in 143 ms at 8 leaves and 1,523 ms at 40, and a `LIMIT $n` read re-plans on every call. The driver, the anti-join head and the INNER spine are unchanged; the `WHERE` is now `CASE type WHEN '<leaf>' THEN EXISTS (<each marker between the branch and the leaf>) AND EXISTS (<the leaf's row>) [AND EXISTS (<a lower stable row>)] … ELSE false END`, each probe at the driver's `(id, version)` and ending `OFFSET 0`, so PostgreSQL keeps it a per-row index probe rather than hashing it (hashed, a 20-leaf page seq-scanned every leaf table: 47–104 ms). A level below the branch is LEFT JOINed only when `project` reads one of its columns; a branch with no per-leaf projection joins no leaf. A `type` naming no subtree leaf, or `NULL`, yields no row.
+  
+  Plan / execution ms, PostgreSQL 16, synthetic branch of 200,000 nodes at two versions under two marker levels, `ORDER BY title, id LIMIT 20` for the page. "CASE (unfenced prototype)" is the `CASE` without `OFFSET 0`; "shipped (fenced)" is the `CASE` with it. "not re-measured" marks a cell never measured fenced; "-" a plan time not recorded:
+  
+  | leaves | read       | effect-drizzle-ext#200 | CASE (unfenced prototype) | shipped (fenced)  |
+  | ------ | ---------- | ---------------------- | ------------------------- | ----------------- |
+  | 8      | page       | 143 / 3.4              | 4.4 / 1.8                 | not re-measured   |
+  | 8      | by id      | 4.7 / 0.6              | 2.0 / 0.4                 | not re-measured   |
+  | 8      | `count(*)` | 17 / 1,407             | 2.3 / 1,005               | not re-measured   |
+  | 20     | page       | 489 / 4.8              | 4.0 / 104                 | 4.4 / 1.9         |
+  | 20     | by id      | 8.8 / 1.0              | 3.1 / 0.7                 | not re-measured   |
+  | 20     | `count(*)` | 35 / 2,061             | 3.3 / 1,245               | not re-measured   |
+  | 40     | page       | 1,523 / 7.7            | 5.5-6.0 / 49-60           | 5.3-5.4 / 2.4-2.6 |
+  | 40     | by id      | 26.8 / 2.6             | 4.2 / 1.1                 | - / 1.3           |
+  | 40     | `count(*)` | 52 / 3,380             | 5.6 / 1,176               | - / 1,601         |
+  
+  The fenced cells are the shipped `OFFSET 0` form; the page rows were measured twice each (20 leaves: 4.4 / 1.9 and 3.7 / 1.9; 40 leaves: 5.4 / 2.6 and 5.3 / 2.4). The unfenced prototype planned a hashed probe per leaf and executed the 20-leaf page in 104 ms and the 40-leaf page in 60 ms and 49 ms. The other prototype rows were never re-measured with `OFFSET 0`; at 40 leaves, a separate unfenced run gave by id 1.6 ms and `count(*)` 1,218 ms (execution), against 1.3 ms and 1,601 ms fenced. On the fixture chain (two leaves, 50,000 books and 50,000 essays at two versions each, a `work_version (title, id)` index), `work_view ORDER BY title, id LIMIT 20` executes in 0.37 ms.
+  
+  The rows, columns, column order and row types are the same as effect-drizzle-ext#200's, checked with `EXCEPT ALL` against the earlier `UNION ALL` definitions for the fixture branches and for generated branches of 12 and 30 leaves, including that release's tightening: a node whose `type` names a leaf with no row at the head (or names no subtree leaf) yields no row. Leaf, keyed, pointer and as-of views, and `makeCurrentVersionView`, are byte-identical.
+  
+  **Upgrading.** Only branch views' SQL changes. Your next `drizzle-kit generate` emits a `DROP VIEW` and a `CREATE VIEW` for each branch view, with no table or data change. drizzle-kit does not order view drops by dependency: if one of your own views selects from a branch view, drop it before the generated statements and recreate it after them (hand-edit the migration), or remove the edge. `checkViewDependencies` from `@thomasfosterau/effect-drizzle-ext-pg/tooling` reports every such edge. Since effect-drizzle-ext#200, leaves that `project` one key from columns of different SQL types throw `DerivationError` at module load, including pairs a `UNION ALL` used to unify (`varchar` and `text`, `integer` and `bigint`); cast or alias in `project` so every leaf names one type, for example ``sql`${columns.key}::text`.as("key")``.
+
+- [#203](https://github.com/thomasfosterau/effect-drizzle-ext/pull/203) [`5adffde`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/5adffde351b5a54625447a23f05ccb965be88c53) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - Drive each `makeTreeViews` branch view from the branch level's own version table instead of a `UNION ALL` of one arm per subtree leaf (effect-drizzle-ext#200). PostgreSQL plans each `UNION ALL` arm that has joins as its own subquery, so no index order reached the top and a paged list sorted every branch row. A branch view is now one SELECT with the same anti-join head as the leaf views: it INNER JOINs the root version row, the identity row, the birth row and the levels down to the branch, then LEFT JOINs each marker below the branch and each subtree leaf at the head. A fail-closed `WHERE` keeps a row only when the leaf its `type` names, and every marker on the way to it, has a row at the head. An index on the branch-level column you sort by (`levels.<branch>.extraConstraints`) now serves `ORDER BY … LIMIT`. Sorting by a leaf-only column can't be index-served.
+  
+  PostgreSQL 16, `EXPLAIN (ANALYZE, BUFFERS)`, second run:
+  
+  | read | before | after |
+  | --- | --- | --- |
+  | fixture `work_view ORDER BY title, id LIMIT 20` (100,000 works at two versions, `work_version (title, id)` index) | 391 ms, a Sort over every row | the index, no Sort (0.37 ms with the effect-drizzle-ext#204 shape) |
+  | synthetic 20-leaf branch, paged list | 2,385 ms | 4.9 ms |
+  | synthetic 20-leaf branch, `WHERE id = $1` | 1.86 ms | 0.88 ms |
+  | synthetic 20-leaf branch, `count(*)` | 1,753 ms | 1,911 ms |
+  
+  The rows, columns, column order and row types are the same as before, checked against the `UNION ALL` definitions with `EXCEPT ALL`. **Behaviour change:** a node whose `type` names one leaf while only another leaf's row exists at the head now yields **no row** in the branch view. The union returned that other leaf's row labelled with the stale `type`, a row that contradicts itself. This shape is only reachable by bypassing the `(id, type)` foreign-key chain (old leaf rows kept past a move). Every other row is unchanged. A per-leaf `project` key becomes one `CASE` on `type`, named and decoded as the first leaf's value. Leaves that project the same key from columns of different SQL types now throw `DerivationError` at module load, and so does an unaliased projected expression.
+  
+  **Upgrading.** Only branch views' SQL changes. Your next `drizzle-kit generate` emits a `DROP VIEW` and a `CREATE VIEW` for each branch view, with no table or data change; leaf, keyed, pointer and as-of views are byte-identical. drizzle-kit does not order view drops by dependency: if one of your own views selects from a branch view, drop it before the generated statements and recreate it after them (hand-edit the migration), or remove the edge. `checkViewDependencies` from `@thomasfosterau/effect-drizzle-ext-pg/tooling` reports every such edge.
+
+- [#201](https://github.com/thomasfosterau/effect-drizzle-ext/pull/201) [`0ddb37a`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/0ddb37a04e9513b0a4f4159d80e9381fc2cb8bab) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - Resolve every derived view's head with an anti-join on the root version table's primary key instead of a grouped `max(version)` (effect-drizzle-ext#199). `makeTreeViews`' leaf, branch, keyed and as-of views now drive from the leaf's own version table and keep a row only when no newer root version of the node exists (`asOf` bounds both sides). Pointer views still drive from the effective pointer fact, and find the head row they read `action` from the same way. `makeCurrentVersionView` drives from the root version row with the same anti-join.
+  
+  PostgreSQL cannot push a filter or a `LIMIT` into a grouped subquery, so any read not filtered by `id` used to aggregate the whole root version table first. On the fixture chain with 150,000 root version rows (PostgreSQL 16, warm, `EXPLAIN (ANALYZE, BUFFERS)`, second run), with an index on `work_version (title, id)`:
+  
+  | read | before | after |
+  | --- | --- | --- |
+  | `book_view ORDER BY title, id LIMIT 20` | 531 ms, 551,771 buffers, an aggregate over `node_version` | 2.7 ms, 628 buffers, the index, no aggregate |
+  | `book_view WHERE id = $1` | 0.29 ms, 28 buffers | 0.27 ms, 28 buffers |
+  | `count(*) FROM book_view` | 353 ms, 601,731 buffers | 162 ms, 6,650 buffers |
+  | `work_view ORDER BY title, id LIMIT 20` (branch) | 373 ms, 751,735 buffers | 241 ms, 308,006 buffers |
+  
+  The rows are the same: a view has a row exactly when every level has one at the node's maximum (bounded, for `asOf`) root version. A head that moved to another leaf or advanced past a level still yields no row, and a tombstone still shows with `action = 'delete'`. Row types and column order are unchanged.
+  
+  **Upgrading.** Every derived view's SQL changes, so your next `drizzle-kit generate` emits a `DROP VIEW` and a `CREATE VIEW` for each view `makeTreeViews` or `makeCurrentVersionView` builds, with no table or data change. Regenerate and apply that migration. drizzle-kit does not order view drops by dependency: if one of your own views selects from a derived view, that view is not in the diff and the derived view's `DROP VIEW` fails. Drop your view before the generated statements and recreate it after them (hand-edit the migration), or remove the edge. `checkViewDependencies` from `@thomasfosterau/effect-drizzle-ext-pg/tooling` reports every such edge.
+
+### Patch Changes
+
+- [#206](https://github.com/thomasfosterau/effect-drizzle-ext/pull/206) [`a7bd413`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/a7bd4139c3d9539ddba9b9aa9c48237784e8fc92) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - A branch view's `project` now LEFT JOINs the leaf tables read through any `SQLWrapper` embedded in its output (effect-drizzle-ext#204), not only through columns, tables and `sql` chunks; before, such a value created a view that failed with a missing FROM-clause entry.
+
+- [#194](https://github.com/thomasfosterau/effect-drizzle-ext/pull/194) [`bbd0957`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/bbd0957a7956551b656d929b33153ae83eb9738b) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - Accept `@thomasfosterau/effect-ext` `^0.2.0 || ^0.3.0`, so an app on effect-ext 0.3 installs one copy instead of a nested 0.2. The `./Ast` predicates and `LiteralExact.tuple` this package uses are unchanged in 0.3.0. (0.3.0 of this package shipped `^0.2.0` alone; its changelog's `^0.1.0 || ^0.2.0` was wrong about the 0.1 line, which isn't accepted.)
+
 ## 0.3.0
 
 ### Minor Changes
