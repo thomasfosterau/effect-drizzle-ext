@@ -126,6 +126,7 @@ export interface DiscriminatorColumns {
 export interface SubtypeTablesConfig<
   TColumns extends Record<string, ColumnBuilderBase>,
   TDiscriminator,
+  TStable extends Record<string, ColumnBuilderBase> = Record<never, never>,
 > {
   /** Leaf name; the version table is `${name}_version` (e.g. `video`). */
   name: string;
@@ -163,12 +164,28 @@ export interface SubtypeTablesConfig<
    * Its shape is whatever the injected hook consumes.
    */
   discriminator?: TDiscriminator | undefined;
+  /**
+   * Extra stable-table columns, appended after the generated `id` and `type`:
+   * immutable identity facts written once per node (an external key, say),
+   * never versioned. Absent: the stable table is `id` and `type` alone.
+   */
+  stableColumns?: TStable | undefined;
+  /**
+   * Extra stable-table constraints and indexes, appended after the
+   * discriminator hook's. The callback receives the stable table's columns
+   * (`stableColumns` included), so a key unique across a level's nodes is a
+   * `unique(…).on(table.key)` here, which a version table, repeating the key
+   * per version, can't hold.
+   */
+  stableConstraints?:
+    | ((table: Record<string, ExtraConfigColumn>) => PgTableExtraConfigValue[])
+    | undefined;
 }
 
 /**
- * The stable identity row's generated column builders — `id` (the primary key
- * that references the parent branch's stable `id`) and the denormalised leaf
- * `type` discriminator.
+ * The stable identity row's column builders — `id` (the primary key that
+ * references the parent branch's stable `id`), the denormalised leaf `type`
+ * discriminator, then the injected `TStable` columns.
  *
  * `type` is a plain {@link PgTextBuilder} rather than a union with its
  * `.notNull()` form because the two reduce: `SetNotNull<T>` is `T & …`, so
@@ -177,10 +194,10 @@ export interface SubtypeTablesConfig<
  * not widen it — the `NOT NULL` a discriminator adds was never in the inferred
  * type either.
  */
-type SubtypeStableColumnBuilders = {
+type SubtypeStableColumnBuilders<TStable extends Record<string, ColumnBuilderBase>> = {
   id: SetIsPrimaryKey<PgUUIDBuilder>;
   type: PgTextBuilder<[string, ...string[]]>;
-};
+} & TStable;
 
 /**
  * The version row's column builders: the generated `(id, version)` key columns
@@ -230,11 +247,14 @@ type SubtypeVersionColumnBuilders<TColumns extends Record<string, ColumnBuilderB
  * Identical behaviour under TypeScript 6.0.3 and the 7.x tsgo build; this is a
  * printer limitation in both, not a version-specific bug.
  */
-export interface SubtypeTables<TColumns extends Record<string, ColumnBuilderBase>> {
+export interface SubtypeTables<
+  TColumns extends Record<string, ColumnBuilderBase>,
+  TStable extends Record<string, ColumnBuilderBase> = Record<never, never>,
+> {
   stable: PgTableWithColumns<{
     name: string;
     schema: string;
-    columns: PgBuildColumns<string, SubtypeStableColumnBuilders>;
+    columns: PgBuildColumns<string, SubtypeStableColumnBuilders<TStable>>;
     dialect: "pg";
     isAlias: false;
   }>;
@@ -248,6 +268,17 @@ export interface SubtypeTables<TColumns extends Record<string, ColumnBuilderBase
 }
 
 /**
+ * An injected extras map, or `{}` when the member is absent.
+ *
+ * SAFETY: `T` is inferred from this very member, so it is a real map when the
+ * member is present and defaults to `{}` (the `Record<never, never>` defaults
+ * of {@link makeSubtypeTables} and {@link makeTreeTables}) exactly when it is
+ * absent.
+ */
+const columnsOrEmpty = <T extends Record<string, ColumnBuilderBase>>(columns: T | undefined): T =>
+  columns ?? ({} as T);
+
+/**
  * Build a `defineSubtypeTables` bound to a discriminator hook. The hook turns a
  * leaf's `discriminator` declaration into the stable-table constraints that
  * enforce it (e.g. a `UNIQUE(id, type)` + composite `(id, type)` → parent FK +
@@ -255,7 +286,9 @@ export interface SubtypeTables<TColumns extends Record<string, ColumnBuilderBase
  * is simply never invoked (its leaves omit `discriminator`).
  *
  * The returned builder emits a regular subtype's `{ stable, version }` table
- * pair with the composite-`(id, version)` FK chain to its parent branch.
+ * pair with the composite-`(id, version)` FK chain to its parent branch. The
+ * stable table carries `id`, `type`, then any `stableColumns`; its
+ * constraints are the discriminator hook's, then any `stableConstraints`.
  */
 export const makeSubtypeTables =
   <TDiscriminator>(
@@ -265,7 +298,10 @@ export const makeSubtypeTables =
       discriminator: TDiscriminator,
     ) => PgTableExtraConfigValue[],
   ) =>
-  <TColumns extends Record<string, ColumnBuilderBase>>(
+  <
+    TColumns extends Record<string, ColumnBuilderBase>,
+    TStable extends Record<string, ColumnBuilderBase> = Record<never, never>,
+  >(
     schema: PgSchema,
     {
       name,
@@ -275,9 +311,11 @@ export const makeSubtypeTables =
       versionDefault,
       extraConstraints,
       discriminator,
-    }: SubtypeTablesConfig<TColumns, TDiscriminator>,
-  ): SubtypeTables<TColumns> => {
-    const stableColumns = {
+      stableColumns,
+      stableConstraints,
+    }: SubtypeTablesConfig<TColumns, TDiscriminator, TStable>,
+  ): SubtypeTables<TColumns, TStable> => {
+    const stableBuilders = {
       id: uuid("id")
         .primaryKey()
         .references((): AnyPgColumn => parentId, { onDelete: "cascade" }),
@@ -287,12 +325,24 @@ export const makeSubtypeTables =
       // the STABLE (identity) row only — never versioned — so the `(id, version)`
       // arc is untouched.
       type: discriminator ? text("type").notNull() : text("type"),
+      ...columnsOrEmpty(stableColumns),
     };
-    const stable = discriminator
-      ? schema.table(name, stableColumns, (table) =>
-          applyDiscriminator(name, { id: table.id, type: table.type }, discriminator),
-        )
-      : schema.table(name, stableColumns);
+    // Pinned through the shared alias for the same reason as the version
+    // table below. A table with no extra config keeps the callback-free call,
+    // so its DDL is exactly what it was before `stableConstraints` existed.
+    const stable =
+      discriminator === undefined && stableConstraints === undefined
+        ? schema.table<string, SubtypeStableColumnBuilders<TStable>>(name, stableBuilders)
+        : schema.table<string, SubtypeStableColumnBuilders<TStable>>(
+            name,
+            stableBuilders,
+            (table) => [
+              ...(discriminator === undefined
+                ? []
+                : applyDiscriminator(name, { id: table.id, type: table.type }, discriminator)),
+              ...(stableConstraints === undefined ? [] : stableConstraints(table)),
+            ],
+          );
 
     // The type arguments are passed explicitly, and through the same
     // `SubtypeVersionColumnBuilders` alias the `SubtypeTables` return
@@ -649,9 +699,9 @@ type MetaOf<M, K, P extends "level" | "leaf" | "keyed"> = K extends keyof M
     : Record<never, never>
   : Record<never, never>;
 
-/** The hand-authored columns the hooks `H` give level `K`; `{}` when none. */
-type HookColumnsOf<H, K> = K extends keyof H
-  ? H[K] extends { readonly columns?: infer C }
+/** The hand-authored column map member `P` the hooks `H` give level `K`; `{}` when none. */
+type HookColumnsOf<H, K, P extends "columns" | "stableColumns" = "columns"> = K extends keyof H
+  ? H[K] extends { readonly [Q in P]?: infer C }
     ? Exclude<C, undefined> extends ColumnMap
       ? Exclude<C, undefined>
       : Record<never, never>
@@ -679,6 +729,12 @@ export type TreeVersionColumns<S, M, B extends ColumnBuilders, H, K extends keyo
     HookColumnsOf<H, K>
 >;
 
+/**
+ * The columns level `K`'s stable table carries beyond `id` and `type`: its
+ * `stableColumns` hook, `{}` when none.
+ */
+export type TreeStableColumns<H, K> = AsColumns<HookColumnsOf<H, K, "stableColumns">>;
+
 /** A fact table's column builders: the `(id, version)` key plus one fact. */
 type FactColumnBuilders<TColumns extends ColumnMap> = {
   id: SetNotNull<PgUUIDBuilder>;
@@ -700,7 +756,10 @@ export type FactTable<TColumns extends ColumnMap> = PgTableWithColumns<{
 
 /** Every level's `{ stable, version }` pair, keyed by level name. */
 export type TreeLevelTables<S, M, B extends ColumnBuilders, H> = {
-  readonly [K in keyof S & string]: SubtypeTables<TreeVersionColumns<S, M, B, H, K>>;
+  readonly [K in keyof S & string]: SubtypeTables<
+    TreeVersionColumns<S, M, B, H, K>,
+    TreeStableColumns<H, K>
+  >;
 };
 
 /** Every fact-scoped level's fact tables, keyed by level then field; `{}` for a plain level. */
@@ -848,6 +907,23 @@ export interface TreeLevelHooks {
     | ((table: Record<string, ExtraConfigColumn>) => PgTableExtraConfigValue[])
     | undefined;
   /**
+   * Hand-authored stable-table columns, after the generated `id` and `type`:
+   * immutable identity facts written once at create (an external key, say),
+   * projected into every view whose path reaches the level. `makeTreeTables`
+   * throws `DerivationError` at module load for a key the stable table
+   * (`id`, `type`) or the level's version table already has.
+   */
+  readonly stableColumns?: ColumnMap | undefined;
+  /**
+   * Extra stable-table constraints and indexes, after the generated
+   * discriminator constraints: where a key unique across the level's nodes
+   * goes (`unique("person_wikidata_id_unique").on(table.wikidataId)`), since
+   * every version row repeats a version column.
+   */
+  readonly stableConstraints?:
+    | ((table: Record<string, ExtraConfigColumn>) => PgTableExtraConfigValue[])
+    | undefined;
+  /**
    * A refinable branch: the `(id, type)` arc of this level and of every level
    * below it gets `ON UPDATE CASCADE`, so flipping the root's `type` from a
    * bare value to a concrete leaf cascades down the existing chain (website's
@@ -868,6 +944,14 @@ export interface TreeRootConfig<
   readonly version?: string | undefined;
   /** Extra identity columns (website's `slug`). */
   readonly identityColumns?: IE | undefined;
+  /**
+   * Extra identity-table constraints and indexes, after the generated
+   * `UNIQUE (id, type)`; the callback receives the identity table's columns
+   * (`identityColumns` included).
+   */
+  readonly identityConstraints?:
+    | ((table: Record<string, ExtraConfigColumn>) => PgTableExtraConfigValue[])
+    | undefined;
   /** Extra root-version columns (pulpit's `proposed_by`). */
   readonly versionColumns?: VE | undefined;
   /** The actor column's name; `actor` when absent. */
@@ -901,28 +985,20 @@ export interface TreeTablesConfig<
 }
 
 /**
- * An injected extras map, or `{}` when the member is absent.
- *
- * SAFETY: `T` is inferred from this very member, so it is a real map when the
- * member is present and defaults to `{}` (the `IE` / `VE` defaults of
- * {@link makeTreeTables}) exactly when it is absent.
- */
-const columnsOrEmpty = <T extends ColumnMap>(columns: T | undefined): T => columns ?? ({} as T);
-
-/**
  * Throws `DerivationError` at module load when an injected column map shares a
  * key with the columns a table already has, naming the key and both sources:
- * spread after them, it would silently replace the earlier column.
+ * spread after them, it would silently replace the earlier column. `target`
+ * names what gets both (`table "node"`).
  */
 const rejectSharedKeys = (
-  table: string,
+  target: string,
   existing: { readonly source: string; readonly keys: ReadonlyArray<string> },
   injected: { readonly source: string; readonly columns: ColumnMap | undefined },
 ): void =>
   Arr.forEach(R.keys(injected.columns ?? {}), (key) => {
     if (Arr.contains(existing.keys, key)) {
       treeError(
-        `table "${table}" gets "${key}" from both ${existing.source} and ${injected.source}; rename the ${injected.source} key`,
+        `${target} gets "${key}" from both ${existing.source} and ${injected.source}; rename the ${injected.source} key`,
       );
     }
   });
@@ -952,14 +1028,19 @@ const VERSION_ACTIONS = LiteralExact.tuple<VersionAction>()(["create", "update",
  * append-only `${name}_pointer` log (`seq`, `id`, a nullable `version`
  * foreign-keyed to the root version table, `at`, the actor, `recorded_at`).
  *
+ * A level's `stableColumns` hook lands on its stable table after `id` and
+ * `type`, and its `stableConstraints` after the discriminator constraints;
+ * `root.identityConstraints` follow the identity table's `UNIQUE (id, type)`.
+ *
  * Constraint names are canonical (`${table}_pkey`, `${table}_${parent}_fk`,
  * `${level}_id_type_unique` / `_fk` / `_type_valid`); no version table carries
  * `action`. Column, constraint and CHECK value order follow declaration order,
  * so the same tree always generates the same migration. Throws
  * `DerivationError` at module load for a column kind `builders` lacks, an
- * unresolvable reference, or an injected column (`root.identityColumns`,
- * `root.versionColumns`, a level's `columns` hook) whose key the table already
- * has, naming the key and both sources.
+ * unresolvable reference, an injected column (`root.identityColumns`,
+ * `root.versionColumns`, a level's `columns` or `stableColumns` hook) whose
+ * key the table already has, or a `stableColumns` key the level's version
+ * table also has, naming the key and both sources.
  *
  * Every table is typed from the tree's column phantom. The one type-erasure
  * seam is inside: the level and fact records are assembled from the runtime
@@ -1019,12 +1100,12 @@ export const makeTreeTables = <
   });
 
   rejectSharedKeys(
-    identityName,
+    `table "${identityName}"`,
     { source: "the identity table's own columns", keys: ["id", "type"] },
     { source: "root.identityColumns", columns: config.root?.identityColumns },
   );
   rejectSharedKeys(
-    versionName,
+    `table "${versionName}"`,
     {
       source: "the root version table's own columns",
       keys: ["id", "version", "action", "timestamp", "actor"],
@@ -1038,7 +1119,10 @@ export const makeTreeTables = <
       type: text("type").notNull(),
       ...columnsOrEmpty(config.root?.identityColumns),
     },
-    (table) => [toolkit.typeUnique(identityName, { id: table.id, type: table.type })],
+    (table) => [
+      toolkit.typeUnique(identityName, { id: table.id, type: table.type }),
+      ...(config.root?.identityConstraints?.(table) ?? []),
+    ],
   );
   const version = schema.table<string, RootVersionColumnBuilders<VE>>(
     versionName,
@@ -1062,7 +1146,7 @@ export const makeTreeTables = <
 
   /** One built level: its pair, plus a fact-scoped level's fact tables. */
   interface BuiltLevel {
-    readonly tables: SubtypeTables<ColumnMap>;
+    readonly tables: SubtypeTables<ColumnMap, ColumnMap>;
     readonly facts: Readonly<Record<string, PgTable>>;
   }
   const subtype = makeSubtypeTables(
@@ -1087,9 +1171,23 @@ export const makeTreeTables = <
     const own: ColumnMap = derive.fromMeta(metas);
     const factScoped = level.kind === "fact-scoped";
     rejectSharedKeys(
-      level.name,
+      `table "${level.name}"`,
       { source: `level "${level.name}"'s tree columns`, keys: ["id", "version", ...R.keys(own)] },
       { source: `levels.${level.name}.columns`, columns: hooks.columns },
+    );
+    rejectSharedKeys(
+      `table "${level.name}"`,
+      { source: "the stable table's own columns", keys: ["id", "type"] },
+      { source: `levels.${level.name}.stableColumns`, columns: hooks.stableColumns },
+    );
+    // Both tables reach every view on the level's path under their keys.
+    rejectSharedKeys(
+      `level "${level.name}"`,
+      {
+        source: `level "${level.name}"'s version columns`,
+        keys: ["version", ...R.keys(own), ...R.keys(hooks.columns ?? {})],
+      },
+      { source: `levels.${level.name}.stableColumns`, columns: hooks.stableColumns },
     );
     const tables = subtype(schema, {
       name: level.name,
@@ -1097,6 +1195,8 @@ export const makeTreeTables = <
       parentVersion: parent.version,
       columns: factScoped ? { ...hooks.columns } : { ...own, ...hooks.columns },
       extraConstraints: hooks.extraConstraints,
+      stableColumns: hooks.stableColumns,
+      stableConstraints: hooks.stableConstraints,
       discriminator: {
         stable: parent.stable,
         // A refinable level's whole subtree cascades: a flipped root `type`
@@ -1266,11 +1366,13 @@ export type TreePathOf<S, K> = K extends keyof S
   : [];
 
 /**
- * What one level contributes to a view: its version table's columns past
- * `(id, version)`, then each fact table's fact, LEFT JOINed and so nullable.
+ * What one level contributes to a view: its stable table's columns past
+ * `(id, type)`, its version table's past `(id, version)`, then each fact
+ * table's fact, LEFT JOINed and so nullable.
  */
 type LevelViewColumns<T extends AnyTreeTables, L> = L extends keyof T["levels"]
-  ? Omit<ColumnsOfTable<T["levels"][L]["version"]>, "id" | "version"> &
+  ? Omit<ColumnsOfTable<T["levels"][L]["stable"]>, "id" | "type"> &
+      Omit<ColumnsOfTable<T["levels"][L]["version"]>, "id" | "version"> &
       (L extends keyof T["facts"]
         ? {
             readonly [F in keyof T["facts"][L]]: SQL.Aliased<ColumnDataOf<
@@ -1309,7 +1411,8 @@ type IdentityViewColumns<T extends AnyTreeTables> = Omit<
 /**
  * The selection of leaf `K`'s current-version view: `id`, `version`, `action`,
  * the identity extras, every level's columns from the branch root down to the
- * leaf, then `timestamp` and `createdAt` (the version-0 timestamp).
+ * leaf (each level's `stableColumns`, then its version and fact columns), then
+ * `timestamp` and `createdAt` (the version-0 timestamp).
  */
 export type TreeLeafSelection<S, T extends AnyTreeTables, K> = Simplify<
   HeadViewColumns<T> &
@@ -1393,7 +1496,7 @@ export type TreeView<TSelection extends ViewColumns> = Omit<
 /**
  * One branch view's options. `project` adds per-leaf columns to every arm of
  * the union (a search vector, a search text): it receives the leaf's name and
- * every column the leaf's chain joins (level, leaf, hook and fact columns,
+ * every column the leaf's chain joins (level, leaf, hook, stable and fact columns,
  * keyed by field), and must return the same keys, in the same order, for
  * every leaf.
  */
@@ -1570,12 +1673,14 @@ const noProjection = (): RuntimeSelection => ({});
  * Every view resolves the head from the root version table (`MAX(version)`
  * per node), then INNER JOINs the root version row, the identity row and
  * **every level's version table** from the branch root down to the leaf at
- * that `(id, version)`, LEFT JOINs each fact table, and INNER JOINs the
+ * that `(id, version)`, INNER JOINs on `id` the stable table of every level
+ * that has `stableColumns`, LEFT JOINs each fact table, and INNER JOINs the
  * version-0 root row for `createdAt`. A node whose head advanced past any
  * level yields **no row**, never a stale older one; a tombstone yields its row
  * with `action = 'delete'`. Columns follow declaration order: `id`,
  * `version`, `action` (and a branch view's `type`), the identity extras, each
- * level's columns root-most first, `timestamp`, `createdAt`.
+ * level's columns root-most first (its `stableColumns`, then its version and
+ * fact columns), `timestamp`, `createdAt`.
  *
  * A keyed leaf also gets `${leaf}_${keyed}_view`: the leaf view LEFT JOINed
  * to its keyed table at the head, one row per key, and one row with a `NULL`
@@ -1591,8 +1696,9 @@ const noProjection = (): RuntimeSelection => ({});
  * view-on-view DROP ordering can't bite (website #1228). Throws
  * `DerivationError` at module load for a `branches` entry naming a leaf or no
  * level, a `project` whose keys differ between leaves, or a column key two of
- * a view's sources share (a level column named like a `root.identityColumns`
- * extra or `createdAt`, or a `project` key the view already selects), naming
+ * a view's sources share (a level or `stableColumns` column named like a
+ * `root.identityColumns` extra, another level's column or `createdAt`, or a
+ * `project` key the view already selects), naming
  * the key and both sources: rename one, or project it under another key.
  *
  * @example
@@ -1656,6 +1762,10 @@ export const makeTreeViews = <
     );
   const factsOf = (name: string) => Option.getOrElse(R.get(tables.facts, name), () => ({}));
 
+  /** One level's stable-table extras (its `stableColumns` hook), past `id` and `type`. */
+  const stableSelection = (name: string): RuntimeSelection =>
+    R.filter(getTableColumns(tablesOf(name).stable), (_, key) => key !== "id" && key !== "type");
+
   /** One level's columns in a view: its version columns, then its facts (nullable). */
   const levelSelection = (name: string) => ({
     ...R.filter(
@@ -1695,7 +1805,12 @@ export const makeTreeViews = <
     const versionZero = alias(tables.root.version, "version_zero");
     const zeroTimestamp = columnOf(getTableColumns(versionZero), "timestamp");
     const projection = project(
-      R.fromEntries(Arr.flatMap(path, (name) => R.toEntries(levelSelection(name)))),
+      R.fromEntries(
+        Arr.flatMap(path, (name) => [
+          ...R.toEntries(stableSelection(name)),
+          ...R.toEntries(levelSelection(name)),
+        ]),
+      ),
     );
     // A pointer arm reads `action` off the real head, so a tombstone hides
     // the node at every pointed version.
@@ -1723,10 +1838,10 @@ export const makeTreeViews = <
         }),
       },
       { source: "root.identityColumns", selection: identityExtras },
-      ...Arr.map(projected, (name) => ({
-        source: `level "${name}"`,
-        selection: levelSelection(name),
-      })),
+      ...Arr.flatMap(projected, (name) => [
+        { source: `levels.${name}.stableColumns`, selection: stableSelection(name) },
+        { source: `level "${name}"`, selection: levelSelection(name) },
+      ]),
       { source: "the keyed table", selection: keyedColumns },
       {
         source: "the chain's timestamps",
@@ -1755,9 +1870,20 @@ export const makeTreeViews = <
         .innerJoin(tables.root.identity, eq(head.id, columnOf(identity, "id"))),
       (q, name) => q.innerJoin(tablesOf(name).version, atHead(tablesOf(name).version)),
     );
+    // A level with stable columns joins its stable row on `id` (one per node,
+    // written at create). A level without any joins nothing here, so a tree
+    // with no `stableColumns` emits exactly the SQL it did before them.
+    const withStable = Arr.reduce(
+      Arr.filter(path, (name) => !R.isEmptyRecord(stableSelection(name))),
+      joined,
+      (q, name) => {
+        const stable = tablesOf(name).stable;
+        return q.innerJoin(stable, eq(head.id, columnOf(getTableColumns(stable), "id")));
+      },
+    );
     const withFacts = Arr.reduce(
       Arr.flatMap(path, (name) => R.values(factsOf(name))),
-      joined,
+      withStable,
       (q, fact) => q.leftJoin(fact, atHead(fact)),
     );
     const withKeyed = Option.match(extras.keyed, {

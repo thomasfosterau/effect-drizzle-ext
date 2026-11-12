@@ -196,6 +196,46 @@ describe("makeSubtypeTables", () => {
 
     expect(getTableConfig(version).name).toBe("sprocket_version");
   });
+
+  it("appends stableColumns after id / type and stableConstraints after the discriminator's", () => {
+    const { stable } = defineSubtypeTables(app, {
+      name: "cog",
+      parentId: entity.id,
+      parentVersion: entityVersion,
+      columns: {},
+      discriminator: { parent: { id: entity.id, type: entity.type } },
+      stableColumns: { serial: text("serial").notNull() },
+      stableConstraints: (t) => [unique("cog_serial_unique").on(t.serial)],
+    });
+    const stableCfg = getTableConfig(stable);
+    expect(stableCfg.columns.map((c) => c.name)).toEqual(["id", "type", "serial"]);
+    expect(stableCfg.uniqueConstraints.map((u) => u.getName())).toEqual([
+      "cog_id_type_unique",
+      "cog_parent_ref",
+      "cog_serial_unique",
+    ]);
+    // `type` stays `string | null` in the type, as `SubtypeStableColumnBuilders`
+    // explains; the stable columns keep their own nullability.
+    expectTypeOf<typeof stable.$inferSelect>().toEqualTypeOf<{
+      id: string;
+      type: string | null;
+      serial: string;
+    }>();
+  });
+
+  it("takes stableConstraints without a discriminator", () => {
+    const { stable } = defineSubtypeTables(app, {
+      name: "pin",
+      parentId: entity.id,
+      parentVersion: entityVersion,
+      columns: {},
+      stableColumns: { serial: text("serial") },
+      stableConstraints: (t) => [unique("pin_serial_unique").on(t.serial)],
+    });
+    expect(getTableConfig(stable).uniqueConstraints.map((u) => u.getName())).toEqual([
+      "pin_serial_unique",
+    ]);
+  });
 });
 
 describe("makeCurrentVersionView", () => {

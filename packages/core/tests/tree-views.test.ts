@@ -25,10 +25,11 @@ const builders = {
 const schema = pgSchema("ontology");
 const dialect = new PgDialect();
 
+const withSlugRoot = { identityColumns: { slug: text("slug") } };
 const frbrTables = makeTreeTables(frbrTree, {
   schema,
   builders,
-  root: { identityColumns: { slug: text("slug") } },
+  root: withSlugRoot,
 });
 const frbrViews = makeTreeViews(frbrTree, frbrTables, {
   schema,
@@ -275,5 +276,114 @@ describe("makeTreeViews: a column key two sources share (effect-drizzle-ext#164)
       "createdAt",
     ]);
     expect(keysOf(views.branches.work).at(-1)).toBe("heading");
+  });
+});
+
+describe("makeTreeViews: stable-table columns (effect-drizzle-ext#188)", () => {
+  const tables = makeTreeTables(frbrTree, {
+    schema,
+    builders,
+    root: withSlugRoot,
+    levels: {
+      agent: { stableColumns: { externalKey: text("external_key") } },
+      person: { stableColumns: { wikidataId: text("wikidata_id") } },
+    },
+  });
+  const views = makeTreeViews(frbrTree, tables, {
+    schema,
+    branches: {
+      agent: {
+        project: (_leaf, columns) => ({
+          key: sql<string>`${columns.externalKey}`.as("key"),
+        }),
+      },
+    },
+  });
+
+  it("projects each level's stable columns before its version columns", () => {
+    expect(keysOf(views.leaves.person)).toEqual([
+      "id",
+      "version",
+      "action",
+      "slug",
+      "externalKey",
+      "name",
+      "wikidataId",
+      "born",
+      "timestamp",
+      "createdAt",
+    ]);
+    expect(keysOf(views.leaves.organisation)).toEqual([
+      "id",
+      "version",
+      "action",
+      "slug",
+      "externalKey",
+      "name",
+      "timestamp",
+      "createdAt",
+    ]);
+  });
+
+  it("INNER JOINs on id the stable table of each level with stable columns, and no other", () => {
+    const query = sqlOf(views.leaves.person);
+    expect(query).toContain(
+      `inner join "ontology"."agent" on "head"."id" = "ontology"."agent"."id"`,
+    );
+    expect(query).toContain(
+      `inner join "ontology"."person" on "head"."id" = "ontology"."person"."id"`,
+    );
+    expect(sqlOf(views.leaves.book)).toBe(sqlOf(frbrViews.leaves.book));
+    expect(query).not.toMatch(/_view"/);
+  });
+
+  it("projects a marker's stable columns into its branch view, and hands them to project", () => {
+    expect(keysOf(views.branches.agent)).toEqual([
+      "id",
+      "version",
+      "action",
+      "type",
+      "slug",
+      "externalKey",
+      "name",
+      "timestamp",
+      "createdAt",
+      "key",
+    ]);
+    expect(sqlOf(views.branches.agent)).toContain(`"ontology"."agent"."external_key"`);
+  });
+
+  it("types the stable columns into the leaf, branch and as-of selections", () => {
+    type Person = typeof views.leaves.person.$inferSelect;
+    expectTypeOf<Person["wikidataId"]>().toBeNullable();
+    expectTypeOf<NonNullable<Person["wikidataId"]>>().toEqualTypeOf<string>();
+    expectTypeOf<NonNullable<Person["externalKey"]>>().toEqualTypeOf<string>();
+    type Agent = typeof views.branches.agent.$inferSelect;
+    expectTypeOf<Agent["externalKey"]>().toBeNullable();
+    expectTypeOf<NonNullable<Agent["externalKey"]>>().toEqualTypeOf<string>();
+    // A level below the branch's marker projects nothing into it.
+    expectTypeOf<"wikidataId" extends keyof Agent ? true : false>().toEqualTypeOf<false>();
+    expectTypeOf(views.asOf("person", { version: 0n }).wikidataId).not.toBeAny();
+  });
+
+  it("throws for a stable column sharing a key with another source of the view", () => {
+    const clashing = makeTreeTables(frbrTree, {
+      schema,
+      builders,
+      root: withSlugRoot,
+      levels: { agent: { stableColumns: { born: text("born_text") } } },
+    });
+    expect(() => makeTreeViews(frbrTree, clashing, { schema })).toThrow(
+      /view "person_view" selects "born" from both levels\.agent\.stableColumns and level "person"/,
+    );
+    const shadowingSlug = makeTreeTables(frbrTree, {
+      schema,
+      builders,
+      root: withSlugRoot,
+      levels: { person: { stableColumns: { slug: text("person_slug") } } },
+    });
+    expect(() => makeTreeViews(frbrTree, shadowingSlug, { schema })).toThrow(
+      /selects "slug" from both root.identityColumns and levels\.person\.stableColumns/,
+    );
   });
 });

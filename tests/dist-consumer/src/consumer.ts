@@ -283,6 +283,10 @@ const ontologyTables = makeTreeTables(ontologyTree, {
   schema: ontology,
   builders: { text: (c: string) => text(c), integer: (c: string) => integer(c) },
   root: { pointers: ["live"] },
+  levels: {
+    work: { stableColumns: { workKey: text("work_key") } },
+    novel: { stableColumns: { externalId: text("external_id").notNull() } },
+  },
 });
 export const ontologyViews = makeTreeViews(ontologyTree, ontologyTables, {
   schema: ontology,
@@ -296,6 +300,7 @@ type NovelLiveRow = typeof ontologyViews.pointers.live.leaves.novel.$inferSelect
 type NovelLocaleLiveRow = typeof ontologyViews.pointers.live.keyed.novel.$inferSelect;
 type NovelLocaleTableRow = typeof ontologyTables.keyed.novel.$inferSelect;
 type LivePointerRow = typeof ontologyTables.pointers.live.$inferSelect;
+type NovelStableRow = typeof ontologyTables.levels.novel.stable.$inferSelect;
 export const novelAsOf = ontologyViews.asOf("novel", { version: 0n });
 
 // ── chain ─────────────────────────────────────────────────────────────────
@@ -308,8 +313,10 @@ export const chain = PgChain.makeVersionChain({
 });
 export const novelCreated = chain.novel.create({
   state: { title: "Dune", words: 1 },
+  stable: { externalId: "Q190192" },
   actor: undefined,
 });
+type NovelStableInput = NonNullable<Parameters<typeof chain.novel.create>[0]["stable"]>;
 export const novelUpdated = chain.novel.update({ id: "x", patch: { words: null }, actor: "a" });
 export const novelSnapshot = chain.novel.getVersion("x", 0n);
 type NovelState = Effect.Success<typeof novelSnapshot>["state"];
@@ -458,6 +465,14 @@ export type Checks = [
   /** _novelLocaleLiveAt */ Assert<Equals<NovelLocaleLiveRow["liveAt"], Date>>,
   /** _keyedTableLocale */ Assert<Equals<NovelLocaleTableRow["locale"], string>>,
   /** _pointerVersion */ Assert<Equals<LivePointerRow["version"], bigint | null>>,
+  /** _stableTableExternalId */ Assert<Equals<NovelStableRow["externalId"], string>>,
+  /** _stableTableType */ Assert<Equals<NovelStableRow["type"], string | null>>,
+  /** _novelViewExternalId */ Assert<Equals<NovelViewRow["externalId"], string>>,
+  /** _novelViewWorkKey */ Assert<Equals<NovelViewRow["workKey"], string | null>>,
+  /** _workViewWorkKey */ Assert<Equals<WorkViewRow["workKey"], string | null>>,
+  /** _novelLiveExternalId */ Assert<Equals<NovelLiveRow["externalId"], string>>,
+  /** _chainStableExternalId */ Assert<Equals<NovelStableInput["externalId"], string>>,
+  /** _chainStableWorkKey */ Assert<Equals<NovelStableInput["workKey"], string | null | undefined>>,
   /** _chainStateTitle */ Assert<Equals<NovelState["title"], string>>,
   /** _chainStateWords */ Assert<Equals<NovelState["words"], number | null>>,
   /** _chainCreateRequiresTx */ Assert<

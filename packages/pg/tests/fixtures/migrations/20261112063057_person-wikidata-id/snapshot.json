@@ -1,0 +1,124 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "777de343-413e-4552-9764-372470f12e36",
+  "prevIds": [
+    "f70c5c53-7579-4ef6-bf6d-fc263c85ed24"
+  ],
+  "footprints": [
+    {
+      "statementType": "drop_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "person_view"
+      ],
+      "writes": [
+        "s|view|ontology.person_view",
+        "n|view|ontology.person_view",
+        "e|view|ontology.person_view",
+        "n|rel|ontology.person_view",
+        "n|type|ontology.person_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "ontology",
+        "person",
+        "wikidata_id"
+      ],
+      "writes": [
+        "s|col|ontology.person.wikidata_id",
+        "n|col|ontology.person.wikidata_id",
+        "e|col|ontology.person.wikidata_id"
+      ],
+      "reads": [
+        "n|tbl|ontology.person",
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "add_unique",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "person"
+      ],
+      "writes": [
+        "s|uq|ontology.person.person_wikidata_id_unique",
+        "n|uq|ontology.person.person_wikidata_id_unique",
+        "e|uq|ontology.person.person_wikidata_id_unique",
+        "n|con|ontology.person.person_wikidata_id_unique",
+        "n|rel|ontology.person_wikidata_id_unique"
+      ],
+      "reads": [
+        "n|tbl|ontology.person",
+        "n|sch|ontology",
+        "n|col|ontology.person.wikidata_id"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "person_view"
+      ],
+      "writes": [
+        "s|view|ontology.person_view",
+        "n|view|ontology.person_view",
+        "e|view|ontology.person_view",
+        "n|rel|ontology.person_view",
+        "n|type|ontology.person_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "person",
+        "name": "wikidata_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "person",
+        "name": "person_wikidata_id_unique",
+        "nameExplicit": true,
+        "columns": [
+          "wikidata_id"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "views\u0000[\"ontology\",\"person_view\"]",
+      "set": {
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"person\".\"wikidata_id\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from (select \"id\", max(\"version\") as \"head_version\" from \"ontology\".\"node_version\" group by \"ontology\".\"node_version\".\"id\") \"head\" inner join \"ontology\".\"node_version\" on ((\"head\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"head\".\"head_version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"head\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"agent_version\" on ((\"head\".\"id\" = \"ontology\".\"agent_version\".\"id\") and (\"head\".\"head_version\" = \"ontology\".\"agent_version\".\"version\")) inner join \"ontology\".\"person_version\" on ((\"head\".\"id\" = \"ontology\".\"person_version\".\"id\") and (\"head\".\"head_version\" = \"ontology\".\"person_version\".\"version\")) inner join \"ontology\".\"person\" on \"head\".\"id\" = \"ontology\".\"person\".\"id\" inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"head\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0))"
+      }
+    }
+  ]
+}
