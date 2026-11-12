@@ -9,7 +9,8 @@
  * the driver error inside its `reasons`).
  */
 
-import { describe, expect, it } from "vite-plus/test";
+import { it } from "@effect/vitest";
+import { describe, expect } from "vite-plus/test";
 import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -33,7 +34,6 @@ import {
   UniqueViolation,
 } from "../src/errors.ts";
 import type { ClassifiedError } from "../src/errors.ts";
-import { runPromise } from "./harness.ts";
 
 /**
  * Classifies `error`, asserts which tag came back, and narrows to that member
@@ -370,65 +370,67 @@ describe("isRetryableTransactionFailure", () => {
 // ── Effect combinators ─────────────────────────────────────────────
 
 describe("catchConstraintViolation", () => {
-  it("recovers a matching failure with the classified violation", async () => {
-    const recovered = await runPromise(
-      Effect.fail(drizzleWrapped(notNullFixture)).pipe(
+  it.effect("recovers a matching failure with the classified violation", () =>
+    Effect.gen(function* () {
+      const recovered = yield* Effect.fail(drizzleWrapped(notNullFixture)).pipe(
         catchConstraintViolation((violation) =>
           Effect.succeed(`${violation._tag}:${Option.getOrElse(violation.table, () => "?")}`),
         ),
-      ),
-    );
-    expect(recovered).toBe("NotNullViolation:widget");
-  });
+      );
+      expect(recovered).toBe("NotNullViolation:widget");
+    }),
+  );
 
-  it("leaves an unrelated failure untouched", async () => {
-    const failure = await runPromise(
-      Effect.flip(
+  it.effect("leaves an unrelated failure untouched", () =>
+    Effect.gen(function* () {
+      const failure = yield* Effect.flip(
         Effect.fail("unrelated").pipe(catchConstraintViolation(() => Effect.succeed("recovered"))),
-      ),
-    );
-    expect(failure).toBe("unrelated");
-  });
+      );
+      expect(failure).toBe("unrelated");
+    }),
+  );
 
-  it("leaves a retryable transaction failure untouched", async () => {
-    const failure = await runPromise(
-      Effect.flip(
+  it.effect("leaves a retryable transaction failure untouched", () =>
+    Effect.gen(function* () {
+      const failure = yield* Effect.flip(
         Effect.fail(serializationFixture).pipe(
           catchConstraintViolation(() => Effect.succeed("recovered")),
         ),
-      ),
-    );
-    expect(failure).toBe(serializationFixture);
-  });
+      );
+      expect(failure).toBe(serializationFixture);
+    }),
+  );
 
-  it("does not touch a success", async () => {
-    const value = await runPromise(
-      Effect.succeed("ok").pipe(catchConstraintViolation(() => Effect.succeed("recovered"))),
-    );
-    expect(value).toBe("ok");
-  });
+  it.effect("does not touch a success", () =>
+    Effect.gen(function* () {
+      const value = yield* Effect.succeed("ok").pipe(
+        catchConstraintViolation(() => Effect.succeed("recovered")),
+      );
+      expect(value).toBe("ok");
+    }),
+  );
 });
 
 describe("catchUniqueViolation", () => {
-  it("recovers a 23505 with the constraint name", async () => {
-    const recovered = await runPromise(
-      Effect.fail(drizzleWrapped(uniqueFixture)).pipe(
+  it.effect("recovers a 23505 with the constraint name", () =>
+    Effect.gen(function* () {
+      const recovered = yield* Effect.fail(drizzleWrapped(uniqueFixture)).pipe(
         catchUniqueViolation((violation) =>
           Effect.succeed(Option.getOrElse(violation.constraint, () => "?")),
         ),
-      ),
-    );
-    expect(recovered).toBe("widget_slug_unique");
-  });
+      );
+      expect(recovered).toBe("widget_slug_unique");
+    }),
+  );
 
-  it("passes another constraint violation through unchanged", async () => {
-    const failure = await runPromise(
-      Effect.flip(
+  it.effect("passes another constraint violation through unchanged", () =>
+    Effect.gen(function* () {
+      const failure = yield* Effect.flip(
         Effect.fail(foreignKeyFixture).pipe(
           catchUniqueViolation(() => Effect.succeed("recovered")),
         ),
-      ),
-    );
-    expect(failure).toBe(foreignKeyFixture);
-  });
+      );
+      expect(failure).toBe(foreignKeyFixture);
+    }),
+  );
 });

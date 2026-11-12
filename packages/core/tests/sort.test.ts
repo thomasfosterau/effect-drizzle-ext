@@ -31,7 +31,8 @@ import {
 } from "drizzle-orm/pg-core";
 import * as Effect from "effect/Effect";
 import * as R from "effect/Record";
-import { describe, expect, it } from "vite-plus/test";
+import { it } from "@effect/vitest";
+import { describe, expect } from "vite-plus/test";
 import {
   chronologicalOrder,
   type OrderTerm,
@@ -42,7 +43,6 @@ import {
   UnsupportedSortError,
 } from "../src/sort.ts";
 import { makeCurrentVersionView } from "../src/versioned-chain.ts";
-import { runSync } from "./harness.ts";
 
 // ── fixture: a two-level chain and its current-version view ──────────────
 
@@ -124,13 +124,17 @@ const orderClause = (order: ReadonlyArray<OrderTerm>): string => {
 };
 
 /** Resolve then render, the way a list operation does. */
-const orderByFor = (options: Omit<ResolveSortOrderOptions, "view">): string =>
-  orderClause(runSync(resolveSortOrder({ view: postView, ...options })));
+const orderByFor = (
+  options: Omit<ResolveSortOrderOptions, "view">,
+): Effect.Effect<string, UnsupportedSortError> =>
+  Effect.map(resolveSortOrder({ view: postView, ...options }), orderClause);
 
 /** Resolve and return the failure, if any. */
-const failureOf = (options: Omit<ResolveSortOrderOptions, "view">): UnsupportedSortError =>
-  // `flip` turns an unexpected success into the failure `runSync` throws.
-  runSync(Effect.flip(resolveSortOrder({ view: postView, ...options })));
+const failureOf = (
+  options: Omit<ResolveSortOrderOptions, "view">,
+): Effect.Effect<UnsupportedSortError, ReadonlyArray<OrderTerm>> =>
+  // `flip` turns an unexpected success into a failure the test run rejects.
+  Effect.flip(resolveSortOrder({ view: postView, ...options }));
 
 const keys = (...fields: string[]): ReadonlyArray<SortKey> =>
   fields.map((field) =>
@@ -200,148 +204,198 @@ describe("sortableColumnsFor", () => {
 // ── resolveSortOrder without a client sort ───────────────────────────────
 
 describe("resolveSortOrder without a client sort", () => {
-  it("keeps the resource's own order and closes it with the `id` tiebreak", () => {
-    expect(orderByFor({ fallback: [postView.publishedAt] })).toBe(
-      `order by "post_view"."published_at", "post_view"."id"`,
-    );
-  });
+  it.effect("keeps the resource's own order and closes it with the `id` tiebreak", () =>
+    Effect.gen(function* () {
+      expect(yield* orderByFor({ fallback: [postView.publishedAt] })).toBe(
+        `order by "post_view"."published_at", "post_view"."id"`,
+      );
+    }),
+  );
 
-  it("does not double the tiebreak when the fallback already ends in `id`", () => {
-    // Drizzle hands back a fresh proxy per column access, so this is matched
-    // by column name — an identity check would silently never fire.
-    expect(orderByFor({ fallback: [postView.publishedAt, postView.id] })).toBe(
-      `order by "post_view"."published_at", "post_view"."id"`,
-    );
-  });
+  it.effect("does not double the tiebreak when the fallback already ends in `id`", () =>
+    Effect.gen(function* () {
+      // Drizzle hands back a fresh proxy per column access, so this is matched
+      // by column name — an identity check would silently never fire.
+      expect(yield* orderByFor({ fallback: [postView.publishedAt, postView.id] })).toBe(
+        `order by "post_view"."published_at", "post_view"."id"`,
+      );
+    }),
+  );
 
-  it("mirrors the tiebreak direction for a newest-first fallback", () => {
-    expect(orderByFor({ fallback: [desc(postView.timestamp)], tiebreak: "desc" })).toBe(
-      `order by "post_view"."timestamp" desc, "post_view"."id" desc`,
-    );
-  });
+  it.effect("mirrors the tiebreak direction for a newest-first fallback", () =>
+    Effect.gen(function* () {
+      expect(yield* orderByFor({ fallback: [desc(postView.timestamp)], tiebreak: "desc" })).toBe(
+        `order by "post_view"."timestamp" desc, "post_view"."id" desc`,
+      );
+    }),
+  );
 
-  it("treats an empty sort list as no sort at all", () => {
-    expect(orderByFor({ sort: [], fallback: [] })).toBe(`order by "post_view"."id"`);
-  });
+  it.effect("treats an empty sort list as no sort at all", () =>
+    Effect.gen(function* () {
+      expect(yield* orderByFor({ sort: [], fallback: [] })).toBe(`order by "post_view"."id"`);
+    }),
+  );
 });
 
 // ── resolveSortOrder with a client sort ──────────────────────────────────
 
 describe("resolveSortOrder with a client sort", () => {
-  it("replaces the resource's order and appends a mirrored `id` tiebreak", () => {
-    expect(
-      orderByFor({
-        sort: keys("-publishedAt"),
-        fallback: [desc(postView.timestamp)],
-        tiebreak: "desc",
-      }),
-    ).toBe(`order by "post_view"."published_at" desc, "post_view"."id" desc`);
-  });
+  it.effect("replaces the resource's order and appends a mirrored `id` tiebreak", () =>
+    Effect.gen(function* () {
+      expect(
+        yield* orderByFor({
+          sort: keys("-publishedAt"),
+          fallback: [desc(postView.timestamp)],
+          tiebreak: "desc",
+        }),
+      ).toBe(`order by "post_view"."published_at" desc, "post_view"."id" desc`);
+    }),
+  );
 
-  it("preserves key order and per-key direction across several keys", () => {
-    expect(orderByFor({ sort: keys("-publishedAt", "name"), fallback: [] })).toBe(
-      `order by "post_view"."published_at" desc, "post_view"."name" asc, "post_view"."id" asc`,
-    );
-  });
+  it.effect("preserves key order and per-key direction across several keys", () =>
+    Effect.gen(function* () {
+      expect(yield* orderByFor({ sort: keys("-publishedAt", "name"), fallback: [] })).toBe(
+        `order by "post_view"."published_at" desc, "post_view"."name" asc, "post_view"."id" asc`,
+      );
+    }),
+  );
 
-  it("resolves `updatedAt` onto the current version's timestamp", () => {
-    expect(orderByFor({ sort: keys("-updatedAt") })).toBe(
-      `order by "post_view"."timestamp" desc, "post_view"."id" desc`,
-    );
-  });
+  it.effect("resolves `updatedAt` onto the current version's timestamp", () =>
+    Effect.gen(function* () {
+      expect(yield* orderByFor({ sort: keys("-updatedAt") })).toBe(
+        `order by "post_view"."timestamp" desc, "post_view"."id" desc`,
+      );
+    }),
+  );
 
-  it("renders the aliased `createdAt` against the view, not its inner expression", () => {
-    // The ordering must name the view's own output column, or the statement
-    // would reference a table alias that doesn't exist in this query.
-    expect(orderByFor({ sort: keys("createdAt") })).toBe(
-      `order by "post_view"."created_at" asc, "post_view"."id" asc`,
-    );
-  });
+  it.effect("renders the aliased `createdAt` against the view, not its inner expression", () =>
+    Effect.gen(function* () {
+      // The ordering must name the view's own output column, or the statement
+      // would reference a table alias that doesn't exist in this query.
+      expect(yield* orderByFor({ sort: keys("createdAt") })).toBe(
+        `order by "post_view"."created_at" asc, "post_view"."id" asc`,
+      );
+    }),
+  );
 
-  it("does not append a second `id` term when the caller sorted by `id`", () => {
-    expect(orderByFor({ sort: keys("-id") })).toBe(`order by "post_view"."id" desc`);
-  });
+  it.effect("does not append a second `id` term when the caller sorted by `id`", () =>
+    Effect.gen(function* () {
+      expect(yield* orderByFor({ sort: keys("-id") })).toBe(`order by "post_view"."id" desc`);
+    }),
+  );
 
-  it("honours an explicit `sortable` override instead of the derived set", () => {
-    expect(orderByFor({ sort: keys("headline"), sortable: { headline: postView.name } })).toBe(
-      `order by "post_view"."name" asc, "post_view"."id" asc`,
-    );
-  });
+  it.effect("honours an explicit `sortable` override instead of the derived set", () =>
+    Effect.gen(function* () {
+      expect(
+        yield* orderByFor({ sort: keys("headline"), sortable: { headline: postView.name } }),
+      ).toBe(`order by "post_view"."name" asc, "post_view"."id" asc`);
+    }),
+  );
 
-  it("keeps the page window bounded — sorting never removes the LIMIT", () => {
-    const order = runSync(resolveSortOrder({ view: postView, sort: keys("-publishedAt") }));
-    const query = db
-      .select({ id: postView.id })
-      .from(postView)
-      .orderBy(...order)
-      .limit(10)
-      .offset(0);
-    expect(dialect.sqlToQuery(query.getSQL()).sql).toContain("limit");
-  });
+  it.effect("keeps the page window bounded — sorting never removes the LIMIT", () =>
+    Effect.gen(function* () {
+      const order = yield* resolveSortOrder({ view: postView, sort: keys("-publishedAt") });
+      const query = db
+        .select({ id: postView.id })
+        .from(postView)
+        .orderBy(...order)
+        .limit(10)
+        .offset(0);
+      expect(dialect.sqlToQuery(query.getSQL()).sql).toContain("limit");
+    }),
+  );
 });
 
 // ── resolveSortOrder rejects what a resource does not expose ─────────────
 
 describe("resolveSortOrder rejects what a resource does not expose", () => {
-  it("refuses an unknown field", () => {
-    expect(failureOf({ sort: keys("nonesuch") })).toBeInstanceOf(UnsupportedSortError);
-  });
+  it.effect("refuses an unknown field", () =>
+    Effect.gen(function* () {
+      expect(yield* failureOf({ sort: keys("nonesuch") })).toBeInstanceOf(UnsupportedSortError);
+    }),
+  );
 
-  it("refuses a version-chain internal", () => {
-    expect(failureOf({ sort: keys("action") }).message).toMatch(/unsupported\.sort-field/);
-  });
+  it.effect("refuses a version-chain internal", () =>
+    Effect.gen(function* () {
+      expect((yield* failureOf({ sort: keys("action") })).message).toMatch(
+        /unsupported\.sort-field/,
+      );
+    }),
+  );
 
-  it("refuses a column that has no useful order", () => {
-    expect(failureOf({ sort: keys("content") }).message).toMatch(/unsupported\.sort-field/);
-  });
+  it.effect("refuses a column that has no useful order", () =>
+    Effect.gen(function* () {
+      expect((yield* failureOf({ sort: keys("content") })).message).toMatch(
+        /unsupported\.sort-field/,
+      );
+    }),
+  );
 
-  it("names the offending field and the fields it could have asked for", () => {
-    const error = failureOf({ sort: keys("nonesuch") });
-    expect(error._tag).toBe("UnsupportedSortError");
-    expect(error.field).toBe("nonesuch");
-    expect(error.code).toBe("unsupported.sort-field");
-    expect(error.allowed).toContain("createdAt");
-    expect(error.allowed).toEqual(error.allowed.toSorted());
-    expect(error.message).toContain("nonesuch");
-  });
+  it.effect("names the offending field and the fields it could have asked for", () =>
+    Effect.gen(function* () {
+      const error = yield* failureOf({ sort: keys("nonesuch") });
+      expect(error._tag).toBe("UnsupportedSortError");
+      expect(error.field).toBe("nonesuch");
+      expect(error.code).toBe("unsupported.sort-field");
+      expect(error.allowed).toContain("createdAt");
+      expect(error.allowed).toEqual(error.allowed.toSorted());
+      expect(error.message).toContain("nonesuch");
+    }),
+  );
 
-  it("rejects the whole request when only one key is bad, never half-applying it", () => {
-    expect(failureOf({ sort: keys("-publishedAt", "nonesuch") }).field).toBe("nonesuch");
-  });
+  it.effect("rejects the whole request when only one key is bad, never half-applying it", () =>
+    Effect.gen(function* () {
+      expect((yield* failureOf({ sort: keys("-publishedAt", "nonesuch") })).field).toBe("nonesuch");
+    }),
+  );
 
-  it("refuses every field for a resource that declares an empty sortable set", () => {
-    const error = failureOf({ sort: keys("name"), sortable: {} });
-    expect(error.allowed).toEqual([]);
-    expect(error.message).toContain("(none)");
-  });
+  it.effect("refuses every field for a resource that declares an empty sortable set", () =>
+    Effect.gen(function* () {
+      const error = yield* failureOf({ sort: keys("name"), sortable: {} });
+      expect(error.allowed).toEqual([]);
+      expect(error.message).toContain("(none)");
+    }),
+  );
 
-  it("is not fooled by an inherited object property", () => {
-    // `constructor` / `toString` are on every object's prototype; the
-    // allow-list check is an own-property test, so they are not sort fields.
-    expect(failureOf({ sort: keys("constructor") }).field).toBe("constructor");
-  });
+  it.effect("is not fooled by an inherited object property", () =>
+    Effect.gen(function* () {
+      // `constructor` / `toString` are on every object's prototype; the
+      // allow-list check is an own-property test, so they are not sort fields.
+      expect((yield* failureOf({ sort: keys("constructor") })).field).toBe("constructor");
+    }),
+  );
 });
 
 // ── chronologicalOrder ───────────────────────────────────────────────────
 
 /** The `order by …` clause `chronologicalOrder` resolves to over `postView`. */
-const render = (options: Omit<Parameters<typeof chronologicalOrder>[0], "view">): string =>
-  orderClause(runSync(chronologicalOrder({ view: postView, ...options })));
+const render = (
+  options: Omit<Parameters<typeof chronologicalOrder>[0], "view">,
+): Effect.Effect<string, UnsupportedSortError> =>
+  Effect.map(chronologicalOrder({ view: postView, ...options }), orderClause);
 
 describe("chronologicalOrder", () => {
-  it("defaults to newest first with a mirrored tiebreak", () => {
-    expect(render({})).toBe(`order by "post_view"."timestamp" desc, "post_view"."id" desc`);
-  });
+  it.effect("defaults to newest first with a mirrored tiebreak", () =>
+    Effect.gen(function* () {
+      expect(yield* render({})).toBe(
+        `order by "post_view"."timestamp" desc, "post_view"."id" desc`,
+      );
+    }),
+  );
 
-  it("takes an oldest-first direction", () => {
-    expect(render({ direction: "asc" })).toBe(
-      `order by "post_view"."timestamp" asc, "post_view"."id" asc`,
-    );
-  });
+  it.effect("takes an oldest-first direction", () =>
+    Effect.gen(function* () {
+      expect(yield* render({ direction: "asc" })).toBe(
+        `order by "post_view"."timestamp" asc, "post_view"."id" asc`,
+      );
+    }),
+  );
 
-  it("yields to a client sort", () => {
-    expect(render({ sort: keys("name") })).toBe(
-      `order by "post_view"."name" asc, "post_view"."id" asc`,
-    );
-  });
+  it.effect("yields to a client sort", () =>
+    Effect.gen(function* () {
+      expect(yield* render({ sort: keys("name") })).toBe(
+        `order by "post_view"."name" asc, "post_view"."id" asc`,
+      );
+    }),
+  );
 });
