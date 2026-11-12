@@ -375,11 +375,11 @@ yield * tx.update(person).set(updateSetMap(input, WRITABLE)).where(eq(person.id,
 Every class carries `cause` (the value classification started from, so the wrapping graph — drizzle's query text and params, the `SqlError` — survives). `classifyError` is `Option.none()` outside these seven (a syntax error, a connection failure — `SqlError.reason` already covers those well). `catchConstraintViolation` / `catchUniqueViolation` are data-last Effect combinators that recover the matching class and re-fail everything else, including other constraint classes, unchanged. `isUniqueViolation` is kept for adoption parity with the consuming applications' pre-existing predicate: same name, same semantics, including a fallback to the stable Postgres message fragment when no `code` survived the wrapping.
 
 ```ts
-export const findPgError: (error: unknown) => Option.Option<PgErrorFacts>;
-export const classifyError: (error: unknown) => Option.Option<ClassifiedError>;
-export const isUniqueViolation: (error: unknown) => boolean;
-export const isConstraintViolation: (error: unknown) => boolean;
-export const isRetryableTransactionFailure: (error: unknown) => boolean;
+export const findPgError: (cause: unknown) => Option.Option<PgErrorFacts>;
+export const classifyError: (cause: unknown) => Option.Option<ClassifiedError>;
+export const isUniqueViolation: (cause: unknown) => boolean;
+export const isConstraintViolation: (cause: unknown) => boolean;
+export const isRetryableTransactionFailure: (cause: unknown) => boolean;
 export const catchConstraintViolation: <A2, E2, R2>(
   f: (violation: ConstraintViolation) => Effect.Effect<A2, E2, R2>,
 ) => <A, E, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<A | A2, E | E2, R | R2>;

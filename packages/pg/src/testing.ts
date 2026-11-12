@@ -122,7 +122,7 @@ export {
 const CONNECT_SEAM_OPERATIONS = HashSet.make("acquireConnection", "connect");
 
 /**
- * Whether `error` is a `SqlError` that failed at the connect/acquire seam and
+ * Whether `cause` is a `SqlError` that failed at the connect/acquire seam and
  * so is safe to retry (when the caller has also confirmed no test body ran).
  *
  * Returns `true` for:
@@ -138,11 +138,10 @@ const CONNECT_SEAM_OPERATIONS = HashSet.make("acquireConnection", "connect");
  * `SqlSyntaxError` raised by a test's own query (`operation === "execute"`),
  * so genuine test failures are never retried.
  */
-// oxlint-disable-next-line effect/no-unknown-parameters -- published signature: the predicate classifies whatever failure value a retry's `while` hands it, and `isSqlError` is the parse; narrowing the parameter would break callers
-export const isRetryableConnectFailure = (error: unknown): boolean => {
-  if (!isSqlError(error)) return false;
-  if (error.isRetryable) return true;
-  const operation = error.reason.operation;
+export const isRetryableConnectFailure = (cause: unknown): boolean => {
+  if (!isSqlError(cause)) return false;
+  if (cause.isRetryable) return true;
+  const operation = cause.reason.operation;
   return operation !== undefined && HashSet.has(CONNECT_SEAM_OPERATIONS, operation);
 };
 
