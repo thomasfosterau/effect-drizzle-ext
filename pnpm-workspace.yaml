@@ -29,31 +29,31 @@ catalog:
   "@changesets/cli": ^3.0.3
   # Compiles AND RUNS every JSDoc `@example` (the `docgen` task); needs `tsx`
   # and a TypeScript JS API — the TS6 alias below satisfies its peer.
-  "@effect/docgen": ^4.1.2
+  "@effect/docgen": ^4.1.4
   "@effect/language-service": ^0.87.5
   # Effect Language Service as a native (TypeScript-Go) binary — the TS7 side
   # of the 6/7 split. `effect-tsgo patch` overwrites the native `tsc` binary
   # with an Effect-patched build matched by gitHead, so this pins in lockstep
   # with `@typescript/native` below and with the `oxlint` that `vite-plus`
-  # pulls in: 0.63.0 supports typescript 7.0.2 / 7.1.0-beta /
-  # 7.1.0-dev.20261028.1, oxlint 1.88.0 – 1.90.0 and oxlint-tsgolint
-  # 7.0.2004 / 7.0.2005, and hard-errors
+  # pulls in: 0.67.7 supports typescript 7.0.2 / 7.1.0-beta /
+  # 7.1.0-dev.20261109.1, oxlint 1.89.0 / 1.91.0 – 1.93.0 and oxlint-tsgolint
+  # 7.0.2004 – 7.0.2006, and hard-errors
   # (UnsupportedTargetPackageVersionError) on anything else — failing
   # `pnpm install` itself. Read the `components` table in
   # node_modules/@effect/tsgo/dist/effect-tsgo.cjs before bumping any of the
   # three.
-  "@effect/tsgo": 0.67.4
-  "@effect/sql-pg": 4.1.2
+  "@effect/tsgo": 0.67.7
+  "@effect/sql-pg": 4.1.4
   # The unit suites' Effect runner (`it.effect`), so a test yields its Effect
   # instead of calling `Effect.runPromise` in a test body
   # (effect-drizzle-ext#105). Released in lockstep with `effect` (it peers on
   # `effect ^4.1.2`, `vitest >=5 <6`), so it moves with the `effect` group.
-  "@effect/vitest": 4.1.2
+  "@effect/vitest": 4.1.4
   # The Node `FileSystem` / `Path` / `ChildProcessSpawner` layer the pg
   # package's tests provide to `./migrations`, `./testing`'s provisioning and
   # `./tooling` — a consumer provides its own (these modules only require the
   # services).
-  "@effect/platform-node": 4.1.2
+  "@effect/platform-node": 4.1.4
   # Starts the integration suite's ephemeral `pgvector/pgvector` server when no
   # local PostgreSQL is reachable — see packages/pg/tests/integration/global-setup.ts.
   "@testcontainers/postgresql": ^12.2.1
@@ -86,7 +86,7 @@ catalog:
   # on `effect` 4.1.0 exactly, but the `effect: "catalog:"` override below
   # resolves it to this workspace's singleton, which it lints fine against.
   "@enfect/oxlint": 0.10.0
-  effect: 4.1.2
+  effect: 4.1.4
   fallow: 3.42.0
   # Exists only for `@effect/docgen`, which requires it as a peer and spawns
   # the `tsx` binary itself to run the compiled examples. Scripts run
@@ -103,15 +103,15 @@ catalog:
   "@typescript/native": "npm:typescript@7.0.2"
   # vite-plus pins `oxlint`, `oxfmt` and `vitest` to exact versions, so this
   # entry decides the oxlint `effect-tsgo patch --oxlint` has to support (see
-  # the @effect/tsgo note above): 1.4.0 carries oxlint 1.89.0, oxfmt 0.74.0,
-  # oxlint-tsgolint 7.0.2004 and vitest 5.0.5. `vite` is the same release
+  # the @effect/tsgo note above): 1.6.0 carries oxlint 1.93.0, oxfmt 0.78.0,
+  # oxlint-tsgolint 7.0.2006 and vitest 5.1.0. `vite` is the same release
   # under its aliased core package, and `vitest` must match vite-plus's exact pin because the
   # `vitest: "catalog:"` override forces every resolution to the catalog
   # singleton; `@vitest/coverage-istanbul` above must equal it too, or
   # vite-plus refuses to run coverage. 1.x moved a task's `env` / `input` /
   # `output` under `cache: { … }` (see the package vite.config.ts files).
-  vite-plus: 1.5.0
-  vite: npm:@voidzero-dev/vite-plus-core@1.4.0
+  vite-plus: 1.6.0
+  vite: npm:@voidzero-dev/vite-plus-core@1.6.0
   vitest: 5.1.0
 
 # Peer ranges the PUBLISHED packages declare. Kept as a named catalog so the
