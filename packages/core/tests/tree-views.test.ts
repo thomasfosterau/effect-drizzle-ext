@@ -79,12 +79,20 @@ describe("makeTreeViews: leaf views", () => {
     ]);
   });
 
-  it("resolves the head from the root and INNER JOINs every level's version table at it", () => {
+  it("drives from the leaf's version table, keeps head rows by an anti-join, and INNER JOINs every other level at it", () => {
     const query = sqlOf(frbrViews.leaves.book);
-    expect(query).toContain(`max("version") as "head_version" from "ontology"."node_version"`);
-    expect(query).toContain(`group by "ontology"."node_version"."id"`);
-    expect(query).toContain(`inner join "ontology"."work_version"`);
-    expect(query).toContain(`inner join "ontology"."book_version"`);
+    expect(query).toContain(
+      `from "ontology"."book_version" inner join "ontology"."node_version" on`,
+    );
+    expect(query).toContain(
+      `where not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."book_version"."id") and ("newer"."version" > "ontology"."book_version"."version")))`,
+    );
+    // No grouped head: the head is a primary-key probe, not an aggregate.
+    expect(query).not.toContain("max(");
+    expect(query).not.toContain("group by");
+    expect(query).toContain(
+      `inner join "ontology"."work_version" on (("ontology"."book_version"."id" = "ontology"."work_version"."id") and ("ontology"."book_version"."version" = "ontology"."work_version"."version"))`,
+    );
     expect(query).toContain(`inner join "ontology"."node_version" "version_zero"`);
     expect(query).not.toContain("left join");
   });
@@ -152,9 +160,12 @@ describe("makeTreeViews: branch views", () => {
     ]);
     const query = sqlOf(view);
     expect(query.match(/union all/g)?.length).toBe(1);
-    // Each arm still INNER JOINs its own leaf, so it fails closed.
-    expect(query).toContain(`inner join "ontology"."book_version"`);
-    expect(query).toContain(`inner join "ontology"."essay_version"`);
+    // Each arm drives from its own leaf, with its own anti-join, so it fails closed.
+    expect(query).toContain(`from "ontology"."book_version" inner join`);
+    expect(query).toContain(`from "ontology"."essay_version" inner join`);
+    expect(query).toContain(`("newer"."id" = "ontology"."book_version"."id")`);
+    expect(query).toContain(`("newer"."id" = "ontology"."essay_version"."id")`);
+    expect(query.match(/where not exists/g)?.length).toBe(2);
     type Work = typeof view.$inferSelect;
     expectTypeOf<Work["type"]>().toEqualTypeOf<string>();
     expectTypeOf<Work["title"]>().toEqualTypeOf<string>();
@@ -200,15 +211,22 @@ describe("makeTreeViews: branch views", () => {
 describe("makeTreeViews: as-of reads", () => {
   it("bounds the head by version", () => {
     const query = dialect.sqlToQuery(sql`select * from ${frbrViews.asOf("book", { version: 2n })}`);
-    expect(query.sql).toContain(`where "ontology"."node_version"."version" <= $1`);
-    expect(query.sql).toContain(`inner join "ontology"."book_version"`);
-    expect(query.params).toContain(2n);
+    // The bound applies to the row itself and inside the anti-join.
+    expect(query.sql).toContain(
+      `where (("ontology"."node_version"."version" <= $2) and (not exists`,
+    );
+    expect(query.sql).toContain(`and ("newer"."version" <= $3))`);
+    expect(query.sql).toContain(`from "ontology"."book_version" inner join`);
+    expect(query.params).toEqual([0n, 2n, 2n]);
   });
 
   it("bounds the head by time", () => {
     const at = DateTime.toDateUtc(DateTime.makeUnsafe("2026-01-01T00:00:00.000Z"));
     const query = dialect.sqlToQuery(sql`select * from ${frbrViews.asOf("book", { at })}`);
-    expect(query.sql).toContain(`where "ontology"."node_version"."timestamp" <= $1`);
+    expect(query.sql).toContain(
+      `where (("ontology"."node_version"."timestamp" <= $2) and (not exists`,
+    );
+    expect(query.sql).toContain(`and ("newer"."timestamp" <= $3))`);
   });
 
   it("types the subquery's columns as the leaf view's", () => {
@@ -328,10 +346,10 @@ describe("makeTreeViews: stable-table columns (effect-drizzle-ext#188)", () => {
   it("INNER JOINs on id the stable table of each level with stable columns, and no other", () => {
     const query = sqlOf(views.leaves.person);
     expect(query).toContain(
-      `inner join "ontology"."agent" on "head"."id" = "ontology"."agent"."id"`,
+      `inner join "ontology"."agent" on "ontology"."person_version"."id" = "ontology"."agent"."id"`,
     );
     expect(query).toContain(
-      `inner join "ontology"."person" on "head"."id" = "ontology"."person"."id"`,
+      `inner join "ontology"."person" on "ontology"."person_version"."id" = "ontology"."person"."id"`,
     );
     expect(sqlOf(views.leaves.book)).toBe(sqlOf(frbrViews.leaves.book));
     expect(query).not.toMatch(/_view"/);

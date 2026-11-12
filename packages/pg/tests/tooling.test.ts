@@ -63,7 +63,7 @@ describe("checkMigrationDrift", () => {
     const report = await run(
       checkMigrationDrift({ schema: fixtureSchema, migrationsDir: FIXTURE_MIGRATIONS }),
     );
-    expect(report).toEqual({ snapshots: 7, baseRef: Option.none() });
+    expect(report).toEqual({ snapshots: 8, baseRef: Option.none() });
   });
 
   it("reads a full v8 snapshot as the latest state", async () => {
@@ -94,7 +94,7 @@ describe("checkMigrationDrift", () => {
     if (!(error instanceof MigrationDriftError)) throw error;
     expect(error.issues).toHaveLength(1);
     expect(error.issues[0]).toMatch(/Schema drift detected/);
-    expect(error.issues[0]).toMatch(/20261112063057_person-wikidata-id\/snapshot\.json/);
+    expect(error.issues[0]).toMatch(/20261112160706_view-head-antijoin\/snapshot\.json/);
     expect(error.issues[0]).toMatch(/CREATE TABLE "fixture"\."gadget"/);
   });
 
@@ -265,9 +265,10 @@ describe("readBaseMigrations", () => {
       "20261107072244_version-fk-cascade",
       "20261107073635_keyed-pointer",
       "20261112063057_person-wikidata-id",
+      "20261112160706_view-head-antijoin",
     ]);
     expect(Option.map(base.head, (h) => h.snapshot.id)).toEqual(
-      Option.some("777de343-413e-4552-9764-372470f12e36"),
+      Option.some("137c20ed-ae88-495b-9b2f-16f0996efa32"),
     );
   });
 });

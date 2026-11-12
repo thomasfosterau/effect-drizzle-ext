@@ -175,6 +175,14 @@ describe("makeTreeViews: pointer views", () => {
       `order by "ontology"."live_pointer"."id", "ontology"."live_pointer"."seq" desc`,
     );
     expect(query).toContain(`"head_row"."action"`);
+    // The head row is found by the same anti-join as a head view, not a grouped max.
+    expect(query).toContain(
+      `inner join "ontology"."node_version" "head_row" on "pointer"."id" = "head_row"."id"`,
+    );
+    expect(query).toContain(
+      `where not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "head_row"."id") and ("newer"."version" > "head_row"."version")))`,
+    );
+    expect(query).not.toContain("max(");
     type Row = typeof view.$inferSelect;
     expectTypeOf<Row["liveAt"]>().toEqualTypeOf<Date>();
   });

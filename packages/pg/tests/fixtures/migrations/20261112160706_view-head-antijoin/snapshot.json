@@ -1,0 +1,443 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "137c20ed-ae88-495b-9b2f-16f0996efa32",
+  "prevIds": [
+    "777de343-413e-4552-9764-372470f12e36"
+  ],
+  "footprints": [
+    {
+      "statementType": "drop_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "book_view"
+      ],
+      "writes": [
+        "s|view|ontology.book_view",
+        "n|view|ontology.book_view",
+        "e|view|ontology.book_view",
+        "n|rel|ontology.book_view",
+        "n|type|ontology.book_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "drop_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "edition_view"
+      ],
+      "writes": [
+        "s|view|ontology.edition_view",
+        "n|view|ontology.edition_view",
+        "e|view|ontology.edition_view",
+        "n|rel|ontology.edition_view",
+        "n|type|ontology.edition_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "drop_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "essay_view"
+      ],
+      "writes": [
+        "s|view|ontology.essay_view",
+        "n|view|ontology.essay_view",
+        "e|view|ontology.essay_view",
+        "n|rel|ontology.essay_view",
+        "n|type|ontology.essay_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "drop_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "organisation_view"
+      ],
+      "writes": [
+        "s|view|ontology.organisation_view",
+        "n|view|ontology.organisation_view",
+        "e|view|ontology.organisation_view",
+        "n|rel|ontology.organisation_view",
+        "n|type|ontology.organisation_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "drop_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "person_view"
+      ],
+      "writes": [
+        "s|view|ontology.person_view",
+        "n|view|ontology.person_view",
+        "e|view|ontology.person_view",
+        "n|rel|ontology.person_view",
+        "n|type|ontology.person_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "drop_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "work_view"
+      ],
+      "writes": [
+        "s|view|ontology.work_view",
+        "n|view|ontology.work_view",
+        "e|view|ontology.work_view",
+        "n|rel|ontology.work_view",
+        "n|type|ontology.work_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "drop_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "book_live_view"
+      ],
+      "writes": [
+        "s|view|ontology.book_live_view",
+        "n|view|ontology.book_live_view",
+        "e|view|ontology.book_live_view",
+        "n|rel|ontology.book_live_view",
+        "n|type|ontology.book_live_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "drop_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "essay_live_view"
+      ],
+      "writes": [
+        "s|view|ontology.essay_live_view",
+        "n|view|ontology.essay_live_view",
+        "e|view|ontology.essay_live_view",
+        "n|rel|ontology.essay_live_view",
+        "n|type|ontology.essay_live_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "drop_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "essay_locale_live_view"
+      ],
+      "writes": [
+        "s|view|ontology.essay_locale_live_view",
+        "n|view|ontology.essay_locale_live_view",
+        "e|view|ontology.essay_locale_live_view",
+        "n|rel|ontology.essay_locale_live_view",
+        "n|type|ontology.essay_locale_live_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "drop_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "essay_locale_view"
+      ],
+      "writes": [
+        "s|view|ontology.essay_locale_view",
+        "n|view|ontology.essay_locale_view",
+        "e|view|ontology.essay_locale_view",
+        "n|rel|ontology.essay_locale_view",
+        "n|type|ontology.essay_locale_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "book_view"
+      ],
+      "writes": [
+        "s|view|ontology.book_view",
+        "n|view|ontology.book_view",
+        "e|view|ontology.book_view",
+        "n|rel|ontology.book_view",
+        "n|type|ontology.book_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "edition_view"
+      ],
+      "writes": [
+        "s|view|ontology.edition_view",
+        "n|view|ontology.edition_view",
+        "e|view|ontology.edition_view",
+        "n|rel|ontology.edition_view",
+        "n|type|ontology.edition_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "essay_view"
+      ],
+      "writes": [
+        "s|view|ontology.essay_view",
+        "n|view|ontology.essay_view",
+        "e|view|ontology.essay_view",
+        "n|rel|ontology.essay_view",
+        "n|type|ontology.essay_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "organisation_view"
+      ],
+      "writes": [
+        "s|view|ontology.organisation_view",
+        "n|view|ontology.organisation_view",
+        "e|view|ontology.organisation_view",
+        "n|rel|ontology.organisation_view",
+        "n|type|ontology.organisation_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "person_view"
+      ],
+      "writes": [
+        "s|view|ontology.person_view",
+        "n|view|ontology.person_view",
+        "e|view|ontology.person_view",
+        "n|rel|ontology.person_view",
+        "n|type|ontology.person_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "work_view"
+      ],
+      "writes": [
+        "s|view|ontology.work_view",
+        "n|view|ontology.work_view",
+        "e|view|ontology.work_view",
+        "n|rel|ontology.work_view",
+        "n|type|ontology.work_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "book_live_view"
+      ],
+      "writes": [
+        "s|view|ontology.book_live_view",
+        "n|view|ontology.book_live_view",
+        "e|view|ontology.book_live_view",
+        "n|rel|ontology.book_live_view",
+        "n|type|ontology.book_live_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "essay_live_view"
+      ],
+      "writes": [
+        "s|view|ontology.essay_live_view",
+        "n|view|ontology.essay_live_view",
+        "e|view|ontology.essay_live_view",
+        "n|rel|ontology.essay_live_view",
+        "n|type|ontology.essay_live_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "essay_locale_live_view"
+      ],
+      "writes": [
+        "s|view|ontology.essay_locale_live_view",
+        "n|view|ontology.essay_locale_live_view",
+        "e|view|ontology.essay_locale_live_view",
+        "n|rel|ontology.essay_locale_live_view",
+        "n|type|ontology.essay_locale_live_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "essay_locale_view"
+      ],
+      "writes": [
+        "s|view|ontology.essay_locale_view",
+        "n|view|ontology.essay_locale_view",
+        "e|view|ontology.essay_locale_view",
+        "n|rel|ontology.essay_locale_view",
+        "n|type|ontology.essay_locale_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "alter",
+      "key": "views\u0000[\"ontology\",\"book_view\"]",
+      "set": {
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"work_version\".\"title\", \"ontology\".\"book_version\".\"pages\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from \"ontology\".\"book_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"book_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"book_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"book_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"work_version\" on ((\"ontology\".\"book_version\".\"id\" = \"ontology\".\"work_version\".\"id\") and (\"ontology\".\"book_version\".\"version\" = \"ontology\".\"work_version\".\"version\")) inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"book_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"book_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"book_version\".\"version\")))"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "views\u0000[\"ontology\",\"edition_view\"]",
+      "set": {
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"manifestation_isbn\".\"isbn\" as \"isbn\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from \"ontology\".\"edition_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"edition_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"edition_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"edition_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"manifestation_version\" on ((\"ontology\".\"edition_version\".\"id\" = \"ontology\".\"manifestation_version\".\"id\") and (\"ontology\".\"edition_version\".\"version\" = \"ontology\".\"manifestation_version\".\"version\")) left join \"ontology\".\"manifestation_isbn\" on ((\"ontology\".\"edition_version\".\"id\" = \"ontology\".\"manifestation_isbn\".\"id\") and (\"ontology\".\"edition_version\".\"version\" = \"ontology\".\"manifestation_isbn\".\"version\")) inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"edition_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"edition_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"edition_version\".\"version\")))"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "views\u0000[\"ontology\",\"essay_view\"]",
+      "set": {
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"work_version\".\"title\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from \"ontology\".\"essay_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"essay_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"essay_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"essay_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"work_version\" on ((\"ontology\".\"essay_version\".\"id\" = \"ontology\".\"work_version\".\"id\") and (\"ontology\".\"essay_version\".\"version\" = \"ontology\".\"work_version\".\"version\")) inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"essay_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"essay_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"essay_version\".\"version\")))"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "views\u0000[\"ontology\",\"organisation_view\"]",
+      "set": {
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from \"ontology\".\"organisation_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"organisation_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"organisation_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"organisation_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"agent_version\" on ((\"ontology\".\"organisation_version\".\"id\" = \"ontology\".\"agent_version\".\"id\") and (\"ontology\".\"organisation_version\".\"version\" = \"ontology\".\"agent_version\".\"version\")) inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"organisation_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"organisation_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"organisation_version\".\"version\")))"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "views\u0000[\"ontology\",\"person_view\"]",
+      "set": {
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"person\".\"wikidata_id\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from \"ontology\".\"person_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"person_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"person_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"person_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"agent_version\" on ((\"ontology\".\"person_version\".\"id\" = \"ontology\".\"agent_version\".\"id\") and (\"ontology\".\"person_version\".\"version\" = \"ontology\".\"agent_version\".\"version\")) inner join \"ontology\".\"person\" on \"ontology\".\"person_version\".\"id\" = \"ontology\".\"person\".\"id\" inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"person_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"person_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"person_version\".\"version\")))"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "views\u0000[\"ontology\",\"work_view\"]",
+      "set": {
+        "definition": "(select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"node\".\"type\", \"ontology\".\"work_version\".\"title\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from \"ontology\".\"book_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"book_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"book_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"book_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"work_version\" on ((\"ontology\".\"book_version\".\"id\" = \"ontology\".\"work_version\".\"id\") and (\"ontology\".\"book_version\".\"version\" = \"ontology\".\"work_version\".\"version\")) inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"book_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"book_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"book_version\".\"version\")))) union all (select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"node\".\"type\", \"ontology\".\"work_version\".\"title\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from \"ontology\".\"essay_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"essay_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"essay_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"essay_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"work_version\" on ((\"ontology\".\"essay_version\".\"id\" = \"ontology\".\"work_version\".\"id\") and (\"ontology\".\"essay_version\".\"version\" = \"ontology\".\"work_version\".\"version\")) inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"essay_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"essay_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"essay_version\".\"version\"))))"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "views\u0000[\"ontology\",\"book_live_view\"]",
+      "set": {
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"head_row\".\"action\", \"ontology\".\"work_version\".\"title\", \"ontology\".\"book_version\".\"pages\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\", \"pointer\".\"at\" as \"live_at\" from (select distinct on (\"ontology\".\"live_pointer\".\"id\") \"id\", \"version\" as \"pointer_version\", \"at\" from \"ontology\".\"live_pointer\" where \"ontology\".\"live_pointer\".\"at\" <= now() order by \"ontology\".\"live_pointer\".\"id\", \"ontology\".\"live_pointer\".\"seq\" desc) \"pointer\" inner join \"ontology\".\"node_version\" on ((\"pointer\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"pointer\".\"pointer_version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"pointer\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"work_version\" on ((\"pointer\".\"id\" = \"ontology\".\"work_version\".\"id\") and (\"pointer\".\"pointer_version\" = \"ontology\".\"work_version\".\"version\")) inner join \"ontology\".\"book_version\" on ((\"pointer\".\"id\" = \"ontology\".\"book_version\".\"id\") and (\"pointer\".\"pointer_version\" = \"ontology\".\"book_version\".\"version\")) inner join \"ontology\".\"node_version\" \"head_row\" on \"pointer\".\"id\" = \"head_row\".\"id\" inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"pointer\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"head_row\".\"id\") and (\"newer\".\"version\" > \"head_row\".\"version\")))"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "views\u0000[\"ontology\",\"essay_live_view\"]",
+      "set": {
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"head_row\".\"action\", \"ontology\".\"work_version\".\"title\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\", \"pointer\".\"at\" as \"live_at\" from (select distinct on (\"ontology\".\"live_pointer\".\"id\") \"id\", \"version\" as \"pointer_version\", \"at\" from \"ontology\".\"live_pointer\" where \"ontology\".\"live_pointer\".\"at\" <= now() order by \"ontology\".\"live_pointer\".\"id\", \"ontology\".\"live_pointer\".\"seq\" desc) \"pointer\" inner join \"ontology\".\"node_version\" on ((\"pointer\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"pointer\".\"pointer_version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"pointer\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"work_version\" on ((\"pointer\".\"id\" = \"ontology\".\"work_version\".\"id\") and (\"pointer\".\"pointer_version\" = \"ontology\".\"work_version\".\"version\")) inner join \"ontology\".\"essay_version\" on ((\"pointer\".\"id\" = \"ontology\".\"essay_version\".\"id\") and (\"pointer\".\"pointer_version\" = \"ontology\".\"essay_version\".\"version\")) inner join \"ontology\".\"node_version\" \"head_row\" on \"pointer\".\"id\" = \"head_row\".\"id\" inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"pointer\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"head_row\".\"id\") and (\"newer\".\"version\" > \"head_row\".\"version\")))"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "views\u0000[\"ontology\",\"essay_locale_live_view\"]",
+      "set": {
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"head_row\".\"action\", \"ontology\".\"work_version\".\"title\", \"ontology\".\"essay_locale\".\"locale\" as \"locale\", \"ontology\".\"essay_locale\".\"abstract\" as \"abstract\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\", \"pointer\".\"at\" as \"live_at\" from (select distinct on (\"ontology\".\"live_pointer\".\"id\") \"id\", \"version\" as \"pointer_version\", \"at\" from \"ontology\".\"live_pointer\" where \"ontology\".\"live_pointer\".\"at\" <= now() order by \"ontology\".\"live_pointer\".\"id\", \"ontology\".\"live_pointer\".\"seq\" desc) \"pointer\" inner join \"ontology\".\"node_version\" on ((\"pointer\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"pointer\".\"pointer_version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"pointer\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"work_version\" on ((\"pointer\".\"id\" = \"ontology\".\"work_version\".\"id\") and (\"pointer\".\"pointer_version\" = \"ontology\".\"work_version\".\"version\")) inner join \"ontology\".\"essay_version\" on ((\"pointer\".\"id\" = \"ontology\".\"essay_version\".\"id\") and (\"pointer\".\"pointer_version\" = \"ontology\".\"essay_version\".\"version\")) left join \"ontology\".\"essay_locale\" on ((\"pointer\".\"id\" = \"ontology\".\"essay_locale\".\"id\") and (\"pointer\".\"pointer_version\" = \"ontology\".\"essay_locale\".\"version\")) inner join \"ontology\".\"node_version\" \"head_row\" on \"pointer\".\"id\" = \"head_row\".\"id\" inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"pointer\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"head_row\".\"id\") and (\"newer\".\"version\" > \"head_row\".\"version\")))"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "views\u0000[\"ontology\",\"essay_locale_view\"]",
+      "set": {
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"work_version\".\"title\", \"ontology\".\"essay_locale\".\"locale\" as \"locale\", \"ontology\".\"essay_locale\".\"abstract\" as \"abstract\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from \"ontology\".\"essay_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"essay_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"essay_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"essay_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"work_version\" on ((\"ontology\".\"essay_version\".\"id\" = \"ontology\".\"work_version\".\"id\") and (\"ontology\".\"essay_version\".\"version\" = \"ontology\".\"work_version\".\"version\")) left join \"ontology\".\"essay_locale\" on ((\"ontology\".\"essay_version\".\"id\" = \"ontology\".\"essay_locale\".\"id\") and (\"ontology\".\"essay_version\".\"version\" = \"ontology\".\"essay_locale\".\"version\")) inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"essay_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"essay_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"essay_version\".\"version\")))"
+      }
+    }
+  ]
+}

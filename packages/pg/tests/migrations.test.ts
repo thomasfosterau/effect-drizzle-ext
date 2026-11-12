@@ -56,6 +56,7 @@ describe("readMigrations", () => {
       "20261107072244_version-fk-cascade",
       "20261107073635_keyed-pointer",
       "20261112063057_person-wikidata-id",
+      "20261112160706_view-head-antijoin",
     ]);
     expect(migrations[0]?.statements[0]).toBe('CREATE SCHEMA "fixture";');
     expect(migrations[0]?.statements).toHaveLength(5);

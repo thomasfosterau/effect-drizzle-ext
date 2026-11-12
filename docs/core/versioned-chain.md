@@ -32,7 +32,7 @@ The chain writes stable columns once, at `create`; no later write touches them. 
 
 `makeTreeViews(tree, tables, { schema, branches?, pointers? })` derives the read views:
 
-- **Per leaf, a fail-closed current-version view** (`${leaf}_view`). It resolves the head from the root version table and INNER JOINs every level's version table at it, so ancestor level columns appear with no per-anchor factory. Each level's stable columns come before its version columns. A node whose head advanced past any level yields **no row**.
+- **Per leaf, a fail-closed current-version view** (`${leaf}_view`). It drives from the leaf's version table, keeps the head row (see [Head resolution](#head-resolution)) and INNER JOINs every other level's version table at it, so ancestor level columns appear with no per-anchor factory. Each level's stable columns come before its version columns. A node whose head advanced past any level yields **no row**.
 - **Per marker named in `branches`, a `UNION ALL` branch view.** An optional per-leaf `project` builds a search union.
 - **Per keyed leaf, a keyed view** (one row per key, and one `NULL`-key row for a head with none).
 - **Per pointer and leaf named in `pointers`, the leaf view at the pointer's effective fact.** It projects the head's `action` and `${pointer}At`, and composes with the keyed view.
@@ -40,11 +40,33 @@ The chain writes stable columns once, at `create`; no later write touches them. 
 
 Every derived view reads base tables only, never another view. Each view's row type is derived from the tree. The write side is [`@thomasfosterau/effect-drizzle-ext-pg/chain`](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/chain.md).
 
+#### Head resolution
+
+A view keeps a leaf version row only when it is the node's head: no root version of the same node is newer. That is an anti-join on the root version table's `(id, version)` primary key (effect-drizzle-ext#199):
+
+```sql
+FROM <leaf>_version
+JOIN <root>_version ON (id, version) match
+-- identity, every other level, stable tables, facts, keyed, version_zero: at the same (id, version)
+WHERE NOT EXISTS (
+  SELECT 1 FROM <root>_version newer
+  WHERE newer.id = <leaf>_version.id AND newer.version > <leaf>_version.version
+)
+```
+
+The anti-join probes the primary key once per candidate row, so a paged list (`ORDER BY title, id LIMIT 20` with an index on the leaf's ordering column) reads a page's worth of rows. Before 0.4 every view drove from a grouped `SELECT id, max(version) … GROUP BY id` head instead. PostgreSQL cannot push a filter or a `LIMIT` into a grouped subquery, so every read not filtered by `id` aggregated the whole root version table first. On the fixture chain with 150,000 root version rows, `book_view ORDER BY title, id LIMIT 20` went from 531 ms (551,771 buffers) to 2.7 ms (628 buffers).
+
+The set of rows is the same as the `max` head's: a row exists when every joined level has a row at the node's maximum root version. A head that moved to another leaf, or advanced past a level, has a newer root version, so the old leaf's view yields no row. A tombstone is the head, so it shows with `action = 'delete'`. Each arm of a branch view drives from its own leaf with its own anti-join. `asOf` bounds both sides, the joined root row and the `newer` one (`version <= v`, or `timestamp <= at`), so it resolves the latest version within the bound. A pointer view still drives from the effective pointer fact; the head row it reads `action` from is found by the same anti-join.
+
+A branch view's paged list still sorts the union: PostgreSQL plans each `UNION ALL` arm with joins as its own subquery, so no index order reaches the top. Each arm now runs without the aggregate.
+
+**Upgrading.** Every derived view's SQL changed, `makeCurrentVersionView`'s included. A consumer's next `drizzle-kit generate` emits a `DROP VIEW` and a `CREATE VIEW` for each derived view, with no table or data change. Regenerate and apply that migration. drizzle-kit does not order view drops by dependency, so an application view that selects from a derived view must be dropped before that migration and recreated after it: hand-edit the generated migration, or better, remove the edge. `checkViewDependencies` in [`@thomasfosterau/effect-drizzle-ext-pg/tooling`](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tooling.md) fails on any such edge before a migration is generated.
+
 ### Per-leaf builders
 
 `makeSubtypeTables(applyDiscriminator)(schema, config)` builds one leaf's `{ stable, version }` pair: the stable identity row (`id` primary key referencing the parent branch's stable `id`, plus a denormalised `type` discriminator), and the version row (`(id, version)` primary key, `(id, version)` foreign-keyed to the parent branch's version table). Domain columns are authored per leaf and merged in via `config.columns`, and `config.stableColumns` / `config.stableConstraints` extend the stable row after `id` / `type` and after the discriminator constraints; `discriminator`, when present, makes `type` `NOT NULL` and appends the constraints `applyDiscriminator` returns (a `./constraints` `DiscriminatorToolkit` is the intended hook). Its return type, `SubtypeTables<TColumns, TStable>`, is written out as an explicit annotation rather than inferred — the declaration printer cannot reduce the homomorphic `PgBuildColumns` mapped type while `TColumns` is still generic, and would otherwise emit an unbound `TTableName` reference that `skipLibCheck` hides.
 
-`makeCurrentVersionView(deps)(schema, name, config)` builds the uniform fail-closed current-version view: currency resolves from `deps.rootVersion` (a `MAX(version)` sub-select grouped by `id`), and `config.leaf` / `config.through` INNER JOIN at exactly that `(id, version)` — a node whose root version advanced past its leaf (a partial-chain tombstone) yields **no row**, rather than surfacing a stale older leaf row. `config.optional` LEFT JOINs 6NF satellite fact tables instead, where row-absence at a version encodes NULL. `deps.merge` can be a plain object (columns merged from `deps.identity`, no extra join, the emitted view definition unchanged) or a function (additionally INNER JOINs a `version = 0` alias of `rootVersion` and hands it to the callback, so a hierarchy can merge in a true `createdAt` sourced from the node's birth row, distinct from the current version's timestamp) — the object form matters for a root version table whose view is itself joined by another hand-written view, since drizzle-kit does not topologically order view-on-view DROPs.
+`makeCurrentVersionView(deps)(schema, name, config)` builds the uniform fail-closed current-version view: currency resolves from `deps.rootVersion` (its row with no newer version of the same node drives the FROM, the same anti-join as [head resolution](#head-resolution)), and `config.leaf` / `config.through` INNER JOIN at exactly that `(id, version)` — a node whose root version advanced past its leaf (a partial-chain tombstone) yields **no row**, rather than surfacing a stale older leaf row. `config.optional` LEFT JOINs 6NF satellite fact tables instead, where row-absence at a version encodes NULL. `deps.merge` can be a plain object (columns merged from `deps.identity`, no extra join, the emitted view definition unchanged) or a function (additionally INNER JOINs a `version = 0` alias of `rootVersion` and hands it to the callback, so a hierarchy can merge in a true `createdAt` sourced from the node's birth row, distinct from the current version's timestamp) — the object form matters for a root version table whose view is itself joined by another hand-written view, since drizzle-kit does not topologically order view-on-view DROPs.
 
 **No view built by `makeCurrentVersionView` may select from another view built by `makeCurrentVersionView`** — a library-level rule, not just an observation about the DROP-ordering hazard above.
 

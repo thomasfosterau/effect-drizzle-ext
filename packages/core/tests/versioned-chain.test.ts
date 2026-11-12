@@ -9,7 +9,7 @@
 
 import { describe, expect, expectTypeOf, it } from "vite-plus/test";
 import type { InferSelectModel } from "drizzle-orm";
-import { getTableConfig, type PgTable } from "drizzle-orm/pg-core";
+import { getTableConfig, getViewConfig, PgDialect, type PgTable } from "drizzle-orm/pg-core";
 import * as Arr from "effect/Array";
 import * as DateTime from "effect/DateTime";
 import * as Order from "effect/Order";
@@ -255,6 +255,28 @@ describe("makeCurrentVersionView", () => {
     expect(view).toBeDefined();
     // the view carries a real Drizzle view symbol config
     expect(Object.getOwnPropertySymbols(view).length).toBeGreaterThan(0);
+  });
+
+  it("drives from the root version row with no newer version, not a grouped max (effect-drizzle-ext#199)", () => {
+    const { version } = defineSubtypeTables(app, {
+      name: "gear",
+      parentId: entity.id,
+      parentVersion: entityVersion,
+      columns: { label: text("label") },
+    });
+    const view = currentVersionView(app, "gear_view", {
+      leaf: version,
+      through: [entityVersion],
+      columns: { id: version.id, action: nodeVersion.action },
+    });
+    const { query } = getViewConfig(view);
+    const rendered = query === undefined ? "" : new PgDialect().sqlToQuery(query).sql;
+    expect(rendered).toContain(`from "app"."node_version" inner join "app"."gear_version" on`);
+    expect(rendered).toContain(
+      `where not exists (select 1 from "app"."node_version" "newer" where (("newer"."node_id" = "app"."node_version"."node_id") and ("newer"."version" > "app"."node_version"."version")))`,
+    );
+    expect(rendered).not.toContain("max(");
+    expect(rendered).not.toContain("group by");
   });
 
   it("builds a view LEFT JOINing an optional fact table", () => {
