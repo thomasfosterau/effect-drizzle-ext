@@ -11,7 +11,7 @@
  * @module tests/derive
  */
 
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, expectTypeOf, it } from "vite-plus/test";
 import type { ColumnBuilderBase } from "drizzle-orm";
 import * as Arr from "effect/Array";
 import * as Order from "effect/Order";
@@ -69,6 +69,31 @@ describe("makeDeriveColumns.fromFields", () => {
     expect(byName.size.hasDefault).toBe(true);
     expect(byName.size.default).toBe(7);
     expect(byName.active.notNull).toBe(false);
+  });
+
+  it("types a defaulted column as optional on $inferInsert (effect-drizzle-ext#162)", () => {
+    const table = pgTable(
+      "gizmo",
+      makeDeriveColumns(builders).fromFields({
+        ...widgetFields,
+        kind: dbColumn(Schema.String, {
+          column: "kind",
+          pg: "text",
+          notNull: true,
+          default: "plain",
+        }),
+      }),
+    );
+    type Insert = typeof table.$inferInsert;
+    // `name` (NOT NULL, no default) is the only required key: `kind` (NOT NULL
+    // with a default) and `size` (nullable with a default) are optional.
+    expectTypeOf<{ name: string }>().toExtend<Insert>();
+    expectTypeOf<Insert>().toHaveProperty("kind");
+    expectTypeOf<NonNullable<Insert["kind"]>>().toEqualTypeOf<string>();
+    expectTypeOf<NonNullable<Insert["size"]>>().toEqualTypeOf<number>();
+    // A default doesn't change the select type.
+    expectTypeOf<(typeof table.$inferSelect)["kind"]>().toEqualTypeOf<string>();
+    expect(getTableConfig(table).columns.find((c) => c.name === "kind")?.hasDefault).toBe(true);
   });
 
   it("peels the optional / NullOr wrappers a field applies", () => {

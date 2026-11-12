@@ -9,7 +9,7 @@
  * @module tests/jsonapi
  */
 
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, expectTypeOf, it } from "vite-plus/test";
 import { Resource } from "@thomasfosterau/effect-jsonapi";
 import type { ColumnBuilderBase } from "drizzle-orm";
 import * as Arr from "effect/Array";
@@ -190,6 +190,24 @@ describe("makeDeriveResourceColumns", () => {
     expect(byName.name.notNull).toBe(true);
     expect(byName.size.hasDefault).toBe(true);
     expect(byName.size.default).toBe(0);
+  });
+
+  it("types a defaulted attribute's column as optional on $inferInsert (effect-drizzle-ext#162)", () => {
+    const ListResource = Resource.make("lists", {
+      attributes: {
+        name: dbColumn(Schema.String, { column: "name", pg: "text", notNull: true }),
+        visibility: dbColumn(Schema.String, {
+          column: "visibility",
+          pg: "text",
+          notNull: true,
+          default: "private",
+        }),
+      },
+    });
+    const lists = pgTable("lists", makeDeriveResourceColumns(builders)(ListResource));
+    expectTypeOf<{ name: string }>().toExtend<typeof lists.$inferInsert>();
+    expectTypeOf<typeof lists.$inferInsert>().toHaveProperty("visibility");
+    expectTypeOf<(typeof lists.$inferSelect)["visibility"]>().toEqualTypeOf<string>();
   });
 
   it("produces the same DDL as fromFields over the equivalent Struct fields", () => {
