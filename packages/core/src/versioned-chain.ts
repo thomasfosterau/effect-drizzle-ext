@@ -1745,9 +1745,17 @@ const tablesRead = (chunk: SQLChunk | SQL.Aliased): ReadonlyArray<Table> =>
 
 /**
  * `EXISTS` a row of `table` matching `on`, ending `OFFSET 0` so PostgreSQL
- * keeps it a per-row subplan: costed against the whole driver rather than a
- * `LIMIT`'s share, a hashed form seq-scans the table to serve one page (a
- * 20-leaf branch page went 2 ms → 100 ms, effect-drizzle-ext#204).
+ * keeps it a per-row subplan. Without the fence the planner costs the probe
+ * against the whole driver rather than a `LIMIT`'s share and picks a hashed
+ * subplan, which seq-scans the table to serve one page (effect-drizzle-ext#204).
+ *
+ * Measured on PostgreSQL 16, a 200,000-node branch at two versions, paged list
+ * plan/exec: 20 leaves 4.0/104 ms unfenced vs 4.4/1.9 ms fenced; 40 leaves
+ * 5.5–6.0/49–60 ms vs 5.3–5.4/2.4–2.6 ms. The trade-off is `count(*)`, which
+ * visits every row and loses the hashed form: 1,218 ms unfenced vs 1,601 ms
+ * fenced at 40 leaves (still below the `UNION ALL` shape's 2,257 ms). By-id
+ * reads are unaffected (1.6 vs 1.3 ms). Every branch-view probe is built
+ * here, so dropping the fence is this one line.
  */
 const probeOf = (table: PgTable, on: (table: PgTable) => SQL | undefined): SQL =>
   sql`exists (select 1 from ${table} where ${on(table)} offset 0)`;
