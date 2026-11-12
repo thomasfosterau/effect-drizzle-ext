@@ -1,5 +1,5 @@
 /**
- * Canary for the derivation entry: `makeDeriveColumns` builds Drizzle column
+ * Canary for the derivation entry: `deriveColumnsWith` builds Drizzle column
  * builders from a `Schema.Struct`'s `dbColumn` annotations, honouring the
  * injected builder registry, notNull / default, the reference-resolver seam,
  * and its failure modes; `deriveCheckConstraintsFrom` /
@@ -31,7 +31,7 @@ import {
   DerivationError,
   deriveCheckConstraintsFrom,
   deriveFieldCheckConstraints,
-  makeDeriveColumns,
+  deriveColumnsWith,
   type ColumnBuilders,
 } from "../src/derive.ts";
 
@@ -55,14 +55,14 @@ const widgetFields = {
 const columnsOf = (cols: Readonly<Record<string, ColumnBuilderBase>>) =>
   getTableConfig(pgTable("widget", cols)).columns;
 
-describe("makeDeriveColumns.fromFields", () => {
+describe("deriveColumnsWith.fromFields", () => {
   it("derives one builder per annotated field, dropping plain ones", () => {
-    const derived = makeDeriveColumns(builders).fromFields(widgetFields);
+    const derived = deriveColumnsWith(builders).fromFields(widgetFields);
     expect(Arr.sort(R.keys(derived), Order.String)).toEqual(["active", "name", "size"]);
   });
 
   it("applies notNull and default from the annotation", () => {
-    const derived = makeDeriveColumns(builders).fromFields(widgetFields);
+    const derived = deriveColumnsWith(builders).fromFields(widgetFields);
     const byName = R.fromEntries(columnsOf(derived).map((c) => [c.name, c]));
     expect(byName.name.notNull).toBe(true);
     expect(byName.size.notNull).toBe(false);
@@ -74,7 +74,7 @@ describe("makeDeriveColumns.fromFields", () => {
   it("types a defaulted column as optional on $inferInsert (effect-drizzle-ext#162)", () => {
     const table = pgTable(
       "gizmo",
-      makeDeriveColumns(builders).fromFields({
+      deriveColumnsWith(builders).fromFields({
         ...widgetFields,
         kind: dbColumn(Schema.String, {
           column: "kind",
@@ -97,7 +97,7 @@ describe("makeDeriveColumns.fromFields", () => {
   });
 
   it("peels the optional / NullOr wrappers a field applies", () => {
-    const derived = makeDeriveColumns(builders).fromFields({
+    const derived = deriveColumnsWith(builders).fromFields({
       label: Schema.optional(
         dbColumn(Schema.NullOr(Schema.String), { column: "label", pg: "text", notNull: false }),
       ),
@@ -114,7 +114,7 @@ describe("makeDeriveColumns.fromFields", () => {
         references: { table: "owner", column: "id", onDelete: "cascade" },
       }),
     };
-    const derive = makeDeriveColumns(builders, {
+    const derive = deriveColumnsWith(builders, {
       resolveReference: (ref) => {
         expect(ref).toEqual({ table: "owner", column: "id", onDelete: "cascade" });
         return () => owner.id;
@@ -132,10 +132,10 @@ describe("makeDeriveColumns.fromFields", () => {
     const badFields = {
       value: dbColumn(Schema.String, { column: "value", pg: "json", notNull: false }),
     };
-    expect(() => makeDeriveColumns(builders).fromFields(badFields)).toThrow(
+    expect(() => deriveColumnsWith(builders).fromFields(badFields)).toThrow(
       /no builder registered/,
     );
-    expect(() => makeDeriveColumns(builders).fromFields(badFields)).toThrow(DerivationError);
+    expect(() => deriveColumnsWith(builders).fromFields(badFields)).toThrow(DerivationError);
   });
 
   it("throws a DerivationError when a column declares a reference but no resolver is provided", () => {
@@ -147,17 +147,17 @@ describe("makeDeriveColumns.fromFields", () => {
         references: { table: "owner", column: "id" },
       }),
     };
-    expect(() => makeDeriveColumns(builders).fromFields(fkFields)).toThrow(/no resolveReference/);
-    expect(() => makeDeriveColumns(builders).fromFields(fkFields)).toThrow(DerivationError);
-    expect(() => makeDeriveColumns(builders).fromFields(fkFields)).toThrow(
+    expect(() => deriveColumnsWith(builders).fromFields(fkFields)).toThrow(/no resolveReference/);
+    expect(() => deriveColumnsWith(builders).fromFields(fkFields)).toThrow(DerivationError);
+    expect(() => deriveColumnsWith(builders).fromFields(fkFields)).toThrow(
       expect.objectContaining({ _tag: "DerivationError" }),
     );
   });
 });
 
-describe("makeDeriveColumns.fromMeta", () => {
+describe("deriveColumnsWith.fromMeta", () => {
   it("derives from an already-projected metadata map", () => {
-    const derived = makeDeriveColumns(builders).fromMeta({
+    const derived = deriveColumnsWith(builders).fromMeta({
       title: { column: "title", pg: "text", notNull: true },
     });
     const columns = columnsOf(derived);
@@ -167,7 +167,7 @@ describe("makeDeriveColumns.fromMeta", () => {
 
   it("shares the failure modes with fromFields", () => {
     expect(() =>
-      makeDeriveColumns(builders).fromMeta({
+      deriveColumnsWith(builders).fromMeta({
         value: { column: "value", pg: "json", notNull: false },
       }),
     ).toThrow(DerivationError);
@@ -212,7 +212,7 @@ describe("deriveFieldCheckConstraints", () => {
 
   /** Materialise the derived checks by building a real table around them. */
   const checksOf = () => {
-    const derive = makeDeriveColumns(builders);
+    const derive = deriveColumnsWith(builders);
     const table = pgTable(
       "bounded_widget",
       derive.fromFields(boundedFields),
@@ -275,7 +275,7 @@ describe("deriveFieldCheckConstraints over Schema.Int (effect-drizzle-ext#138)",
   };
 
   it("derives only the declared bounds, never isInt's safe-integer range", () => {
-    const derive = makeDeriveColumns(builders);
+    const derive = deriveColumnsWith(builders);
     const table = pgTable(
       "int_widget",
       derive.fromFields(intFields),
@@ -320,7 +320,7 @@ describe("deriveCheckConstraintsFrom", () => {
 
 describe("type-level precision", () => {
   it("keeps each derived column's builder type (compile-time)", () => {
-    const derived = makeDeriveColumns(builders).fromFields(widgetFields);
+    const derived = deriveColumnsWith(builders).fromFields(widgetFields);
     // `name` is notNull, so its builder is the `.notNull()` form; `note` is not
     // a column at all and must not appear in the map.
     type Derived = typeof derived;

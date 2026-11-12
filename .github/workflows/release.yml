@@ -45,14 +45,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Setup pnpm
-        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
-      - name: Setup Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1.22.0
         with:
-          node-version: "*"
-          check-latest: true
-          cache: pnpm
+          cache: true
+          run-install: false
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Select mode
@@ -78,14 +75,11 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Setup pnpm
-        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
-      - name: Setup Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1.22.0
         with:
-          node-version: "*"
-          check-latest: true
-          cache: pnpm
+          cache: true
+          run-install: false
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Create or update the version PR
@@ -135,27 +129,23 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      # Not the shared ./.github/actions/setup: that one installs WITH
-      # scripts (the root `prepare` patches tsc for CI's type gate). Here
+      # Not CI's install step: that one runs WITH scripts (the root `prepare`
+      # patches tsc for CI's type gate). Here
       # --ignore-scripts keeps a compromised dependency's install hooks out of
       # this privileged job (the Shai-Hulud vector). The build needs no patch:
       # `vp pack` builds the same `dist/` with the unpatched native compiler
       # (the Effect plugin only adds diagnostics). It only holds because
       # `pnpm_config_verify_deps_before_run` is off for this job (see `env`).
-      - name: Setup pnpm
-        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
-
-      # The newest released Node ships npm >= 11.5.1, which scripts/release.sh
+      # An exact Node, never a range, for the job that publishes: 26.13.0
+      # (LTS) ships npm 11.20.0, past the 11.5.1 that scripts/release.sh
       # requires for the OIDC trusted-publishing exchange (it checks and fails
-      # loudly). `"*"` + `check-latest`, never `latest`: setup-node resolves
-      # `latest` to the Node 27 alpha, and a release must not publish from a
-      # pre-release runtime.
-      - name: Setup Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      # loudly).
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1.22.0
         with:
-          node-version: "*"
-          check-latest: true
-          cache: pnpm
+          cache: true
+          run-install: false
+          node-version: "26.13.0"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts

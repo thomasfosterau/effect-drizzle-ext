@@ -2,7 +2,7 @@
  * Canary for the JSON:API entries: `resourceColumns` / `resourceColumnBounds`
  * project a `Resource.make` definition's `dbColumn` annotations (seeing through
  * `Resource.attribute` descriptors and the `resource: "optional"` wrapper), the
- * table annotation round-trips on a resource, and `makeDeriveResourceColumns` /
+ * table annotation round-trips on a resource, and `deriveResourceColumnsWith` /
  * `deriveCheckConstraints` produce exactly the DDL the equivalent
  * `Schema.Struct` produces through `./derive`.
  *
@@ -22,7 +22,7 @@ import { dbColumn, type DbColumn } from "../src/index.ts";
 import {
   DerivationError,
   deriveFieldCheckConstraints,
-  makeDeriveColumns,
+  deriveColumnsWith,
   type ColumnBuilders,
 } from "../src/derive.ts";
 import {
@@ -34,7 +34,7 @@ import {
   resourceColumns,
   type ResourceColumnsMetaOf,
 } from "../src/jsonapi/index.ts";
-import { deriveCheckConstraints, makeDeriveResourceColumns } from "../src/jsonapi/derive.ts";
+import { deriveCheckConstraints, deriveResourceColumnsWith } from "../src/jsonapi/derive.ts";
 
 const builders = {
   text: (c: string) => text(c),
@@ -179,9 +179,9 @@ const ddlOf = (columns: Readonly<Record<string, ColumnBuilderBase>>) =>
     hasDefault: c.hasDefault,
   }));
 
-describe("makeDeriveResourceColumns", () => {
+describe("deriveResourceColumnsWith", () => {
   it("derives one builder per annotated attribute, applying notNull and default", () => {
-    const derive = makeDeriveResourceColumns(builders, {
+    const derive = deriveResourceColumnsWith(builders, {
       resolveReference: () => () => owner.id,
     });
     const columns = getTableConfig(pgTable("widget", derive(WidgetResource))).columns;
@@ -204,7 +204,7 @@ describe("makeDeriveResourceColumns", () => {
         }),
       },
     });
-    const lists = pgTable("lists", makeDeriveResourceColumns(builders)(ListResource));
+    const lists = pgTable("lists", deriveResourceColumnsWith(builders)(ListResource));
     expectTypeOf<{ name: string }>().toExtend<typeof lists.$inferInsert>();
     expectTypeOf<typeof lists.$inferInsert>().toHaveProperty("visibility");
     expectTypeOf<(typeof lists.$inferSelect)["visibility"]>().toEqualTypeOf<string>();
@@ -223,8 +223,8 @@ describe("makeDeriveResourceColumns", () => {
       note: Schema.String,
     };
     const options = { resolveReference: () => () => owner.id };
-    expect(ddlOf(makeDeriveResourceColumns(builders, options)(WidgetResource))).toEqual(
-      ddlOf(makeDeriveColumns(builders, options).fromFields(fields)),
+    expect(ddlOf(deriveResourceColumnsWith(builders, options)(WidgetResource))).toEqual(
+      ddlOf(deriveColumnsWith(builders, options).fromFields(fields)),
     );
   });
 
@@ -234,11 +234,11 @@ describe("makeDeriveResourceColumns", () => {
         value: dbColumn(Schema.String, { column: "value", pg: "json", notNull: false }),
       },
     });
-    expect(() => makeDeriveResourceColumns(builders)(Bad)).toThrow(DerivationError);
+    expect(() => deriveResourceColumnsWith(builders)(Bad)).toThrow(DerivationError);
   });
 
   it("throws a DerivationError when a reference has no resolver", () => {
-    expect(() => makeDeriveResourceColumns(builders)(WidgetResource)).toThrow(
+    expect(() => deriveResourceColumnsWith(builders)(WidgetResource)).toThrow(
       /no resolveReference/,
     );
   });
@@ -268,7 +268,7 @@ describe("deriveCheckConstraints", () => {
   });
 
   const checksOf = () => {
-    const derive = makeDeriveResourceColumns(builders);
+    const derive = deriveResourceColumnsWith(builders);
     return getTableConfig(
       pgTable(
         "bounded_widget_version",
@@ -311,7 +311,7 @@ describe("deriveCheckConstraints", () => {
     const fieldChecks = getTableConfig(
       pgTable(
         "bounded_widget_version",
-        makeDeriveColumns(builders).fromFields(fields),
+        deriveColumnsWith(builders).fromFields(fields),
         deriveFieldCheckConstraints(fields, "bounded_widget_version"),
       ),
     ).checks;
@@ -346,7 +346,7 @@ describe("type-level precision", () => {
     const size: Meta["size"]["pg"] = "integer";
     const absent: "note" extends keyof Meta ? false : true = true;
 
-    const derived = makeDeriveResourceColumns(builders)(Descriptored);
+    const derived = deriveResourceColumnsWith(builders)(Descriptored);
     const notNull: (typeof derived)["slug"]["_"]["notNull"] = true;
     expect([slug, size, absent, notNull]).toEqual(["text", "integer", true, true]);
   });
