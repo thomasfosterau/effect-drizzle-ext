@@ -15,6 +15,9 @@
  *   chain; no version row is ever updated or deleted.
  * - **Create is never an upsert.** A caller-supplied id that exists fails
  *   {@link NodeAlreadyExists}.
+ * - **Stable columns are written once.** A level's `stableColumns` (immutable
+ *   identity facts) are set by `create` alone; no later write touches a stable
+ *   row.
  * - **Update carries forward.** A patch is tri-state per field: a value sets,
  *   `null` clears, an absent (or `undefined`) key carries the head's value
  *   forward.
@@ -215,6 +218,17 @@ type LevelCreate<T extends ChainTables, L> = Omit<
     | undefined;
 };
 
+/** One level's stable-table extras past `(id, type)` (its `stableColumns` hook), as written at create. */
+type LevelStable<T extends ChainTables, L> = Omit<
+  InsertOf<MemberOf<MemberOf<T["levels"], L>, "stable">>,
+  "id" | "type"
+>;
+
+/** Every level on a path's stable extras, root-most first. */
+type PathStable<T extends ChainTables, P> = P extends readonly [infer H, ...infer Rest]
+  ? LevelStable<T, H> & PathStable<T, Rest>
+  : Record<never, never>;
+
 /** Every level on a path's state, root-most first. */
 type PathState<T extends ChainTables, P> = P extends readonly [infer H, ...infer Rest]
   ? LevelState<T, H> & PathState<T, Rest>
@@ -274,6 +288,13 @@ export type ChainKeyedPatch<S, T extends ChainTables, K> = {
     | undefined;
 };
 
+/**
+ * Leaf `K`'s stable-table extras: every level's `stableColumns` on its path,
+ * keyed by field, as written once at create (an external key, say). `{}` for
+ * a path with none.
+ */
+export type ChainStableExtras<S, T extends ChainTables, K> = Simplify<PathStable<T, PathOf<S, K>>>;
+
 /** The root identity table's injected extras (`slug`, say), as written at create. */
 export type ChainIdentityExtras<T extends ChainTables> = Omit<
   InsertOf<T["root"]["identity"]>,
@@ -309,7 +330,13 @@ export interface ChainPrecondition {
 }
 
 /** The input to {@link LeafChain.create}. */
-export interface ChainCreateInput<State, IE, VE, KL = never> extends ChainActor<VE> {
+export interface ChainCreateInput<
+  State,
+  IE,
+  VE,
+  KL = never,
+  ST = Record<never, never>,
+> extends ChainActor<VE> {
   /** A caller-supplied node id; minted (`gen_random_uuid()`) when absent. */
   readonly id?: string | undefined;
   /** The leaf's full state at version 0. */
@@ -318,6 +345,12 @@ export interface ChainCreateInput<State, IE, VE, KL = never> extends ChainActor<
   readonly keyed?: KL | undefined;
   /** The root identity table's injected extras. */
   readonly identity?: IE | undefined;
+  /**
+   * The stable-table extras of every level on the leaf's path
+   * ({@link ChainStableExtras}), keyed by field. Written once, here: `update`,
+   * `restore`, `delete` and `restoreVersion` never touch a stable row.
+   */
+  readonly stable?: ST | undefined;
 }
 
 /** The input to {@link LeafChain.update} and {@link LeafChain.restore}. */
@@ -361,10 +394,16 @@ export interface LeafChain<
   I,
   KL = Record<never, never>,
   KP = never,
+  ST = Record<never, never>,
 > {
-  /** Insert the node and version 0 (`create`) at every level. Fails {@link NodeAlreadyExists} on a taken id. */
+  /**
+   * Insert the node, every level's stable row (with its `stable` extras) and
+   * version 0 (`create`) at every level. Fails {@link NodeAlreadyExists} on a
+   * taken id; a stable constraint's violation (a duplicate external key) is
+   * the driver's error.
+   */
   readonly create: (
-    input: ChainCreateInput<CreateState, IE, VE, KL>,
+    input: ChainCreateInput<CreateState, IE, VE, KL, ST>,
   ) => Effect.Effect<ChainWrite, E | NodeAlreadyExists | VersionConflict, I>;
   /**
    * Append an `update` version carrying the patch over the head's state.
@@ -436,7 +475,8 @@ export type VersionChain<S, T extends ChainTables, E, I> = {
     E,
     I,
     ChainKeyedLevel<S, T, K>,
-    ChainKeyedPatch<S, T, K>
+    ChainKeyedPatch<S, T, K>,
+    ChainStableExtras<S, T, K>
   >;
 };
 
@@ -558,7 +598,9 @@ const onUniqueViolation =
  * version row (`action`, the actor, the injected extras; `timestamp` from
  * its default, the transaction's `now()`), then each level's version row in
  * path order, then each non-null fact. A create first writes the identity
- * row and every level's stable row, `type` set to the leaf. State is keyed by
+ * row and every level's stable row, `type` set to the leaf and its
+ * `stableColumns` from `stable` (keyed by field across the path, like
+ * `identity`); no later write touches a stable row. State is keyed by
  * field across the whole path (the tree rejects a key two levels of one path
  * share).
  *
@@ -665,6 +707,10 @@ export const makeVersionChain = <
       name,
       ...levelTables(name),
       keys: columnKeys(levelTables(name).version),
+      stableKeys: Arr.filter(
+        R.keys(getTableColumns(levelTables(name).stable)),
+        (key) => key !== "id" && key !== "type",
+      ),
       facts: R.toEntries(factTables(name)),
     }));
 
@@ -847,8 +893,31 @@ export const makeVersionChain = <
       );
     });
 
+    /**
+     * Every level's stable row, in path order: each references its parent's
+     * (the branch root's references the identity row), and carries the
+     * level's own stable extras. Written once, at create.
+     */
+    const writeStable = Effect.fn(`${leaf}.writeStable`)(function* (
+      id: string,
+      extras: Row | undefined,
+    ) {
+      const tx = yield* CurrentTransaction;
+      const stable = present(extras ?? {});
+      yield* Effect.forEach(
+        levels,
+        (level) =>
+          tx.insert(level.stable).values({
+            ...R.filter(stable, (_, key) => Arr.contains(level.stableKeys, key)),
+            id,
+            type: leaf,
+          }),
+        { concurrency: 1, discard: true },
+      );
+    });
+
     const create = Effect.fn(`${leaf}.create`)(function* (
-      input: ChainCreateInput<Row, Row, Row, KeyedRows>,
+      input: ChainCreateInput<Row, Row, Row, KeyedRows, Row>,
     ) {
       const tx = yield* CurrentTransaction;
       const id = input.id ?? (yield* mintId());
@@ -864,12 +933,7 @@ export const makeVersionChain = <
             Effect.fail(new NodeAlreadyExists({ type: leaf, id })),
           ),
         );
-      // Stable rows in path order: each references its parent's (the branch
-      // root's references the identity row). The version rows follow.
-      yield* Effect.forEach(levels, (level) => tx.insert(level.stable).values({ id, type: leaf }), {
-        concurrency: 1,
-        discard: true,
-      });
+      yield* writeStable(id, input.stable);
       yield* writeVersion(
         id,
         0n,

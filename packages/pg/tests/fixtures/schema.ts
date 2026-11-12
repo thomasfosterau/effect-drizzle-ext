@@ -20,7 +20,18 @@ import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext";
 import type { ColumnBuilders } from "@thomasfosterau/effect-drizzle-ext/derive";
 import { makeTreeTables, makeTreeViews } from "@thomasfosterau/effect-drizzle-ext/versioned-chain";
 import { eq } from "drizzle-orm";
-import { bigint, integer, pgSchema, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  integer,
+  pgSchema,
+  text,
+  timestamp,
+  unique,
+  uuid,
+  type ExtraConfigColumn,
+} from "drizzle-orm/pg-core";
+import * as Arr from "effect/Array";
+import * as P from "effect/Predicate";
 import * as Schema from "effect/Schema";
 
 export const fixture = pgSchema("fixture");
@@ -62,7 +73,8 @@ const ontologyBuilders = {
 /**
  * A small tree with the shapes the version-chain slices need: a work spine
  * whose level column reaches two leaves, a localised leaf (`essay`, keyed by
- * locale), a fact-scoped level, and a refinable agent branch.
+ * locale), a fact-scoped level, and a refinable agent branch whose `person`
+ * leaf carries an external key on its stable table, unique across persons.
  */
 export const ontologyTree = defineTree({
   work: {
@@ -99,7 +111,16 @@ export const ontology = pgSchema("ontology");
 export const ontologyTables = makeTreeTables(ontologyTree, {
   schema: ontology,
   builders: ontologyBuilders,
-  levels: { agent: { refinable: true } },
+  levels: {
+    agent: { refinable: true },
+    person: {
+      stableColumns: { wikidataId: text("wikidata_id") },
+      stableConstraints: (table: Record<string, ExtraConfigColumn>) =>
+        Arr.map(Arr.filter([table.wikidataId], P.isNotUndefined), (column) =>
+          unique("person_wikidata_id_unique").on(column),
+        ),
+    },
+  },
   root: { pointers: ["live"] },
 });
 

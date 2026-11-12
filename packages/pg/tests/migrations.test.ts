@@ -55,6 +55,7 @@ describe("readMigrations", () => {
       "20261107070600_ontology-views",
       "20261107072244_version-fk-cascade",
       "20261107073635_keyed-pointer",
+      "20261112063057_person-wikidata-id",
     ]);
     expect(migrations[0]?.statements[0]).toBe('CREATE SCHEMA "fixture";');
     expect(migrations[0]?.statements).toHaveLength(5);
