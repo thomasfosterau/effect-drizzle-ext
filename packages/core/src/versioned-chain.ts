@@ -44,6 +44,7 @@ import {
   getTableName,
   gt,
   is,
+  isSQLWrapper,
   lte,
   notExists,
   SQL,
@@ -51,6 +52,7 @@ import {
   StringChunk,
   Table,
   type SQLChunk,
+  type SQLWrapper,
   type DriverValueDecoder,
   type Subquery,
 } from "drizzle-orm";
@@ -1730,18 +1732,25 @@ const columnBehind = (value: AnyPgColumn | SQL | SQL.Aliased): Option.Option<Col
 /** Whether a SQL chunk is a list of chunks (an interpolated array). */
 const isChunkList = (chunk: SQLChunk | SQL.Aliased): chunk is SQLChunk[] => Arr.isArray(chunk);
 
-const tablesRead = (chunk: SQLChunk | SQL.Aliased): ReadonlyArray<Table> =>
-  isChunkList(chunk)
-    ? Arr.flatMap(chunk, tablesRead)
-    : is(chunk, Column)
-      ? [getColumnTable(chunk)]
-      : is(chunk, Table)
-        ? [chunk]
-        : is(chunk, SQL.Aliased)
-          ? tablesRead(chunk.sql)
-          : is(chunk, SQL)
-            ? Arr.flatMap(chunk.queryChunks, tablesRead)
-            : [];
+const tablesRead = (chunk: SQLChunk | SQL.Aliased): ReadonlyArray<Table> => {
+  if (isChunkList(chunk)) return Arr.flatMap(chunk, tablesRead);
+  if (is(chunk, Column)) return [getColumnTable(chunk)];
+  if (is(chunk, Table)) return [chunk];
+  if (is(chunk, SQL.Aliased)) return tablesRead(chunk.sql);
+  if (is(chunk, SQL)) return Arr.flatMap(chunk.queryChunks, tablesRead);
+  return isSQLWrapper(chunk) ? tablesReadByWrapper(chunk) : [];
+};
+
+/**
+ * The tables a custom {@link SQLWrapper} reads, through the SQL its `getSQL()`
+ * stands for. Drizzle's own `Param`, `Name` and `Placeholder` answer
+ * `new SQL([this])`, which holds the wrapper again: that reads no table, so it
+ * ends the walk rather than recursing.
+ */
+function tablesReadByWrapper(wrapper: SQLWrapper): ReadonlyArray<Table> {
+  const expression = wrapper.getSQL();
+  return Arr.contains(expression.queryChunks, wrapper) ? [] : tablesRead(expression);
+}
 
 /**
  * `EXISTS` a row of `table` matching `on`, ending `OFFSET 0` so PostgreSQL

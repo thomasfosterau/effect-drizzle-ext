@@ -251,6 +251,40 @@ describe("makeTreeViews: branch views", () => {
     expect(is(note, SQL.Aliased) ? getColumnFromDecoder(note)?.name : undefined).toBe("pages");
   });
 
+  it("LEFT JOINs a leaf read through a custom SQLWrapper in `project` (effect-drizzle-ext#204)", () => {
+    const views = makeTreeViews(frbrTree, frbrTables, {
+      schema,
+      branches: {
+        work: {
+          project: (leaf, columns) => {
+            const wrapper = { getSQL: () => sql`${columns["pages"]}` };
+            return {
+              wrapped: leaf === "book" ? sql`${wrapper}`.as("wrapped") : sql`null`.as("wrapped"),
+            };
+          },
+        },
+      },
+    });
+    const query = sqlOf(views.branches.work);
+    expect(query).toContain(`left join "ontology"."book_version"`);
+    expect(query).not.toContain(`left join "ontology"."essay_version"`);
+    expect(query).toContain(`when 'book' then ("ontology"."book_version"."pages")`);
+  });
+
+  it("escapes a leaf name holding a single quote in the CASE literals", () => {
+    const tree = defineTree({
+      work: {
+        columns: { title: dbColumn(Schema.String, { column: "title", pg: "text", notNull: true }) },
+      },
+      "o'brien": { parent: "work", leaf: {} },
+    });
+    const tables = makeTreeTables(tree, { schema, builders });
+    const views = makeTreeViews(tree, tables, { schema, branches: { work: true } });
+    const query = sqlOf(views.branches.work);
+    expect(query).toContain(`when 'o''brien' then exists (`);
+    expect(query).not.toContain(`'o'brien'`);
+  });
+
   it("selects a column every leaf projects as itself bare, with no CASE", () => {
     const views = makeTreeViews(frbrTree, frbrTables, {
       schema,
