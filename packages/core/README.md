@@ -18,7 +18,7 @@ pnpm add @thomasfosterau/effect-drizzle-ext effect drizzle-orm
 
 ```ts
 import { dbColumn } from "@thomasfosterau/effect-drizzle-ext";
-import { makeDeriveColumns } from "@thomasfosterau/effect-drizzle-ext/derive";
+import { deriveColumnsWith } from "@thomasfosterau/effect-drizzle-ext/derive";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import * as Schema from "effect/Schema";
 
@@ -29,7 +29,7 @@ const Article = Schema.Struct({
 });
 
 // A builder registry turns the annotations into Drizzle columns.
-const { fromFields } = makeDeriveColumns({
+const { fromFields } = deriveColumnsWith({
   text: (c: string) => text(c),
   integer: (c: string) => integer(c),
 });
@@ -43,7 +43,7 @@ The [overview](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/d
 | Subpath | Drizzle? | Contents | Guide |
 | --- | --- | --- | --- |
 | `.` | no | The `dbColumn` / `dbTable` annotation vocabulary, phantoms, `Option` readers, numeric bounds, struct-field projection, and `defineTree`, the Drizzle-free ontology declaration. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/annotations.md) |
-| `./derive` | yes | The builder registry, `makeDeriveColumns`, CHECK derivation from bounds, `DerivationError`. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/derive.md) |
+| `./derive` | yes | The builder registry, `deriveColumnsWith`, CHECK derivation from bounds, `DerivationError`. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/derive.md) |
 | `./references` | yes | The lazy FK-reference registry a `resolveReference` hook is built from. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/references.md) |
 | `./constraints` | yes | `enumCheck` and the threaded `type`-discriminator toolkit. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/constraints.md) |
 | `./columns` | yes | `bytea`, `tsvector`, `jsonbSchema`, `timestamps`, the hex codec. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/columns.md) |

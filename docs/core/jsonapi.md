@@ -17,9 +17,9 @@ dbTable(Article, { name: "article", level: "work" });
 ```
 
 ```ts
-import { makeDeriveResourceColumns } from "@thomasfosterau/effect-drizzle-ext/jsonapi/derive";
+import { deriveResourceColumnsWith } from "@thomasfosterau/effect-drizzle-ext/jsonapi/derive";
 
-const deriveResourceColumns = makeDeriveResourceColumns(builders, {
+const deriveResourceColumns = deriveResourceColumnsWith(builders, {
   resolveReference: references.resolve,
 });
 export const articleColumns = deriveResourceColumns(Article);
@@ -50,7 +50,7 @@ export interface ResourceAttributeProjection {
 export const resourceAttributeProjections: (
   resource: AnyResource,
 ) => ReadonlyArray<ResourceAttributeProjection>;
-export const makeDeriveResourceColumns: <B extends ColumnBuilders>(
+export const deriveResourceColumnsWith: <B extends ColumnBuilders>(
   builders: B,
   options?: DeriveOptions,
 ) => <R extends AnyResource>(resource: R) => DerivedResourceColumns<R, B>;

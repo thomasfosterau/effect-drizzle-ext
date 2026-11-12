@@ -2,7 +2,7 @@
 
 _A guide to [`@thomasfosterau/effect-drizzle-ext`](../../packages/core/README.md). The API reference is the doc comments on each export (your editor's hover, or `vp run docgen`)._
 
-Reads the `DbColumn` metadata a schema declaration carries — via `fieldColumns`, or any other projection yielding a `Record<string, DbColumn>` (the `./jsonapi/derive` entry is one) — and emits the matching Drizzle column builders. `makeDeriveColumns(builders, options)` binds a derivation to a consumer's own kind → builder registry and returns `{ fromFields, fromMeta }`: `fromFields` takes a `Schema.Struct`'s fields directly, `fromMeta` an already-projected metadata map.
+Reads the `DbColumn` metadata a schema declaration carries — via `fieldColumns`, or any other projection yielding a `Record<string, DbColumn>` (the `./jsonapi/derive` entry is one) — and emits the matching Drizzle column builders. `deriveColumnsWith(builders, options)` binds a derivation to a consumer's own kind → builder registry and returns `{ fromFields, fromMeta }`: `fromFields` takes a `Schema.Struct`'s fields directly, `fromMeta` an already-projected metadata map.
 
 Failures here are **thrown**, never Effect failures — this module runs at _module load_, while a consumer's table modules are being evaluated, before any Effect runtime exists to fail an Effect in. A missing builder, a `references` annotation with no `resolveReference` hook, or numeric bounds on a column the table does not carry each throw `DerivationError`, a `Schema.TaggedError`. Runtime query failures are the opposite and are never thrown: see `./errors`.
 
@@ -21,7 +21,7 @@ A nullable column's expression is guarded with `col IS NULL OR …`.
 export class DerivationError extends Schema.TaggedError<DerivationError>()("DerivationError", {
   message: Schema.String,
 }) {}
-export const makeDeriveColumns: <B extends ColumnBuilders>(
+export const deriveColumnsWith: <B extends ColumnBuilders>(
   builders: B,
   options?: DeriveOptions,
 ) => {

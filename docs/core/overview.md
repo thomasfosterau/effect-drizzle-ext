@@ -49,17 +49,17 @@ export const Article = Schema.Struct({
 });
 ```
 
-A builder registry supplies the Drizzle column for each `pg` kind, and `makeDeriveColumns` interprets the annotations against it:
+A builder registry supplies the Drizzle column for each `pg` kind, and `deriveColumnsWith` interprets the annotations against it:
 
 ```ts
 import { boolean, integer, text, timestamp } from "drizzle-orm/pg-core";
-import { makeDeriveColumns, type ColumnBuilders } from "@thomasfosterau/effect-drizzle-ext/derive";
+import { deriveColumnsWith, type ColumnBuilders } from "@thomasfosterau/effect-drizzle-ext/derive";
 import { makeReferenceRegistry } from "@thomasfosterau/effect-drizzle-ext/references";
 import type { PgKind } from "./db-annotation.ts";
 
 export const references = makeReferenceRegistry();
 const builders: ColumnBuilders<PgKind> = { text, integer, boolean, timestamp };
-export const { fromFields } = makeDeriveColumns(builders, { resolveReference: references.resolve });
+export const { fromFields } = deriveColumnsWith(builders, { resolveReference: references.resolve });
 ```
 
 The table factory spreads `fromFields(...)` for the columns and `deriveFieldCheckConstraints(...)` for the numeric-bound CHECKs the model's own `Schema.isGreaterThanOrEqualTo` / `isBetween` checks imply:
