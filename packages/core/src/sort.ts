@@ -54,6 +54,11 @@
  * returns therefore ends in the view's `id`, mirroring the direction of the
  * last sort key, unless the caller already sorted by `id`.
  *
+ * A field repeated in `?sort=` (JSON:API's grammar allows it) keeps its first
+ * occurrence only: the later key could never break a tie the first already
+ * ordered, and counting it would let a redundant key flip the tiebreak's
+ * direction (`name,-name` orders exactly as `name` does).
+ *
  * Ported from the website and gardeneria applications'
  * `apps/api/src/operations/sort.ts`.
  *
@@ -240,6 +245,9 @@ export const sortableColumnsFor = (
   return map;
 };
 
+/** Two sort keys name the same field (whatever their directions). */
+const sameField = (self: SortKey, that: SortKey): boolean => self.field === that.field;
+
 /** Apply a direction to one `ORDER BY` term. */
 const directed = (term: OrderTerm, direction: "asc" | "desc"): SQL =>
   direction === "desc" ? desc(term) : asc(term);
@@ -293,6 +301,10 @@ export interface ResolveSortOrderOptions {
  * partially-valid `?sort=` is rejected rather than silently half-applied.
  * The allow-list check is an own-property test, so `constructor` or
  * `toString` are never sort fields.
+ *
+ * A repeated field keeps its first occurrence only, and the `id` tiebreak
+ * follows the de-duplicated list: `[name asc, name desc]` resolves exactly as
+ * `[name asc]` does (`name asc, id asc`).
  */
 export const resolveSortOrder = (
   options: ResolveSortOrderOptions,
@@ -320,12 +332,20 @@ export const resolveSortOrder = (
           );
         }
 
+        // A repeated field keeps its first occurrence: the later key is dead
+        // SQL, and it must not set the tiebreak's direction either.
+        const effective = Arr.dedupeWith(sort, sameField);
         // Every field was checked as an own key of `sortable` above.
-        const terms = sort.map(({ field, direction }) => directed(sortable[field], direction));
+        const terms = Arr.map(effective, ({ field, direction }) =>
+          directed(sortable[field], direction),
+        );
         // A caller who sorted by `id` has already asked for a total order; a
         // second `id` term would be redundant SQL.
-        if (sort.some(({ field }) => field === "id")) return Effect.succeed(terms);
-        return Effect.succeed([...terms, directed(idColumn, Arr.lastNonEmpty(sort).direction)]);
+        // (Read before `Arr.some`, whose type guard narrows `effective` away
+        // in its false branch.)
+        const tiebreak = directed(idColumn, Arr.lastNonEmpty(effective).direction);
+        if (Arr.some(effective, ({ field }) => field === "id")) return Effect.succeed(terms);
+        return Effect.succeed([...terms, tiebreak]);
       },
     });
   });
