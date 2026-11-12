@@ -8,7 +8,7 @@ PostgreSQL 16, `EXPLAIN (ANALYZE, BUFFERS)`, second run:
 
 | read | before | after |
 | --- | --- | --- |
-| fixture `work_view ORDER BY title, id LIMIT 20` (100,000 works at two versions, `work_version (title, id)` index) | 391 ms, a Sort over every row | ~2.3 ms, the index, no Sort |
+| fixture `work_view ORDER BY title, id LIMIT 20` (100,000 works at two versions, `work_version (title, id)` index) | 391 ms, a Sort over every row | the index, no Sort (0.37 ms with the effect-drizzle-ext#204 shape) |
 | synthetic 20-leaf branch, paged list | 2,385 ms | 4.9 ms |
 | synthetic 20-leaf branch, `WHERE id = $1` | 1.86 ms | 0.88 ms |
 | synthetic 20-leaf branch, `count(*)` | 1,753 ms | 1,911 ms |

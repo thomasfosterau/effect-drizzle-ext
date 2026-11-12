@@ -51,6 +51,7 @@ export interface PlanNode {
   readonly "Node Type": string;
   readonly "Relation Name"?: string;
   readonly "Index Name"?: string;
+  readonly "Parent Relationship"?: string;
   readonly Plans?: ReadonlyArray<PlanNode>;
 }
 
@@ -58,6 +59,7 @@ const PlanNode: Schema.Codec<PlanNode> = Schema.Struct({
   "Node Type": Schema.String,
   "Relation Name": Schema.optionalKey(Schema.String),
   "Index Name": Schema.optionalKey(Schema.String),
+  "Parent Relationship": Schema.optionalKey(Schema.String),
   Plans: Schema.optionalKey(Schema.Array(Schema.suspend((): Schema.Codec<PlanNode> => PlanNode))),
 });
 
@@ -70,6 +72,22 @@ const ExplainRow = Schema.Struct({
 const planNodes = (plan: PlanNode): ReadonlyArray<PlanNode> => [
   plan,
   ...Arr.flatMap(plan.Plans ?? [], planNodes),
+];
+
+/**
+ * Every node of a plan tree outside its subplans, depth first: the relations
+ * the query joins, not those a correlated `EXISTS` probes per row.
+ */
+const joinedNodes = (plan: PlanNode): ReadonlyArray<PlanNode> => [
+  plan,
+  ...Arr.flatMap(
+    Arr.filter(
+      plan.Plans ?? [],
+      (child) =>
+        child["Parent Relationship"] !== "SubPlan" && child["Parent Relationship"] !== "InitPlan",
+    ),
+    joinedNodes,
+  ),
 ];
 
 /** A plan's aggregate nodes. */
@@ -108,14 +126,25 @@ export const viewOracle = <Relations extends AnyRelations>(
     return { rows, missing, extra };
   });
 
+  /** The plan PostgreSQL picks for `query`, walked by `walk`. */
+  const planOf = (query: string, walk: (plan: PlanNode) => ReadonlyArray<PlanNode>) =>
+    Effect.gen(function* () {
+      const tx = yield* CurrentTransaction;
+      const rows = yield* executeRows(tx, sql.raw(`EXPLAIN (FORMAT JSON) ${query}`), ExplainRow);
+      return Arr.flatMap(rows, (result) =>
+        Arr.flatMap(result["QUERY PLAN"], (explained) => walk(explained.Plan)),
+      );
+    });
+
   /** The plan PostgreSQL picks for `query`, as its node list. */
   const explain = Effect.fn("viewOracle.explain")(function* (query: string) {
-    const tx = yield* CurrentTransaction;
-    const rows = yield* executeRows(tx, sql.raw(`EXPLAIN (FORMAT JSON) ${query}`), ExplainRow);
-    return Arr.flatMap(rows, (result) =>
-      Arr.flatMap(result["QUERY PLAN"], (explained) => planNodes(explained.Plan)),
-    );
+    return yield* planOf(query, planNodes);
   });
 
-  return { exec, execAll, difference, explain };
+  /** The nodes of `query`'s plan outside its subplans: what it joins. */
+  const explainJoined = Effect.fn("viewOracle.explainJoined")(function* (query: string) {
+    return yield* planOf(query, joinedNodes);
+  });
+
+  return { exec, execAll, difference, explain, explainJoined };
 };

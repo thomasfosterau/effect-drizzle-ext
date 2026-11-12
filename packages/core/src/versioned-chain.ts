@@ -39,17 +39,18 @@ import {
   desc,
   eq,
   getColumnFromDecoder,
+  getColumnTable,
   getTableColumns,
   getTableName,
   gt,
   is,
-  isNotNull,
   lte,
   notExists,
-  or,
   SQL,
   sql,
   StringChunk,
+  Table,
+  type SQLChunk,
   type DriverValueDecoder,
   type Subquery,
 } from "drizzle-orm";
@@ -1720,6 +1721,37 @@ const columnBehind = (value: AnyPgColumn | SQL | SQL.Aliased): Option.Option<Col
   return chunks.length === 1 && is(chunks[0], Column) ? Option.some(chunks[0]) : Option.none();
 };
 
+/**
+ * Every table a SQL chunk reads: a column's table, a table named in it, and
+ * those of its nested expressions and aliases. A branch view LEFT JOINs a
+ * level below the branch only when its projection reads one of the level's
+ * tables (effect-drizzle-ext#204).
+ */
+/** Whether a SQL chunk is a list of chunks (an interpolated array). */
+const isChunkList = (chunk: SQLChunk | SQL.Aliased): chunk is SQLChunk[] => Arr.isArray(chunk);
+
+const tablesRead = (chunk: SQLChunk | SQL.Aliased): ReadonlyArray<Table> =>
+  isChunkList(chunk)
+    ? Arr.flatMap(chunk, tablesRead)
+    : is(chunk, Column)
+      ? [getColumnTable(chunk)]
+      : is(chunk, Table)
+        ? [chunk]
+        : is(chunk, SQL.Aliased)
+          ? tablesRead(chunk.sql)
+          : is(chunk, SQL)
+            ? Arr.flatMap(chunk.queryChunks, tablesRead)
+            : [];
+
+/**
+ * `EXISTS` a row of `table` matching `on`, ending `OFFSET 0` so PostgreSQL
+ * keeps it a per-row subplan: costed against the whole driver rather than a
+ * `LIMIT`'s share, a hashed form seq-scans the table to serve one page (a
+ * 20-leaf branch page went 2 ms → 100 ms, effect-drizzle-ext#204).
+ */
+const probeOf = (table: PgTable, on: (table: PgTable) => SQL | undefined): SQL =>
+  sql`exists (select 1 from ${table} where ${on(table)} offset 0)`;
+
 /** A column's SQL type, array dimensions included (`text[]`). */
 const sqlTypeOf = (column: Column): string =>
   `${column.getSQLType()}${is(column, PgColumn) ? "[]".repeat(column.dimensions) : ""}`;
@@ -1813,11 +1845,12 @@ const caseOverLeaves = (
  * columns).
  *
  * A branch view is one SELECT, not a `UNION ALL` of per-leaf arms: past its
- * spine it LEFT JOINs each marker below the branch and each subtree leaf (and
- * their stable and fact tables) at the head, and keeps a row only when every
- * level on the path to the leaf its `type` names joined, so it fails closed
- * exactly where a leaf view would, and a node whose `type` names a leaf with
- * no row at the head has no row.
+ * spine it LEFT JOINs only the tables below the branch its `project` reads,
+ * and keeps a row only when a `CASE` on its `type` finds, by `EXISTS`, every
+ * level on the path to the leaf that `type` names at the head
+ * (effect-drizzle-ext#204), so it fails closed exactly where a leaf view
+ * would; a node whose `type` names a leaf with no row at the head, or no
+ * subtree leaf, has no row.
  *
  * A keyed leaf also gets `${leaf}_${keyed}_view`: the leaf view LEFT JOINed
  * to its keyed table at the head, one row per key, and one row with a `NULL`
@@ -2154,13 +2187,15 @@ export const makeTreeViews = <
    * `ORDER BY … LIMIT`. It drives from the branch level's own version table
    * with the same anti-join head as a leaf view, INNER JOINs the root version
    * row, the identity row, the birth row and every level from the branch root
-   * down to the branch at the driver's `(id, version)`, then LEFT JOINs each
-   * marker strictly between the branch and a subtree leaf (once each) and
-   * each subtree leaf, in declaration order. The fail-closed predicate keeps a
-   * row only when, for the leaf `type` names, every level below the branch on
-   * its path joined (the levels the arm form INNER JOINed): a head that
-   * advanced past one of them, or whose `type` names a leaf with no row at
-   * the head, yields no row.
+   * down to the branch at the driver's `(id, version)`, then LEFT JOINs, in
+   * declaration order, only the markers, leaves, stable and fact tables below
+   * the branch that `project` reads (effect-drizzle-ext#204: each nullable
+   * join multiplies the planner's join search). The fail-closed predicate is
+   * a `CASE` on `type` that, for the leaf `type` names, requires by `EXISTS`
+   * every level below the branch on its path (the levels the arm form INNER
+   * JOINed), and `ELSE false`: a head that advanced past one of them, or
+   * whose `type` names a leaf with no row at the head or no subtree leaf,
+   * yields no row.
    */
   const branchView = (name: string, entry: RuntimeBranchConfig): PgView => {
     const branch = levelOf(name);
@@ -2237,35 +2272,51 @@ export const makeTreeViews = <
         ),
         (q, level) => q.innerJoin(tablesOf(level).stable, onId(tablesOf(level).stable)),
       );
-      // LEFT: the spine's facts, then every level below the branch (markers,
-      // then leaves), their stable rows and their facts.
+      // LEFT: the spine's facts, as a leaf view joins them.
       const withSpineFacts = Arr.reduce(
         Arr.flatMap(spine, (level) => R.values(factsOf(level))),
         inner,
         (q, fact) => q.leftJoin(fact, atKey(fact)),
       );
-      const withLower = Arr.reduce(
-        stableLevels([...markers, ...leaves]),
-        Arr.reduce([...markers, ...leaves], withSpineFacts, (q, level) =>
-          q.leftJoin(tablesOf(level).version, atKey(tablesOf(level).version)),
-        ),
-        (q, level) => q.leftJoin(tablesOf(level).stable, onId(tablesOf(level).stable)),
+      // LEFT: a level below the branch (a marker or leaf version table, its
+      // stable row, its facts) only when `project` reads one of its columns,
+      // in declaration order (effect-drizzle-ext#204). Each nullable join
+      // multiplies the planner's join search, so a branch that projects no
+      // per-leaf column joins none.
+      const read = Arr.flatMap(R.values(projection), tablesRead);
+      const projected = (table: PgTable) => Arr.some(read, (found) => found === table);
+      const lowerVersions = Arr.filter(
+        Arr.map([...markers, ...leaves], (level) => tablesOf(level).version),
+        projected,
+      );
+      const lowerStables = Arr.filter(
+        Arr.map(stableLevels([...markers, ...leaves]), (level) => tablesOf(level).stable),
+        projected,
       );
       const query = Arr.reduce(
-        Arr.flatMap(lower, (level) => R.values(factsOf(level))),
-        withLower,
+        Arr.filter(
+          Arr.flatMap(lower, (level) => R.values(factsOf(level))),
+          projected,
+        ),
+        Arr.reduce(
+          lowerStables,
+          Arr.reduce(lowerVersions, withSpineFacts, (q, table) => q.leftJoin(table, atKey(table))),
+          (q, table) => q.leftJoin(table, onId(table)),
+        ),
         (q, fact) => q.leftJoin(fact, atKey(fact)),
       );
-      const joinedId = (table: PgTable) => isNotNull(columnOf(getTableColumns(table), "id"));
-      const failClosed = or(
-        ...Arr.map(leaves, (leaf) =>
-          and(
-            eq(typeColumn, leaf),
-            ...Arr.map(below(leaf), (level) => joinedId(tablesOf(level).version)),
-            ...Arr.map(stableLevels(below(leaf)), (level) => joinedId(tablesOf(level).stable)),
-          ),
-        ),
-      );
+      // Fail closed: `CASE type WHEN '<leaf>' THEN EXISTS (<each level below
+      // the branch on its path, at the driver's (id, version)>) AND EXISTS
+      // (<each such level's stable row>) … ELSE false END`. A `type` naming no
+      // subtree leaf, or NULL, reaches `ELSE false` and yields no row.
+      const arms = Arr.map(leaves, (leaf) => {
+        const present = and(
+          ...Arr.map(below(leaf), (level) => probeOf(tablesOf(level).version, atKey)),
+          ...Arr.map(stableLevels(below(leaf)), (level) => probeOf(tablesOf(level).stable, onId)),
+        );
+        return sql`when ${leaf} then ${present}`;
+      });
+      const failClosed = sql`case ${typeColumn} ${sql.join(arms, sql` `)} else false end`;
       return query.where(and(noNewerVersion(qb, id, version, Option.none()), failClosed));
     });
   };

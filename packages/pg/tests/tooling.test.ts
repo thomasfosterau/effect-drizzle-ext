@@ -63,7 +63,7 @@ describe("checkMigrationDrift", () => {
     const report = await run(
       checkMigrationDrift({ schema: fixtureSchema, migrationsDir: FIXTURE_MIGRATIONS }),
     );
-    expect(report).toEqual({ snapshots: 10, baseRef: Option.none() });
+    expect(report).toEqual({ snapshots: 11, baseRef: Option.none() });
   });
 
   it("reads a full v8 snapshot as the latest state", async () => {
@@ -94,7 +94,7 @@ describe("checkMigrationDrift", () => {
     if (!(error instanceof MigrationDriftError)) throw error;
     expect(error.issues).toHaveLength(1);
     expect(error.issues[0]).toMatch(/Schema drift detected/);
-    expect(error.issues[0]).toMatch(/20261112164138_branch-view-single-driver\/snapshot\.json/);
+    expect(error.issues[0]).toMatch(/20261112193408_branch-view-case-check\/snapshot\.json/);
     expect(error.issues[0]).toMatch(/CREATE TABLE "fixture"\."gadget"/);
   });
 
@@ -268,9 +268,10 @@ describe("readBaseMigrations", () => {
       "20261112160706_view-head-antijoin",
       "20261112163910_collection-branch",
       "20261112164138_branch-view-single-driver",
+      "20261112193408_branch-view-case-check",
     ]);
     expect(Option.map(base.head, (h) => h.snapshot.id)).toEqual(
-      Option.some("502e9eb6-896c-4bc5-a472-1be64905edc4"),
+      Option.some("25e0b543-26b7-46eb-9041-ddc5f007c367"),
     );
   });
 });

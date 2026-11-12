@@ -169,6 +169,10 @@ const decoded = (leaf: string, columns: Columns) => {
   };
 };
 
+/** The fail-closed CASE's probe of `level`'s version row at the continuant driver. */
+const probe = (level: string) =>
+  `exists (select 1 from "ontology"."${level}_version" where (("ontology"."continuant_version"."id" = "ontology"."${level}_version"."id") and ("ontology"."continuant_version"."version" = "ontology"."${level}_version"."version")) offset 0)`;
+
 describe("makeTreeViews: branch views", () => {
   it("drives one SELECT from the marker's version table, projecting its path and `type`", () => {
     const view = frbrViews.branches.work;
@@ -190,14 +194,13 @@ describe("makeTreeViews: branch views", () => {
     expect(query).toContain(`from "ontology"."work_version" inner join "ontology"."node_version"`);
     expect(query.match(/not exists/g)?.length).toBe(1);
     expect(query).toContain(`("newer"."id" = "ontology"."work_version"."id")`);
-    // Each subtree leaf LEFT JOINs at the driver's (id, version), in declaration order.
-    const bookJoin = query.indexOf(`left join "ontology"."book_version"`);
-    const essayJoin = query.indexOf(`left join "ontology"."essay_version"`);
-    expect(bookJoin).toBeGreaterThan(0);
-    expect(essayJoin).toBeGreaterThan(bookJoin);
-    // Fail closed: the row's `type` must name a leaf whose row joined.
+    // Nothing below the branch is projected, so no leaf is joined
+    // (effect-drizzle-ext#204).
+    expect(query).not.toContain("left join");
+    // Fail closed: a CASE on `type` probes the named leaf's row, in
+    // declaration order, and any other `type` (or NULL) is false.
     expect(query).toContain(
-      `((("ontology"."node"."type" = 'book') and (("ontology"."book_version"."id" is not null)))) or ((("ontology"."node"."type" = 'essay') and (("ontology"."essay_version"."id" is not null))))`,
+      `case "ontology"."node"."type" when 'book' then exists (select 1 from "ontology"."book_version" where (("ontology"."work_version"."id" = "ontology"."book_version"."id") and ("ontology"."work_version"."version" = "ontology"."book_version"."version")) offset 0) when 'essay' then exists (select 1 from "ontology"."essay_version" where (("ontology"."work_version"."id" = "ontology"."essay_version"."id") and ("ontology"."work_version"."version" = "ontology"."essay_version"."version")) offset 0) else false end`,
     );
     type Work = typeof view.$inferSelect;
     expectTypeOf<Work["type"]>().toEqualTypeOf<string>();
@@ -239,6 +242,9 @@ describe("makeTreeViews: branch views", () => {
     expect(query).toContain(
       `case "ontology"."node"."type" when 'book' then "ontology"."book_version"."pages" when 'essay' then length("ontology"."work_version"."title") end as "pages"`,
     );
+    // Only the projected leaf is joined; essay's arm reads the spine.
+    expect(query).toContain(`left join "ontology"."book_version"`);
+    expect(query).not.toContain(`left join "ontology"."essay_version"`);
     const note = getViewConfig(views.branches.work).selectedFields["note"];
     expect(note).toBeInstanceOf(SQL.Aliased);
     // Decoded as the first leaf's column.
@@ -250,7 +256,11 @@ describe("makeTreeViews: branch views", () => {
       schema,
       branches: { work: { project: (_leaf, columns) => ({ heading: columns.url }) } },
     });
-    expect(sqlOf(views.branches.work)).not.toContain("case");
+    // The only CASE left is the fail-closed one in the WHERE.
+    expect(sqlOf(views.branches.work)).toContain(
+      `"version_zero"."timestamp" as "created_at", "ontology"."work_version"."url" from`,
+    );
+    expect(sqlOf(views.branches.work).match(/case /g)?.length).toBe(1);
   });
 
   it("keeps a non-column projection's own decoder", () => {
@@ -346,7 +356,7 @@ describe("makeTreeViews: branch views", () => {
     ).toThrow(/project returns columns \(b\) for "essay" but \(a\) for "book"/);
   });
 
-  it("LEFT JOINs each marker below the branch once, and requires the leaf's markers", () => {
+  it("joins nothing below the branch, and requires each leaf's markers in its CASE arm", () => {
     const tables = makeTreeTables(bfoTree, { schema, builders });
     const views = makeTreeViews(bfoTree, tables, {
       schema,
@@ -363,28 +373,20 @@ describe("makeTreeViews: branch views", () => {
       "createdAt",
     ]);
     const query = sqlOf(views.branches.continuant);
-    const joins = Arr.map(
-      [
-        `left join "ontology"."independent_continuant_version"`,
-        `left join "ontology"."material_entity_version"`,
-        `left join "ontology"."dependent_continuant_version"`,
-        `left join "ontology"."plant_version"`,
-        `left join "ontology"."bed_version"`,
-        `left join "ontology"."document_version"`,
-      ],
-      (join) => {
-        expect(query.split(join).length - 1, `once: ${join}`).toBe(1);
-        return query.indexOf(join);
-      },
-    );
-    // Markers in declaration order, then leaves in declaration order.
-    expect(joins).toEqual(Arr.sort(joins, Order.Number));
+    // Nothing below the branch is projected, so nothing below it is joined
+    // (effect-drizzle-ext#204); each leaf's CASE arm probes its own path.
+    expect(query).not.toContain("left join");
     expect(query).toContain(
-      `("ontology"."node"."type" = 'plant') and (("ontology"."independent_continuant_version"."id" is not null)) and (("ontology"."material_entity_version"."id" is not null)) and (("ontology"."plant_version"."id" is not null))`,
+      `when 'plant' then ((${probe("independent_continuant")}) and (${probe("material_entity")}) and (${probe("plant")}))`,
     );
     expect(query).toContain(
-      `("ontology"."node"."type" = 'document') and (("ontology"."dependent_continuant_version"."id" is not null)) and (("ontology"."document_version"."id" is not null))`,
+      `when 'document' then ((${probe("dependent_continuant")}) and (${probe("document")}))`,
     );
+    expect(query).toContain(" else false end");
+    // Leaves in declaration order.
+    const arms = Arr.map(["plant", "bed", "document"], (leaf) => query.indexOf(`when '${leaf}'`));
+    expect(arms).toEqual(Arr.sort(arms, Order.Number));
+    expect(Arr.every(arms, (i) => i > 0)).toBe(true);
     // A nested branch INNER JOINs the levels above it and drives from its own.
     const nested = sqlOf(views.branches.independent_continuant);
     expect(nested).toContain(`from "ontology"."independent_continuant_version" inner join`);
