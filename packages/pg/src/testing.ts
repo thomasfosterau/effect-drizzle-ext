@@ -43,18 +43,26 @@
 import type { AnyRelations } from "drizzle-orm/relations";
 import * as Arr from "effect/Array";
 import * as Cause from "effect/Cause";
+import type * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as HashSet from "effect/HashSet";
 import * as Layer from "effect/Layer";
 import type * as ManagedRuntime from "effect/ManagedRuntime";
+import * as MutableRef from "effect/MutableRef";
+import * as Option from "effect/Option";
 import * as P from "effect/Predicate";
 import type * as Redacted from "effect/Redacted";
 import * as R from "effect/Record";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
 import { isSqlError, type SqlError } from "effect/sql/SqlError";
+import type {
+  DatabaseServices,
+  ReadSurface,
+  TransactionalDatabase,
+} from "@thomasfosterau/effect-drizzle-ext/database";
 import { type PgDatabase, pgClientFromUrl } from "./index.ts";
 
 export {
@@ -100,7 +108,7 @@ export {
 //
 // These failures still originate at the connect/acquire seam — before the
 // transaction body opens — so they are safe to retry when composed (at the
-// call site) with the `captured === null` guard that proves no test work has
+// call site) with the `captured`-is-`none` guard that proves no test work has
 // run. We identify the seam by the `operation` label `@effect/sql-pg` stamps
 // on the reason (`"acquireConnection"` for the pool `reserveRaw` path,
 // `"connect"` for client/pool creation), which is present regardless of how
@@ -240,13 +248,10 @@ export interface TestTransaction<Key extends string> {
    * Runs `effect` inside a transaction that is always rolled back once the
    * test completes, against a caller-supplied runtime.
    *
-   * `R` is the runtime's own context. It **must include the `Database`
-   * key**, which is what lets the program below yield the client; that
-   * relationship is not expressible as a generic constraint once `R` can be a
-   * union that also carries unrelated services (a harness's platform binding
-   * stubs, a spec's viewer services), so it is documented here rather than
-   * enforced by the type checker — the same trade-off the ported wrapper
-   * makes.
+   * The runtime provides the `Database` key (the runner yields the client
+   * from it) plus `R`, any other services the spec needs (a harness's
+   * platform binding stubs, a spec's viewer services). A runtime without the
+   * `Database` key is a type error.
    *
    * `${Key}/CurrentTransaction` is in the ACCEPTED requirement, not in the
    * runtime's catalogue: nothing provides it as a layer. The runner wraps the
@@ -254,8 +259,8 @@ export interface TestTransaction<Key extends string> {
    * the boundary in production, and the requirement is discharged there.
    */
   readonly runInTestTransaction: <R, A, E>(
-    runtime: ManagedRuntime.ManagedRuntime<R, SqlError>,
-    effect: Effect.Effect<A, E, R | `${Key}/CurrentTransaction`>,
+    runtime: ManagedRuntime.ManagedRuntime<R | Key, SqlError>,
+    effect: Effect.Effect<A, E, R | Key | `${Key}/CurrentTransaction`>,
   ) => Promise<A>;
 
   /**
@@ -263,8 +268,8 @@ export interface TestTransaction<Key extends string> {
    * suite exports as its own `withTestTransaction(effect)` helper.
    */
   readonly withTestTransaction: <R>(
-    runtime: ManagedRuntime.ManagedRuntime<R, SqlError>,
-  ) => <A, E>(effect: Effect.Effect<A, E, R | `${Key}/CurrentTransaction`>) => Promise<A>;
+    runtime: ManagedRuntime.ManagedRuntime<R | Key, SqlError>,
+  ) => <A, E>(effect: Effect.Effect<A, E, R | Key | `${Key}/CurrentTransaction`>) => Promise<A>;
 
   /**
    * Run `effect` inside a **SAVEPOINT** and hand back its `Exit`, leaving the
@@ -302,21 +307,30 @@ export interface TestTransaction<Key extends string> {
  * runner needs nothing else: a suite calls this once next to its
  * {@link makePgDatabase} call and exports the three helpers.
  */
-export const makeTestTransaction = <Relations extends AnyRelations, Key extends string>(
-  database: PgDatabase<Relations, Key>,
+export const makeTestTransaction = <
+  Key extends string,
+  Db extends TransactionalDatabase<Tx>,
+  Tx extends ReadSurface & TransactionalDatabase<Tx>,
+>(
+  // `Key` is inferred from the `Database` key alone: through `transact`'s
+  // `Exclude<R, …>` it would widen to `string`.
+  database: DatabaseServices<Db, Tx, NoInfer<Key>> & {
+    readonly Database: Context.Service<Key, Db>;
+  },
 ): TestTransaction<Key> => {
   const runInTestTransaction = async <R, A, E>(
-    runtime: ManagedRuntime.ManagedRuntime<R, SqlError>,
-    effect: Effect.Effect<A, E, R | `${Key}/CurrentTransaction`>,
+    runtime: ManagedRuntime.ManagedRuntime<R | Key, SqlError>,
+    effect: Effect.Effect<A, E, R | Key | `${Key}/CurrentTransaction`>,
   ): Promise<A> => {
-    // oxlint-disable-next-line effect/prefer-option-over-null -- write-once slot assigned inside the nested `Effect.gen` closure; the `null` sentinel is what the "inner Exit was never captured" check below tests, and TS's control-flow analysis (see the note at the read site) already treats this declaration specially
-    let captured: Exit.Exit<A, E | SqlError> | null = null;
+    // Write-once: set inside the transaction body, so `none` after the run
+    // means the body never ran.
+    const captured = MutableRef.make(Option.none<Exit.Exit<A, E | SqlError>>());
 
     const program = Effect.gen(function* () {
       const db = yield* database.Database;
       return yield* db.transaction(() =>
         Effect.gen(function* () {
-          captured = yield* Effect.exit(database.transact(effect));
+          MutableRef.set(captured, Option.some(yield* Effect.exit(database.transact(effect))));
           return yield* Effect.fail(rollback);
         }),
       );
@@ -334,39 +348,24 @@ export const makeTestTransaction = <Relations extends AnyRelations, Key extends 
       //     `SqlError`, so a *successful* test and a *genuinely failing* test
       //     (whose Exit is captured before the rollback) both fail the
       //     program with `rollback` and never retry.
-      //  2. `captured === null` — the inner test body never ran. A
+      //  2. `captured` is still `none` — the inner test body never ran. A
       //     connect-seam `SqlError` can in principle surface *after* the body
       //     has executed and been captured (e.g. the connection drops on the
       //     rollback raise); re-running then would double-execute the test's
       //     side effects, so we refuse to retry once any test work has
       //     happened. The connect flake by construction fails before the
-      //     transaction body opens, so `captured` is still null then —
+      //     transaction body opens, so `captured` is still `none` then —
       //     exactly the case we retry.
       Effect.retry({
         schedule: connectRetrySchedule,
-        while: (e) => captured === null && isRetryableConnectFailure(e),
+        while: (e) => Option.isNone(MutableRef.get(captured)) && isRetryableConnectFailure(e),
       }),
     );
 
-    const outer = await runtime.runPromiseExit(
-      // SAFETY: the only requirement `program` adds beyond `R` is the
-      // `Database` key it yields, and `R` includes that key — the documented
-      // contract of `runInTestTransaction` (see `TestTransaction`), which a
-      // generic constraint cannot express.
-      program as Effect.Effect<Effect.Success<typeof program>, Effect.Error<typeof program>, R>,
-    );
+    const outer = await runtime.runPromiseExit(program);
 
-    // Snapshot to a local const: `captured` is only ever reassigned inside the
-    // nested `Effect.gen` closure above, so TS's control-flow analysis doesn't
-    // track that write here — it narrows `captured` as if still `null` (its
-    // only textually-direct assignment), collapsing every read below to
-    // `never`. The annotation restates the variable's real declared type,
-    // which the runtime assignment inside the closure does in fact produce.
-    // SAFETY: restates `captured`'s declared type verbatim, undoing only the
-    // control-flow narrowing described above.
-    // oxlint-disable-next-line effect/prefer-option-over-null -- restates `captured`'s declared type verbatim; see the comment above
-    const innerExit = captured as Exit.Exit<A, E | SqlError> | null;
-    if (!innerExit) {
+    const innerExit = MutableRef.get(captured);
+    if (Option.isNone(innerExit)) {
       if (Exit.isFailure(outer)) {
         throw new TestTransactionError({
           message: `runInTestTransaction: outer transaction failed: ${String(outer.cause)}`,
@@ -386,7 +385,7 @@ export const makeTestTransaction = <Relations extends AnyRelations, Key extends 
       });
     }
 
-    if (Exit.isSuccess(innerExit)) return innerExit.value;
+    if (Exit.isSuccess(innerExit.value)) return innerExit.value.value;
     // Project the captured `Cause` to something a test can assert on.
     // Throwing the raw `Cause` makes vitest serialise it as `{ _tag: 'Die',
     // defect: [Object] }` with an empty `.message`, so `.rejects.toThrow(/…/)`
@@ -395,14 +394,14 @@ export const makeTestTransaction = <Relations extends AnyRelations, Key extends 
     // (keeps `_tag` + message) or a `Die`'s thrown defect (a real `Error` with
     // a message + stack) — so the actual failure surfaces in vitest output
     // and `.rejects.toThrow(/…/)` matches.
-    throw Cause.squash(innerExit.cause);
+    throw Cause.squash(innerExit.value.cause);
   };
 
   return {
     runInTestTransaction,
     withTestTransaction:
-      <R>(runtime: ManagedRuntime.ManagedRuntime<R, SqlError>) =>
-      <A, E>(effect: Effect.Effect<A, E, R | `${Key}/CurrentTransaction`>): Promise<A> =>
+      <R>(runtime: ManagedRuntime.ManagedRuntime<R | Key, SqlError>) =>
+      <A, E>(effect: Effect.Effect<A, E, R | Key | `${Key}/CurrentTransaction`>): Promise<A> =>
         runInTestTransaction(runtime, effect),
     attemptInSavepoint: <A, E, R>(
       effect: Effect.Effect<A, E, R>,
@@ -429,7 +428,7 @@ export const makeTestTransaction = <Relations extends AnyRelations, Key extends 
  */
 /* oxlint-disable effect/prefer-option-over-null -- driver-facing config: `connectTimeout` is forwarded verbatim to `pgClientFromUrl` and from there to `@effect/sql-pg`'s `PgPoolConfig`, which reads `undefined` as "not supplied". See `pgClientFromUrl`'s block in ./index.ts. */
 export const testDatabaseLayer = <Relations extends AnyRelations, Key extends string>(
-  database: PgDatabase<Relations, Key>,
+  database: Pick<PgDatabase<Relations, Key>, "layer">,
   options: {
     readonly url: Redacted.Redacted<string>;
     readonly connectTimeout?: Duration.Input | undefined;

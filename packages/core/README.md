@@ -255,7 +255,7 @@ A window function over zero rows returns nothing, so **an empty page reports `to
 
 `combineFilters(...filters)` `AND`-joins the defined ones and returns `undefined` with none defined, so a caller omits `.where(...)` entirely rather than applying a vacuous `WHERE true`. `boundedPagination({ maxLimit, defaultLimit })` builds a `limit` / `offset` input schema bounded to `(0, maxLimit]` / `>= 0`, decoding absent keys to `defaultLimit` / `0`.
 
-`executeRows` is a rows-normalising wrapper for raw-SQL reads (`db.execute<T>`): drizzle's effect-postgres driver types `db.execute<T>` as `readonly T[]`, but depending on the SQL client bound underneath, the query can resolve in "raw" mode with no row mapper and hand back the full driver result object (`{ rows, rowCount, … }`) instead — so `.map` on the yielded value throws. Every raw-SQL read that needs its rows should go through `executeRows` instead of `db.execute` directly; write-only executes (INSERT/DDL) that never read rows can keep calling `db.execute`.
+`executeRows` is a rows-normalising wrapper for raw-SQL reads (`db.execute<T>`): drizzle's effect-postgres driver types `db.execute<T>` as `readonly T[]`, but depending on the SQL client bound underneath, the query can resolve in "raw" mode with no row mapper and hand back the full driver result object (`{ rows, rowCount, … }`) instead — so `.map` on the yielded value throws. Every raw-SQL read that needs its rows should go through `executeRows` instead of `db.execute` directly; write-only executes (INSERT/DDL) that never read rows can keep calling `db.execute`. It decodes each row with the Schema you pass, so the rows are typed by what was checked, and a mismatch fails with `Schema.SchemaError`: ``executeRows(db, sql`SELECT n FROM t`, Schema.Struct({ n: Schema.Finite }))``.
 
 ```ts
 export const totalCountColumn: { readonly __totalCount: SQL<number> };
@@ -276,14 +276,15 @@ export const boundedPagination: (options: {
   readonly maxLimit: number;
   readonly defaultLimit: number;
 }) => BoundedPagination;
-export const executeRows: <T extends Record<string, unknown>>(
+export const executeRows: <S extends Schema.Decoder<unknown>>(
   db: {
     readonly execute: (
       query: SQLWrapper | string,
     ) => Effect.Effect<unknown, EffectDrizzleQueryError>;
   },
   query: SQLWrapper | string,
-) => Effect.Effect<readonly T[], EffectDrizzleQueryError>;
+  row: S,
+) => Effect.Effect<ReadonlyArray<S["Type"]>, EffectDrizzleQueryError | Schema.SchemaError>;
 ```
 
 ## `./sort`

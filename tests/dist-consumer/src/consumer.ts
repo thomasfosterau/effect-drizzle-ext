@@ -16,6 +16,7 @@ import * as PgClient from "@effect/sql-pg/PgClient";
 import type { SqlError } from "effect/sql/SqlError";
 import { Resource } from "@thomasfosterau/effect-jsonapi";
 import { sql, type SQL } from "drizzle-orm";
+import type { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import { boolean, integer, pgSchema, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import {
   type DbColumnOf,
@@ -183,9 +184,13 @@ declare const bookRow: BookRow;
 export const page = pageOf([{ ...bookRow, [`__totalCount`]: 3 }], (row) => row.title);
 export const total = totalCountColumn;
 const pagination = boundedPagination({ maxLimit: 100, defaultLimit: 20 });
-export const rows = executeRows<{ readonly one: number }>(
+export const rows: Effect.Effect<
+  ReadonlyArray<{ readonly one: number }>,
+  EffectDrizzleQueryError | Schema.SchemaError
+> = executeRows(
   { execute: () => Effect.succeed([{ one: 1 }]) },
   sql`select 1 as one`,
+  Schema.Struct({ one: Schema.Finite }),
 );
 
 // ── errors ────────────────────────────────────────────────────────────────

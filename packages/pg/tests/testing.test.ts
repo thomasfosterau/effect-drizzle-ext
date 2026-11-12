@@ -25,7 +25,6 @@
  */
 
 import type { PgTransactionConfig } from "drizzle-orm/pg-core";
-import type { AnyRelations } from "drizzle-orm/relations";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -42,7 +41,6 @@ import {
 } from "effect/sql/SqlError";
 import { makeDatabaseServices } from "@thomasfosterau/effect-drizzle-ext/database";
 import { describe, expect, it } from "vite-plus/test";
-import type { PgDatabase } from "../src/index.ts";
 import {
   isRetryableConnectFailure,
   makeTestTransaction,
@@ -183,7 +181,7 @@ interface Fake {
   readonly events: ReadonlyArray<string>;
   /** How many times the OUTER boundary was attempted (the retry counter). */
   readonly attempts: () => number;
-  readonly database: PgDatabase<AnyRelations, "Fake">;
+  readonly database: typeof services & { readonly layer: Layer.Layer<"Fake"> };
   readonly runtime: ManagedRuntime.ManagedRuntime<"Fake", never>;
 }
 
@@ -254,17 +252,7 @@ const makeFake = (options: {
   return {
     events,
     attempts: () => attempts,
-    // The runner only reads `Database`, `CurrentTransaction` and `transact`;
-    // `make` / `layer` exist so the value satisfies the published interface.
-    // SAFETY: a test double — the runner touches only `Database`,
-    // `CurrentTransaction` and `transact`, all built over `FakeHandle`, which
-    // carries every member of the handle the runner calls.
-    // oxlint-disable-next-line effect/avoid-any, effect/no-chained-type-assertions -- a structural fake of the driver handle is deliberately not Drizzle's `PgDatabaseClient`, so TypeScript requires the conversion through `unknown`; nothing here is untrusted input to parse
-    database: {
-      ...services,
-      make: Effect.succeed(handle),
-      layer: Layer.succeed(services.Database, handle),
-    } as unknown as PgDatabase<AnyRelations, "Fake">,
+    database: { ...services, layer: Layer.succeed(services.Database, handle) },
     runtime: ManagedRuntime.make(Layer.succeed(services.Database, handle)),
   };
 };

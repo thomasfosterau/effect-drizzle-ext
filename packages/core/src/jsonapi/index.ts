@@ -37,6 +37,7 @@ import {
   readDbTable as coreReadDbTable,
   numericBounds,
   DB_COLUMN_KEY,
+  isDbColumn,
   type ColumnBounds,
   type DbColumn,
   type TableAnnotated as CoreTableAnnotated,
@@ -102,12 +103,7 @@ export const resourceColumns = (resource: AnyResource): Record<string, DbColumn>
   // the foreign `undefined` becomes an `Option` on the same expression.
   R.getSomes(
     R.map(Resource.attributeAnnotations(resource), (annotations) =>
-      Option.map(
-        Option.fromUndefinedOr(annotations?.[DB_COLUMN_KEY]),
-        // SAFETY: DB_COLUMN_KEY is namespaced to this package and only
-        // `dbColumn` / `dbColumnFor` write it, always with a `DbColumn` value.
-        (meta) => meta as DbColumn,
-      ),
+      Option.liftPredicate(annotations?.[DB_COLUMN_KEY], isDbColumn),
     ),
   );
 
@@ -120,9 +116,7 @@ export const resourceColumns = (resource: AnyResource): Record<string, DbColumn>
  * `deriveCheckConstraints`.
  */
 export const resourceColumnBounds = (resource: AnyResource): Record<string, ColumnBounds> => {
-  // SAFETY: `Resource.attributes` returns the resource object's
-  // `Schema.Struct.Fields`; every value is a schema.
-  const fields = Resource.attributes(resource) as Record<string, Schema.Constraint>;
+  const fields: Schema.Struct.Fields = Resource.attributes(resource);
   return R.getSomes(
     R.map(resourceColumns(resource), (column, name) =>
       Option.map(numericBounds(fields[name]), (bounds): ColumnBounds => ({ column, ...bounds })),
@@ -179,9 +173,7 @@ export interface ResourceAttributeProjection {
 export const resourceAttributeProjections = (
   resource: AnyResource,
 ): ReadonlyArray<ResourceAttributeProjection> => {
-  // SAFETY: `Resource.attributes` returns the resource object's
-  // `Schema.Struct.Fields`; every value is a schema.
-  const fields = Resource.attributes(resource) as Record<string, Schema.Top>;
+  const fields: Schema.Struct.Fields = Resource.attributes(resource);
   const columns = resourceColumns(resource);
   return Arr.map(R.toEntries(fields), ([key, schema]) => ({
     key,

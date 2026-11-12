@@ -30,10 +30,11 @@
  * @module references
  */
 
-import { getColumns, getTableName } from "drizzle-orm";
-import type { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
+import { getColumns, getTableName, is } from "drizzle-orm";
+import { PgColumn, type AnyPgColumn, type PgTable } from "drizzle-orm/pg-core";
 import * as MutableHashMap from "effect/MutableHashMap";
 import * as Option from "effect/Option";
+import * as R from "effect/Record";
 import { DerivationError } from "./derive.ts";
 import type { DbColumnReference } from "./index.ts";
 
@@ -68,6 +69,9 @@ export interface ReferenceRegistry {
   readonly resolve: (reference: DbColumnReference) => () => AnyPgColumn;
 }
 
+/** Whether a column-map entry is a Drizzle PostgreSQL column. */
+const isPgColumn = (value: unknown): value is AnyPgColumn => is(value, PgColumn);
+
 /**
  * Build a fresh {@link ReferenceRegistry}. Each call owns its own name → table
  * map, so independent schemas never resolve into each other.
@@ -89,15 +93,14 @@ export const makeReferenceRegistry = (): ReferenceRegistry => {
             `— call register(${reference.table}) in its table module`,
         });
       }
-      // SAFETY: `getColumns` returns the table's column map keyed by property
-      // name; every value is a Drizzle column, and a miss is checked below.
-      const column = (getColumns(table.value) as Record<string, AnyPgColumn>)[reference.column];
-      if (column === undefined) {
-        throw new DerivationError({
-          message: `table '${reference.table}' has no column '${reference.column}'`,
-        });
-      }
-      return column;
+      return Option.getOrElse(
+        Option.filter(R.get(getColumns(table.value), reference.column), isPgColumn),
+        () => {
+          throw new DerivationError({
+            message: `table '${reference.table}' has no column '${reference.column}'`,
+          });
+        },
+      );
     },
   };
 };

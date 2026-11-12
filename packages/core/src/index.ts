@@ -202,27 +202,29 @@ export const dbColumnFor =
     schema.annotate({ [DB_COLUMN_KEY]: meta }) as Annotated<S, M>;
 
 /**
+ * Whether a value is db-column metadata: an object whose `column` and `pg` are
+ * strings and whose `notNull` is a boolean. {@link readDbColumn} reads an
+ * annotation through it, so a foreign value under {@link DB_COLUMN_KEY} reads
+ * as no column rather than as a malformed one.
+ */
+export const isDbColumn = (value: unknown): value is DbColumn =>
+  P.isObject(value) &&
+  P.isString(value["column"]) &&
+  P.isString(value["pg"]) &&
+  P.isBoolean(value["notNull"]);
+
+/**
  * Read the db-column annotation off a schema at runtime. `Option.none()` when
- * the schema declares none.
+ * the schema declares none, or when the value under {@link DB_COLUMN_KEY} is
+ * not {@link isDbColumn} metadata.
  *
  * Reads the schema's **own** annotations only: `Schema.resolveAnnotations` on a
  * `Schema.optional(...)` / `Schema.NullOr(...)` wrapper does not see the inner
  * schema's annotation. Use {@link fieldColumns} for a struct's fields, which
  * peels those wrappers structurally.
  */
-/*
- * NOT migrated to `Option`: this union is not a modelling choice, it names the
- * runtime shape effect's own `Schema.resolveAnnotations` returns — an absent
- * annotation record, and an absent key inside it, are both a literal
- * `undefined`. The foreign `undefined` is converted to `Option` on the very
- * next expression, which is where the boundary is.
- */
-/* oxlint-disable effect/prefer-option-over-null -- names effect's own runtime shape at a cast, converted on the same line */
-// SAFETY: DB_COLUMN_KEY is namespaced to this package and only `dbColumn` /
-// `dbColumnFor` write it, always with a `DbColumn` value.
 export const readDbColumn = (schema: Schema.Constraint): Option.Option<DbColumn> =>
-  Option.fromNullishOr(Schema.resolveAnnotations(schema)?.[DB_COLUMN_KEY] as DbColumn | undefined);
-/* oxlint-enable effect/prefer-option-over-null */
+  Option.liftPredicate(Schema.resolveAnnotations(schema)?.[DB_COLUMN_KEY], isDbColumn);
 
 // ── Table-level annotation ────────────────────────────────────────────
 
@@ -328,11 +330,11 @@ export const dbTableFor =
  * which is where the level is statically known.
  */
 export const readDbTable = <T extends object>(target: T): Option.Option<TableMeta> =>
-  Option.fromNullishOr(
-    // SAFETY: DB_TABLE_KEY is a module-private symbol that only `dbTable`
-    // writes, always with a `TableMeta`; an unannotated target lacks it.
-    (target as T & Partial<Record<typeof DB_TABLE_KEY, TableMeta>>)[DB_TABLE_KEY],
-  );
+  DB_TABLE_KEY in target ? Option.liftPredicate(target[DB_TABLE_KEY], isTableMeta) : Option.none();
+
+/** Whether a value is table metadata: an object whose `name` is a string. */
+const isTableMeta = (value: unknown): value is TableMeta =>
+  P.isObject(value) && P.isString(value["name"]);
 
 // ── Numeric bounds (schema checks → CHECK-constraint metadata) ────────
 
@@ -511,25 +513,12 @@ export type FieldColumnsMetaOf<F extends Schema.Struct.Fields> = {
  * `null` / `undefined` arms are the ones to skip.
  */
 const underlyingSchema = (schema: Schema.Constraint): Option.Option<Schema.Constraint> => {
-  /*
-   * NOT migrated to `Option`: this structural view is not a modelling choice,
-   * it names the runtime shape of effect's own wrapper schemas — a schema that
-   * wraps nothing simply has no `schema` / `members` own property, so the
-   * absence *is* `undefined`. The function converts it at its return.
-   */
-  /* oxlint-disable effect/prefer-option-over-null -- names effect's own runtime shape at a cast, converted at the return */
-  // SAFETY: both members are optional and checked before use; a schema that
-  // is neither wrapper simply lacks both properties.
-  const wrapper = schema as {
-    readonly schema?: Schema.Constraint | undefined;
-    readonly members?: ReadonlyArray<Schema.Constraint> | undefined;
-  };
-  /* oxlint-enable effect/prefer-option-over-null */
-  if (wrapper.schema !== undefined) return Option.some(wrapper.schema);
-  return Arr.findFirst(wrapper.members ?? [], (member) => {
-    const tag = member.ast._tag;
-    return tag !== "Null" && tag !== "Undefined";
-  });
+  if ("schema" in schema && Schema.isSchema(schema.schema)) return Option.some(schema.schema);
+  if (!("members" in schema) || !Arr.isArray(schema.members)) return Option.none();
+  return Arr.findFirst(
+    Arr.filter(schema.members, Schema.isSchema),
+    (member) => member.ast._tag !== "Null" && member.ast._tag !== "Undefined",
+  );
 };
 
 /**

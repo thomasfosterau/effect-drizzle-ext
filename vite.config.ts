@@ -79,11 +79,6 @@ export default defineConfig({
             "The `Buffer` global is typed `any` wherever @cloudflare/workers-types is loaded. Use Uint8Array/DataView, or byteaToHex/hexToBytea from ./columns.",
         },
       ],
-      // `casting-awareness` is an awareness prompt, not a defect rule — it
-      // fires on every `as`, including the narrowings Drizzle's builder types
-      // structurally require (the `FluentColumn` bridge in derive.ts, the
-      // widened join chain in versioned-chain.ts). Stays visible as a warning.
-      "effect/casting-awareness": "warn",
 
       "typescript/no-explicit-any": "off",
       "typescript/no-empty-object-type": "off",
@@ -92,20 +87,10 @@ export default defineConfig({
       "vite-plus/prefer-vite-plus-imports": "error",
 
       // ---- type-aware rules (oxlint-tsgolint) -------------------------------
-      // Allowance (effect-drizzle-ext#104): 26 sites (35 when type-aware
-      // linting was turned on; the tree interpreter's documented type-erasure
-      // seams, in core's versioned-chain.ts for its tables, keyed tables,
-      // pointer logs and views, and in pg's chain.ts, are the newest), every one a
-      // `// SAFETY:`-commented narrowing at a Drizzle builder, schema-annotation
-      // or tree-derivation boundary in src/, or a
-      // deliberately ill-typed test double (the hostile `toJsonSchema` in
-      // annotation.test.ts, the fake handle in pg's testing.test.ts). A new
-      // site is a defect; lower the count as sites are fixed and return the
-      // rule to `error` at zero.
-      "typescript/no-unsafe-type-assertion": "warn",
-      // Allowance (effect-drizzle-ext#104): 1 site, the `Effect` channel
-      // narrowing in runInTestTransaction (packages/pg/src/testing.ts).
-      "effecttsgo/unsafe-effect-type-assertion": "warn",
+      // At `error` everywhere but the type-erasure seams (the first override
+      // below, effect-drizzle-ext#104).
+      "typescript/no-unsafe-type-assertion": "error",
+      "effecttsgo/unsafe-effect-type-assertion": "error",
       // This library is the binding of `effect/sql/*`, `@effect/sql-pg` and
       // the platform services drizzle-kit's tooling needs (FileSystem, Path,
       // ChildProcessSpawner): those unstable modules are its subject, so no
@@ -131,6 +116,39 @@ export default defineConfig({
       "typescript/no-generated-empty-object-type": "off",
     },
     overrides: [
+      // The type-erasure seams (effect-drizzle-ext#104, owner decision A):
+      // each `// SAFETY:`-commented `as` here names a type TypeScript can't
+      // compute from the runtime value that has it, and no guard can recover
+      // that type, because the precision lives only in the type. Narrowing at
+      // a guard-able boundary is fixed in code instead, so a new `as` in any
+      // other file is an error. The 17 sites:
+      // - core derive.ts (3): the `FluentColumn` bridge over the registry's
+      //   widened `ColumnBuilderBase`, and `fromMeta` / `fromFields` naming
+      //   the per-entry `DerivedColumns` the builder loop computes.
+      // - core jsonapi/derive.ts (1): the same naming for a resource.
+      // - core versioned-chain.ts (8): `makeTreeTables` (3) and
+      //   `makeTreeViews` (1) naming per-level tables and views built from
+      //   the runtime tree; `makeCurrentVersionView`'s untyped join chain and
+      //   re-pinned view (3); `columnsOrEmpty`'s `{}` default for an inferred
+      //   extras map (1).
+      // - core index.ts (3): `dbColumn` / `dbColumnFor` / `dbTable` stamping
+      //   the type-only phantom (never present at runtime) onto the value.
+      // - core update.ts (1): `updateSetMap`'s key-filtered `UpdateSet`.
+      // - pg chain.ts (1): `makeVersionChain` naming per-leaf operations.
+      {
+        files: [
+          "packages/core/src/derive.ts",
+          "packages/core/src/jsonapi/derive.ts",
+          "packages/core/src/versioned-chain.ts",
+          "packages/core/src/index.ts",
+          "packages/core/src/update.ts",
+          "packages/pg/src/chain.ts",
+        ],
+        rules: {
+          "typescript/no-unsafe-type-assertion": "off",
+          "effect/casting-awareness": "off",
+        },
+      },
       // Build/test configs and the integration global setup are evaluated by
       // Vite and Vitest in bare Node, before any Effect runtime exists — there
       // is no `Config` provider to read from and no `FileSystem` service to

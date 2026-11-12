@@ -12,6 +12,7 @@
 import { and, sql } from "drizzle-orm";
 import type { SQL, SQLWrapper } from "drizzle-orm";
 import type { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
+import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as P from "effect/Predicate";
 import * as Schema from "effect/Schema";
@@ -161,23 +162,42 @@ export type BoundedPagination = ReturnType<typeof boundedPagination>;
  * for call sites. Write-only executes (INSERT/DDL) that never read rows
  * may keep calling `db.execute` directly.
  *
+ * Each row is decoded with `row` (an Effect Schema), so the returned rows
+ * are the row type the schema checks, not one the caller asserts. A row the
+ * schema rejects fails the effect with its `SchemaError`, as does a result
+ * that is neither shape (several statements' results, for one).
+ *
  * `db` is typed to the narrowest shape this needs (`execute` alone),
  * widened so both a real Effect-Drizzle database and a stub client in a
  * test satisfy it without a cast.
+ *
+ * @example
+ * ```ts
+ * import { executeRows } from "@thomasfosterau/effect-drizzle-ext/query";
+ * import * as Effect from "effect/Effect";
+ * import * as Schema from "effect/Schema";
+ *
+ * const db = { execute: () => Effect.succeed({ rows: [{ n: 1 }, { n: 2 }] }) };
+ * const rows = Effect.runSync(executeRows(db, "SELECT n", Schema.Struct({ n: Schema.Finite })));
+ * console.log(rows); // [{ n: 1 }, { n: 2 }]
+ * ```
  */
-export const executeRows = <T extends Record<string, unknown>>(
+export const executeRows = <S extends Schema.Decoder<unknown>>(
   db: {
     readonly execute: (
       query: SQLWrapper | string,
     ) => Effect.Effect<unknown, EffectDrizzleQueryError>;
   },
   query: SQLWrapper | string,
-): Effect.Effect<readonly T[], EffectDrizzleQueryError> =>
-  Effect.map(db.execute(query), (result) =>
-    // SAFETY: `T` is the row type the caller asserts its query selects (the
-    // driver hands rows back untyped); a non-array result is the driver's
-    // result object, whose `rows` holds those rows when present.
-    Array.isArray(result)
-      ? (result as readonly T[])
-      : ((result as { rows?: readonly T[] }).rows ?? []),
+  row: S,
+): Effect.Effect<ReadonlyArray<S["Type"]>, EffectDrizzleQueryError | Schema.SchemaError> =>
+  Effect.flatMap(db.execute(query), (result) =>
+    // The rows are the array itself, or a result object's `rows` (none when absent).
+    Schema.decodeUnknownEffect(Schema.Array(row))(
+      Arr.isArray(result)
+        ? result
+        : P.hasProperty(result, "rows") && result.rows !== undefined
+          ? result.rows
+          : [],
+    ),
   );
