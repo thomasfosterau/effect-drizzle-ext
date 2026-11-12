@@ -34,8 +34,8 @@ catalogs:
       specifier: ^12.2.1
       version: 12.2.1
     '@thomasfosterau/effect-ext':
-      specifier: ^0.1.0
-      version: 0.1.0
+      specifier: ^0.2.0
+      version: 0.2.0
     '@thomasfosterau/effect-jsonapi':
       specifier: ^0.20.1
       version: 0.20.1
@@ -141,7 +141,7 @@ importers:
     dependencies:
       '@thomasfosterau/effect-ext':
         specifier: 'catalog:'
-        version: 0.1.0(@effect/platform-node@4.1.2(effect@4.1.2)(redis@6.2.1))(@thomasfosterau/effect-jsonapi@0.20.1(effect@4.1.2))(effect@4.1.2)
+        version: 0.2.0(@effect/platform-node@4.1.2(effect@4.1.2)(redis@6.2.1))(@thomasfosterau/effect-jsonapi@0.20.1(effect@4.1.2))(effect@4.1.2)
     devDependencies:
       '@effect/language-service':
         specifier: 'catalog:'
@@ -1177,15 +1177,15 @@ packages:
     peerDependencies:
       '@testing-library/dom': '>=7.21.4'
 
-  '@thomasfosterau/effect-ext@0.1.0':
-    resolution: {integrity: sha512-gCewDQmefBF48NeR/3iVdPSxilNbPel6P/AYU5j1iykcBCmXNv3ZwAkkLOls2c5j7iscquXLlTov2IGsAvhgzw==}
+  '@thomasfosterau/effect-ext@0.2.0':
+    resolution: {integrity: sha512-T1EukW6BJDub7EMdii65Qisy1uDMwAkbso6s2gQQD9MbUC8jGycJppsL4McRdnjgboEu5yVxirzr2pobkh9qFw==}
     engines: {node: '>=22.18'}
     hasBin: true
     peerDependencies:
       '@effect/platform-browser': ^4.0.0
       '@effect/platform-node': ^4.0.0
       '@thomasfosterau/effect-jsonapi': '>=0.16.1'
-      '@thomasfosterau/effect-parse': ^0.4.1
+      '@thomasfosterau/effect-parse': ^0.4.1 || ^0.5.0
       effect: 4.1.2
     peerDependenciesMeta:
       '@effect/platform-browser':
@@ -3877,7 +3877,7 @@ snapshots:
     dependencies:
       '@testing-library/dom': 10.4.2
 
-  '@thomasfosterau/effect-ext@0.1.0(@effect/platform-node@4.1.2(effect@4.1.2)(redis@6.2.1))(@thomasfosterau/effect-jsonapi@0.20.1(effect@4.1.2))(effect@4.1.2)':
+  '@thomasfosterau/effect-ext@0.2.0(@effect/platform-node@4.1.2(effect@4.1.2)(redis@6.2.1))(@thomasfosterau/effect-jsonapi@0.20.1(effect@4.1.2))(effect@4.1.2)':
     dependencies:
       effect: 4.1.2
     optionalDependencies:
@@ -4088,7 +4088,7 @@ snapshots:
       magicast: 0.5.5
       obug: 3.0.0
       tinyrainbow: 3.2.0
-      vitest: 5.1.0(@types/node@26.6.6)(@vitest/browser-preview@5.1.0)(@vitest/coverage-istanbul@5.1.0(vitest@5.1.0))(@vitest/ui@5.1.0(vitest@5.1.0))(@voidzero-dev/vite-plus-core@1.5.0(@types/node@26.6.6)(@typescript/typescript6@6.0.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+      vitest: 5.1.0(@types/node@26.6.6)(@vitest/browser-preview@5.1.0)(@vitest/coverage-istanbul@5.1.0)(@vitest/ui@5.1.0)(@voidzero-dev/vite-plus-core@1.4.0(@types/node@26.6.6)(@typescript/typescript6@6.0.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   '@vitest/istanbul-lib-coverage@2.1.0': {}
 
@@ -4150,7 +4150,7 @@ snapshots:
       pathe: 2.0.3
       sirv: 3.0.2
       tinyrainbow: 3.2.0
-      vitest: 5.1.0(@types/node@26.6.6)(@vitest/browser-preview@5.1.0)(@vitest/coverage-istanbul@5.1.0(vitest@5.1.0))(@vitest/ui@5.1.0(vitest@5.1.0))(@voidzero-dev/vite-plus-core@1.5.0(@types/node@26.6.6)(@typescript/typescript6@6.0.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+      vitest: 5.1.0(@types/node@26.6.6)(@vitest/browser-preview@5.1.0)(@vitest/coverage-istanbul@5.1.0)(@vitest/ui@5.1.0)(@voidzero-dev/vite-plus-core@1.4.0(@types/node@26.6.6)(@typescript/typescript6@6.0.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   '@vitest/utils@5.1.0':
     dependencies:
