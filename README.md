@@ -23,7 +23,7 @@ The core package alone (`effect`, `drizzle-orm` peers) covers derivation, errors
 
 ```ts
 import { dbColumnFor } from "@thomasfosterau/effect-drizzle-ext";
-import { makeDeriveColumns } from "@thomasfosterau/effect-drizzle-ext/derive";
+import { deriveColumnsWith } from "@thomasfosterau/effect-drizzle-ext/derive";
 import { makePgDatabase } from "@thomasfosterau/effect-drizzle-ext-pg";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import * as Schema from "effect/Schema";
@@ -36,7 +36,7 @@ const Article = Schema.Struct({
 });
 
 // A builder registry turns the annotations into Drizzle columns.
-const { fromFields } = makeDeriveColumns({ text, integer });
+const { fromFields } = deriveColumnsWith({ text, integer });
 export const articleTable = pgTable("article", fromFields(Article.fields));
 
 // One `@effect/sql-pg` binding call gives the app its services.
