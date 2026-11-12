@@ -11,6 +11,7 @@
  * @module packages/pg/tests/integration/chain
  */
 
+import { classifyError } from "@thomasfosterau/effect-drizzle-ext/errors";
 import { eq, sql } from "drizzle-orm";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
@@ -22,13 +23,20 @@ import { makeVersionChain, MAX_HISTORY_LIMIT } from "../../src/chain.ts";
 import { integrationDatabaseLayer } from "./database-url.ts";
 import { makePgDatabase } from "../../src/index.ts";
 import { makeTestTransaction } from "../../src/testing.ts";
-import { node, nodeVersion, ontologyTables, ontologyTree } from "../fixtures/schema.ts";
+import {
+  node,
+  nodeVersion,
+  ontologyTables,
+  ontologyTree,
+  person,
+  personView,
+} from "../fixtures/schema.ts";
 
 const database = makePgDatabase({ relations: {}, key: "Database" });
 const { CurrentTransaction, transact } = database;
 
 const runtime = ManagedRuntime.make(integrationDatabaseLayer(database));
-const { runInTestTransaction } = makeTestTransaction(database);
+const { runInTestTransaction, attemptInSavepoint } = makeTestTransaction(database);
 
 const chain = makeVersionChain({ tree: ontologyTree, tables: ontologyTables, CurrentTransaction });
 
@@ -645,6 +653,83 @@ describe("an id that isn't a UUID (effect-drizzle-ext#165)", () => {
           Option.some(0n),
           Option.some(0n),
         ]);
+      }),
+    );
+  });
+});
+
+describe("stable columns (effect-drizzle-ext#188)", () => {
+  const PERSON = "00000000-0000-4000-8000-0000000000c1";
+  const OTHER = "00000000-0000-4000-8000-0000000000c2";
+  const QID = "Q42";
+
+  /** Person `PERSON` at version 0, its stable `wikidata_id` set. */
+  const createPerson = chain.person.create({
+    id: PERSON,
+    state: {},
+    stable: { wikidataId: QID },
+    actor: ACTOR,
+  });
+
+  /** The persons the view resolves, as `[id, version, wikidataId]`. */
+  const personRows = Effect.fn("chain.personRows")(function* () {
+    const tx = yield* CurrentTransaction;
+    const rows = yield* tx.select().from(personView).orderBy(personView.id);
+    return rows.map((row) => [row.id, row.version, row.wikidataId] as const);
+  });
+
+  it("writes the stable extras at create, and the view projects them", async () => {
+    await run(
+      Effect.gen(function* () {
+        yield* createPerson;
+        yield* chain.person.create({ id: OTHER, state: {}, actor: ACTOR });
+        expect(yield* personRows()).toEqual([
+          [PERSON, 0n, QID],
+          [OTHER, 0n, null],
+        ]);
+      }),
+    );
+  });
+
+  it("refuses a second node with the same key, by the consumer's constraint name", async () => {
+    await run(
+      Effect.gen(function* () {
+        yield* createPerson;
+        const attempt = yield* attemptInSavepoint(
+          chain.person.create({ id: OTHER, state: {}, stable: { wikidataId: QID }, actor: ACTOR }),
+        );
+        assert(Exit.isFailure(attempt), "unreachable: a duplicate key should have been refused");
+        const violation = classifyError(attempt.cause);
+        expect(Option.map(violation, (error) => error._tag)).toEqual(
+          Option.some("UniqueViolation"),
+        );
+        expect(
+          Option.flatMap(violation, (error) =>
+            "constraint" in error ? error.constraint : Option.none(),
+          ),
+        ).toEqual(Option.some("person_wikidata_id_unique"));
+        expect(yield* personRows()).toEqual([[PERSON, 0n, QID]]);
+      }),
+    );
+  });
+
+  it("appends a second version of one node without touching its stable row", async () => {
+    await run(
+      Effect.gen(function* () {
+        yield* createPerson;
+        expect(yield* chain.person.update({ id: PERSON, patch: {}, actor: ACTOR })).toEqual({
+          id: PERSON,
+          version: 1n,
+        });
+        yield* chain.person.delete(PERSON, { actor: ACTOR });
+        yield* chain.person.restoreVersion(PERSON, 0n, { actor: ACTOR });
+        expect(yield* personRows()).toEqual([[PERSON, 3n, QID]]);
+        const tx = yield* CurrentTransaction;
+        const stable = yield* tx
+          .select({ wikidataId: person.wikidataId })
+          .from(person)
+          .where(eq(person.id, PERSON));
+        expect(stable).toEqual([{ wikidataId: QID }]);
       }),
     );
   });

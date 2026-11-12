@@ -8,14 +8,31 @@ The opt-in interpreter for "a tree of levels, each a stable + version table pair
 
 `makeTreeTables(tree, { schema, builders, root?, levels? })` derives every table and constraint of a `defineTree` tree in one call. Column types still come from your builder registry:
 
-- **The root:** the identity table (`id`, `type`, `root.identityColumns`; `UNIQUE (id, type)`) and the root version table, keyed `(id, version)`. The root version table carries `action` (CHECKed to `create` / `update` / `delete`, the single home of currency and tombstone state), `timestamp`, the actor and `root.versionColumns`.
+- **The root:** the identity table (`id`, `type`, `root.identityColumns`; `UNIQUE (id, type)`, then `root.identityConstraints`) and the root version table, keyed `(id, version)`. The root version table carries `action` (CHECKed to `create` / `update` / `delete`, the single home of currency and tombstone state), `timestamp`, the actor and `root.versionColumns`.
 - **Per level:** a stable table (`id` → parent, the `type` discriminator arced down the tree and CHECKed to the level's subtree leaves) and a version table (`(id, version)` → the parent's, cascading on delete) carrying its level and leaf columns and `levels[name].columns` hooks. A fact-scoped level gets its fact tables, a keyed leaf its `${leaf}_${name}` table, and each name in `root.pointers` an append-only `${name}_pointer` log.
 
 Constraint names are canonical, and the same tree always generates the same migration.
 
+**Stable columns** hold what a node keeps for life, such as an external key that must be unique across a leaf's nodes. A version table can't constrain that, because every version repeats it. `levels[name].stableColumns` appends columns to the level's stable table after `id` and `type`, and `levels[name].stableConstraints` appends constraints after the discriminator's. The constraint names are whatever your hook passes:
+
+```ts
+const tables = makeTreeTables(tree, {
+  schema,
+  builders,
+  levels: {
+    person: {
+      stableColumns: { wikidataId: text("wikidata_id") },
+      stableConstraints: (table) => [unique("person_wikidata_id_unique").on(table.wikidataId)],
+    },
+  },
+});
+```
+
+The chain writes stable columns once, at `create`; no later write touches them. Every view whose path reaches the level projects them (INNER JOINed on `id`). A `stableColumns` key that the stable table (`id`, `type`) or the level's version table already has is a thrown `DerivationError`. So is a key another of a view's sources shares, which `makeTreeViews` reports. A tree with no stable hooks emits exactly the DDL and view SQL it did before.
+
 `makeTreeViews(tree, tables, { schema, branches?, pointers? })` derives the read views:
 
-- **Per leaf, a fail-closed current-version view** (`${leaf}_view`). It resolves the head from the root version table and INNER JOINs every level's version table at it, so ancestor level columns appear with no per-anchor factory. A node whose head advanced past any level yields **no row**.
+- **Per leaf, a fail-closed current-version view** (`${leaf}_view`). It resolves the head from the root version table and INNER JOINs every level's version table at it, so ancestor level columns appear with no per-anchor factory. Each level's stable columns come before its version columns. A node whose head advanced past any level yields **no row**.
 - **Per marker named in `branches`, a `UNION ALL` branch view.** An optional per-leaf `project` builds a search union.
 - **Per keyed leaf, a keyed view** (one row per key, and one `NULL`-key row for a head with none).
 - **Per pointer and leaf named in `pointers`, the leaf view at the pointer's effective fact.** It projects the head's `action` and `${pointer}At`, and composes with the keyed view.
@@ -25,7 +42,7 @@ Every derived view reads base tables only, never another view. Each view's row t
 
 ### Per-leaf builders
 
-`makeSubtypeTables(applyDiscriminator)(schema, config)` builds one leaf's `{ stable, version }` pair: the stable identity row (`id` primary key referencing the parent branch's stable `id`, plus a denormalised `type` discriminator), and the version row (`(id, version)` primary key, `(id, version)` foreign-keyed to the parent branch's version table). Domain columns are authored per leaf and merged in via `config.columns`; `discriminator`, when present, makes `type` `NOT NULL` and appends the constraints `applyDiscriminator` returns (a `./constraints` `DiscriminatorToolkit` is the intended hook). Its return type, `SubtypeTables<TColumns>`, is written out as an explicit annotation rather than inferred — the declaration printer cannot reduce the homomorphic `PgBuildColumns` mapped type while `TColumns` is still generic, and would otherwise emit an unbound `TTableName` reference that `skipLibCheck` hides.
+`makeSubtypeTables(applyDiscriminator)(schema, config)` builds one leaf's `{ stable, version }` pair: the stable identity row (`id` primary key referencing the parent branch's stable `id`, plus a denormalised `type` discriminator), and the version row (`(id, version)` primary key, `(id, version)` foreign-keyed to the parent branch's version table). Domain columns are authored per leaf and merged in via `config.columns`, and `config.stableColumns` / `config.stableConstraints` extend the stable row after `id` / `type` and after the discriminator constraints; `discriminator`, when present, makes `type` `NOT NULL` and appends the constraints `applyDiscriminator` returns (a `./constraints` `DiscriminatorToolkit` is the intended hook). Its return type, `SubtypeTables<TColumns, TStable>`, is written out as an explicit annotation rather than inferred — the declaration printer cannot reduce the homomorphic `PgBuildColumns` mapped type while `TColumns` is still generic, and would otherwise emit an unbound `TTableName` reference that `skipLibCheck` hides.
 
 `makeCurrentVersionView(deps)(schema, name, config)` builds the uniform fail-closed current-version view: currency resolves from `deps.rootVersion` (a `MAX(version)` sub-select grouped by `id`), and `config.leaf` / `config.through` INNER JOIN at exactly that `(id, version)` — a node whose root version advanced past its leaf (a partial-chain tombstone) yields **no row**, rather than surfacing a stale older leaf row. `config.optional` LEFT JOINs 6NF satellite fact tables instead, where row-absence at a version encodes NULL. `deps.merge` can be a plain object (columns merged from `deps.identity`, no extra join, the emitted view definition unchanged) or a function (additionally INNER JOINs a `version = 0` alias of `rootVersion` and hands it to the callback, so a hierarchy can merge in a true `createdAt` sourced from the node's birth row, distinct from the current version's timestamp) — the object form matters for a root version table whose view is itself joined by another hand-written view, since drizzle-kit does not topologically order view-on-view DROPs.
 
@@ -40,10 +57,13 @@ export const makeSubtypeTables: <TDiscriminator>(
     stable: DiscriminatorColumns,
     discriminator: TDiscriminator,
   ) => PgTableExtraConfigValue[],
-) => <TColumns extends Record<string, ColumnBuilderBase>>(
+) => <
+  TColumns extends Record<string, ColumnBuilderBase>,
+  TStable extends Record<string, ColumnBuilderBase> = {},
+>(
   schema: PgSchema,
-  config: SubtypeTablesConfig<TColumns, TDiscriminator>,
-) => SubtypeTables<TColumns>;
+  config: SubtypeTablesConfig<TColumns, TDiscriminator, TStable>,
+) => SubtypeTables<TColumns, TStable>;
 export const makeCurrentVersionView: <
   TRoot extends PgTable & VersionTable,
   TMerge extends ViewColumns,
