@@ -12,4 +12,4 @@ Options bags the library reads itself now spell optional members `readonly x?: T
 
 Config handed to Drizzle (`DbColumn`, `DeriveOptions`, `./versioned-chain`'s builder config) and to `PgPoolConfig` (`pgClientFromUrl` / `pgClientFromPool` / `testDatabaseLayer`) keeps `?: T | undefined`.
 
-**Migration:** under `exactOptionalPropertyTypes`, omit an absent member instead of passing `undefined`. For example, `resolveSortOrder({ view, sort: query.sort })` with a possibly-undefined `query.sort` becomes `resolveSortOrder({ view, ...(query.sort === undefined ? {} : { sort: query.sort }) })`, or forward the whole optional with a rest spread (`const { direction, ...rest } = options`).
+**Migration:** under `exactOptionalPropertyTypes`, omit an absent member instead of passing `undefined`. For example, `resolveSortOrder({ view, sort: query.sort })` with a possibly-undefined `query.sort` becomes `resolveSortOrder(query.sort === undefined ? { view } : { view, sort: query.sort })`. Where a caller holds a whole options object, forward it with a rest spread (`const { direction, ...rest } = options`), which keeps an absent key absent.
