@@ -137,6 +137,8 @@ const P1 = idOf(10); // person refined to organisation (old leaf rows cascade aw
 const P2 = idOf(11); // person moved to organisation, old leaf rows surviving
 const P3 = idOf(12); // person, plain
 const O1 = idOf(13); // organisation, plain
+const B6 = idOf(14); // book, v1 and v2 share one timestamp
+const B7 = idOf(15); // book, v1 backdated to before v0
 
 /** Version `v`'s timestamp: the first of month `v + 1` of 2026. */
 const at = (v: number) => `2026-${String(v + 1).padStart(2, "0")}-01T00:00:00Z`;
@@ -149,8 +151,8 @@ const node = (id: string, type: string, stable: ReadonlyArray<string>) => [
   ),
 ];
 
-const root = (id: string, v: number, action: string) =>
-  `INSERT INTO ontology.node_version (id, version, action, timestamp) VALUES ('${id}', ${v}, '${action}', '${at(v)}')`;
+const root = (id: string, v: number, action: string, when = at(v)) =>
+  `INSERT INTO ontology.node_version (id, version, action, timestamp) VALUES ('${id}', ${v}, '${action}', '${when}')`;
 
 const row = (table: string, id: string, v: number, extra = "") => {
   const [columns, values] = Str.isNonEmpty(extra) ? extra.split("|") : ["", ""];
@@ -158,8 +160,8 @@ const row = (table: string, id: string, v: number, extra = "") => {
 };
 
 /** A full book version: the root, the work spine and the leaf. */
-const bookAt = (id: string, v: number, action: string) => [
-  root(id, v, action),
+const bookAt = (id: string, v: number, action: string, when = at(v)) => [
+  root(id, v, action, when),
   row("work_version", id, v, `title|'b${v}'`),
   row("book_version", id, v, `pages|${100 + v}`),
 ];
@@ -182,6 +184,12 @@ const agentAt = (id: string, v: number, action: string, leaf: string) => [
 const pointAt = (id: string, version: string, when = "now()") =>
   `INSERT INTO ontology.live_pointer (id, version, at) VALUES ('${id}', ${version}, ${when})`;
 
+/** The timestamp B6's v1 and v2 share. */
+const TIE = "2026-02-10T00:00:00Z";
+/** B7's v0, and its v1 backdated to before it. */
+const BACKDATED_V0 = "2026-02-20T00:00:00Z";
+const BACKDATED_V1 = "2026-01-10T00:00:00Z";
+
 /** The mixed histories every equivalence check reads. */
 const seedHistories = execAll([
   ...node(B1, "book", ["work", "book"]),
@@ -202,6 +210,15 @@ const seedHistories = execAll([
   ...node(B5, "book", ["work", "book"]),
   ...bookAt(B5, 0, "create"),
   root(B5, 1, "update"),
+  // Timestamps that do not rise with the version: the head is the highest
+  // version among those at or before the point, not the latest timestamp.
+  ...node(B6, "book", ["work", "book"]),
+  ...bookAt(B6, 0, "create"),
+  ...bookAt(B6, 1, "update", TIE),
+  ...bookAt(B6, 2, "update", TIE),
+  ...node(B7, "book", ["work", "book"]),
+  ...bookAt(B7, 0, "create", BACKDATED_V0),
+  ...bookAt(B7, 1, "update", BACKDATED_V1),
   ...node(E1, "essay", ["work", "essay"]),
   ...essayAt(E1, 0, "create", ["en", "fr"]),
   ...essayAt(E1, 1, "update", ["en"]),
@@ -272,15 +289,32 @@ const VIEWS = [
 
 const LEAVES = ["book", "essay", "edition", "person", "organisation"] as const;
 
-/** `asOf` points: before any version, at each version, past the last; and times between them. */
-const VERSION_POINTS = [0n, 1n, 2n, 5n];
-const TIME_POINTS = [
-  "2025-12-31T00:00:00Z",
-  "2026-01-15T00:00:00Z",
-  "2026-02-01T00:00:00Z",
-  "2026-02-15T00:00:00Z",
-  "2026-03-15T00:00:00Z",
+type Leaf = (typeof LEAVES)[number];
+
+/**
+ * `asOf` points: before any version, at each version, past the last; and times
+ * between them, at the tied timestamp and after the backdated ones. Each names
+ * the leaves it must return rows for; every other leaf must return none.
+ */
+const VERSION_POINTS: ReadonlyArray<{
+  readonly version: bigint;
+  readonly nonEmpty: ReadonlyArray<Leaf>;
+}> = [
+  { version: 0n, nonEmpty: LEAVES },
+  { version: 1n, nonEmpty: LEAVES },
+  { version: 2n, nonEmpty: LEAVES },
+  { version: 5n, nonEmpty: LEAVES },
 ];
+const TIME_POINTS: ReadonlyArray<{ readonly iso: string; readonly nonEmpty: ReadonlyArray<Leaf> }> =
+  [
+    { iso: "2025-12-31T00:00:00Z", nonEmpty: [] }, // before any version
+    { iso: "2026-01-15T00:00:00Z", nonEmpty: LEAVES }, // B7's backdated v1 only
+    { iso: "2026-02-01T00:00:00Z", nonEmpty: LEAVES },
+    { iso: TIE, nonEmpty: LEAVES }, // exactly B6's tied v1 and v2
+    { iso: "2026-02-15T00:00:00Z", nonEmpty: LEAVES },
+    { iso: "2026-02-25T00:00:00Z", nonEmpty: LEAVES }, // B7 has both versions, v0 later in time
+    { iso: "2026-03-15T00:00:00Z", nonEmpty: LEAVES },
+  ];
 
 const date = (iso: string) => DateTime.toDateUtc(DateTime.makeUnsafe(iso));
 
@@ -315,14 +349,16 @@ describe("view heads: the anti-join returns exactly the max head's rows", () => 
       Effect.gen(function* () {
         yield* seedHistories;
         const byVersion = Arr.flatMap(LEAVES, (leaf) =>
-          Arr.map(VERSION_POINTS, (version) => ({
+          Arr.map(VERSION_POINTS, ({ version, nonEmpty }) => ({
+            expectNonEmpty: Arr.contains(nonEmpty, leaf),
             label: `${leaf} at version ${version}`,
             query: sql`select * from ${ontologyViews.asOf(leaf, { version })}`,
             oracle: trunkAsOf(leaf, `"ontology"."node_version"."version" <= ${version}`),
           })),
         );
         const byTime = Arr.flatMap(LEAVES, (leaf) =>
-          Arr.map(TIME_POINTS, (iso) => ({
+          Arr.map(TIME_POINTS, ({ iso, nonEmpty }) => ({
+            expectNonEmpty: Arr.contains(nonEmpty, leaf),
             label: `${leaf} at ${iso}`,
             query: sql`select * from ${ontologyViews.asOf(leaf, { at: date(iso) })}`,
             oracle: trunkAsOf(leaf, `"ontology"."node_version"."timestamp" <= '${iso}'`),
@@ -330,17 +366,28 @@ describe("view heads: the anti-join returns exactly the max head's rows", () => 
         );
         const results = yield* Effect.forEach(
           [...byVersion, ...byTime],
-          ({ label, query, oracle }) =>
-            Effect.map(difference(query, oracle), (result) => ({ label, ...result })),
+          ({ label, query, oracle, expectNonEmpty }) =>
+            Effect.map(difference(query, oracle), (result) => ({
+              label,
+              expectNonEmpty,
+              ...result,
+            })),
           { concurrency: 1 },
         );
-        Arr.forEach(results, ({ label, missing, extra }) => {
+        Arr.forEach(results, ({ label, rows, missing, extra, expectNonEmpty }) => {
           expect({ label, missing, extra }).toEqual({ label, missing: 0, extra: 0 });
+          // Per point, so an empty == empty comparison cannot pass silently.
+          expect({ label, nonEmpty: (rows ?? 0) > 0 }).toEqual({ label, nonEmpty: expectNonEmpty });
         });
-        // Not vacuous: most points see rows.
-        expect(Arr.filter(results, ({ rows }) => (rows ?? 0) > 0).length).toBeGreaterThan(
-          results.length / 2,
-        );
+        // Tied versions: both are at the point, the higher is the head.
+        expect(yield* asOfHeads("book", { at: date(TIE) }, B6)).toEqual([[2, "update"]]);
+        // Backdated: v1 alone is visible, then both, and v1 is the head either way.
+        expect(yield* asOfHeads("book", { at: date("2026-01-15T00:00:00Z") }, B7)).toEqual([
+          [1, "update"],
+        ]);
+        expect(yield* asOfHeads("book", { at: date("2026-02-25T00:00:00Z") }, B7)).toEqual([
+          [1, "update"],
+        ]);
       }),
     );
   });
