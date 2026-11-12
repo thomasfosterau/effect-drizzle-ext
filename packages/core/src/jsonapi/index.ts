@@ -141,7 +141,10 @@ export const resourceColumnBounds = (resource: AnyResource): Record<string, Colu
  *   passthrough.
  *
  * `column` is the column the attribute's `dbColumn` annotation names, `none`
- * for an attribute that declares none.
+ * for an attribute that declares none. It is an `Option` rather than an
+ * optional key by design: this is a reader the library owns, and the family
+ * rule is that such readers return `Option` (only config handed to Drizzle or
+ * a driver keeps `?: T | undefined`).
  */
 export interface ResourceAttributeProjection {
   readonly key: string;
