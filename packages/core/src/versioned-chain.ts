@@ -106,7 +106,6 @@ export interface DiscriminatorColumns {
   type: AnyPgColumn;
 }
 
-/* oxlint-disable effect/prefer-option-over-null -- Drizzle builder inputs: this library's rule (packages/core/CLAUDE.md) is that any config threaded straight into a Drizzle builder call stays `?: T | undefined`, never `Option` */
 /**
  * Declaration accepted by a {@link makeSubtypeTables} builder.
  *
@@ -171,7 +170,6 @@ export interface SubtypeTablesConfig<
    */
   discriminator?: TDiscriminator | undefined;
 }
-/* oxlint-enable effect/prefer-option-over-null */
 
 /**
  * The stable identity row's generated column builders — `id` (the primary key
@@ -403,7 +401,6 @@ type CurrentVersionViewResult<TColumns extends ViewColumns, TMerge extends ViewC
   $inferSelect: ViewRow<TColumns & TMerge>;
 };
 
-/* oxlint-disable effect/prefer-option-over-null -- Drizzle join inputs: this library's rule (packages/core/CLAUDE.md) is that any config threaded straight into a Drizzle builder call stays `?: T | undefined`, never `Option` */
 /**
  * Declaration accepted by a {@link makeCurrentVersionView} builder.
  *
@@ -438,7 +435,6 @@ export interface CurrentVersionViewConfig<TColumns extends ViewColumns> {
   /** Explicit column selection, including `id`, `action`, and `timestamp`. */
   columns: TColumns;
 }
-/* oxlint-enable effect/prefer-option-over-null */
 
 /** Injected dependencies for a {@link makeCurrentVersionView} builder. */
 export interface CurrentVersionViewDeps<
@@ -633,7 +629,6 @@ export interface VersionTimestamps {
  * {@link makeCurrentVersionView}), and falls back to `updatedAt` for a view
  * that carries none (website #1223).
  */
-/* oxlint-disable effect/prefer-option-over-null -- a Drizzle row seam: a view row's nullable column is typed `T | null` by Drizzle itself, and a view without the birth-row merge has no `createdAt` key at all */
 export const versionTimestamps = (row: {
   readonly timestamp: Date;
   readonly createdAt?: Date | null | undefined;
@@ -641,7 +636,6 @@ export const versionTimestamps = (row: {
   createdAt: row.createdAt ?? row.timestamp,
   updatedAt: row.timestamp,
 });
-/* oxlint-enable effect/prefer-option-over-null */
 
 // ── Tree → tables ─────────────────────────────────────────────────────
 
@@ -844,7 +838,6 @@ export interface TreeTables<
   readonly pointers: { readonly [N in P]: PointerTable };
 }
 
-/* oxlint-disable effect/prefer-option-over-null -- Drizzle builder inputs: this library's rule (packages/core/CLAUDE.md) is that any config threaded straight into a Drizzle builder call stays `?: T | undefined`, never `Option` */
 /**
  * Per-level hooks for what a model can't carry. Every member is threaded into
  * a Drizzle builder call, so each is `?: T | undefined` (see
@@ -918,7 +911,6 @@ export interface TreeTablesConfig<
  * {@link makeTreeTables}) exactly when it is absent.
  */
 const columnsOrEmpty = <T extends ColumnMap>(columns: T | undefined): T => columns ?? ({} as T);
-/* oxlint-enable effect/prefer-option-over-null */
 
 /**
  * The `action` values the root version table admits, in CHECK order; a
@@ -1222,7 +1214,6 @@ type Simplify<A> = { [K in keyof A]: A[K] };
 /** A table type's built column map. */
 type ColumnsOfTable<T> = T extends { readonly _: { readonly columns: infer C } } ? C : never;
 
-/* oxlint-disable effect/prefer-option-over-null -- Drizzle row types: a LEFT JOINed fact is `T | null` in Drizzle's own row inference, and `project` is view-builder config (`?: T | undefined`, packages/core/CLAUDE.md) */
 /** The data type of column `F` in column map `C`. */
 type ColumnDataOf<C, F> = F extends keyof C
   ? C[F] extends AnyPgColumn
@@ -1295,8 +1286,6 @@ export type TreeLeafSelection<S, T extends AnyTreeTables, K> = Simplify<
 /** The columns a branch view's `project` adds, or none. */
 type ProjectedColumnsOf<P> = P extends ViewColumns ? P : Record<never, never>;
 
-/* oxlint-enable effect/prefer-option-over-null */
-
 /**
  * The selection of marker `K`'s branch view: `id`, `version`, `action`, the
  * leaf `type`, the identity extras, the columns of every level from the branch
@@ -1311,7 +1300,6 @@ export type TreeBranchSelection<S, T extends AnyTreeTables, K, P> = Simplify<
     ProjectedColumnsOf<P>
 >;
 
-/* oxlint-disable effect/prefer-option-over-null -- Drizzle row types: a LEFT JOINed keyed row is `T | null` in Drizzle's own row inference */
 /** The key column and keyed columns a keyed view adds for leaf `K`, LEFT JOINed and so nullable. */
 type KeyedViewColumns<T extends AnyTreeTables, K> = K extends keyof T["keyed"]
   ? {
@@ -1320,7 +1308,6 @@ type KeyedViewColumns<T extends AnyTreeTables, K> = K extends keyof T["keyed"]
       ]: SQL.Aliased<ColumnDataOf<ColumnsOfTable<T["keyed"][K]>, C> | null>;
     }
   : Record<never, never>;
-/* oxlint-enable effect/prefer-option-over-null */
 
 /**
  * The selection of leaf `K`'s keyed view: the leaf view's, then the key
@@ -1368,7 +1355,6 @@ export type TreeView<TSelection extends ViewColumns> = Omit<
   $inferSelect: ViewRow<TSelection>;
 };
 
-/* oxlint-disable effect/prefer-option-over-null -- Drizzle view inputs: config threaded straight into the view builder stays `?: T | undefined` (packages/core/CLAUDE.md) */
 /**
  * One branch view's options. `project` adds per-leaf columns to every arm of
  * the union (a search vector, a search text): it receives the leaf's name and
@@ -1403,7 +1389,6 @@ export interface TreeViewsConfig<BR, PV = Record<never, never>> {
    */
   readonly branches?: { readonly [K in keyof BR]: true | TreeBranchViewConfig<BR[K]> } | undefined;
 }
-/* oxlint-enable effect/prefer-option-over-null */
 
 /**
  * The point an {@link TreeViews.asOf} read resolves each node at: the latest
@@ -1482,7 +1467,6 @@ const rootColumnOf = (columns: Readonly<Record<string, AnyPgColumn>>, key: strin
 
 /** A branch entry as the builder reads it: `project` returns some selection. */
 interface RuntimeBranchConfig {
-  // oxlint-disable-next-line effect/prefer-option-over-null -- the builder's view of `TreeBranchViewConfig`, which is view-builder config and so `?: T | undefined` (packages/core/CLAUDE.md)
   readonly project?: ((leaf: string, columns: Readonly<ViewColumns>) => ViewColumns) | undefined;
 }
 

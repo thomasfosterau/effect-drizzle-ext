@@ -67,16 +67,6 @@ export interface TypedStable {
   readonly type: AnyPgColumn;
 }
 
-/*
- * Every optional member from here to the end of the file — the name templates,
- * `onUpdate`, the `refinable` option — is `?: T | undefined`, never `Option`,
- * for the reason stated once in ./derive.ts: they are config a consumer hands
- * to a Drizzle-emitting factory, and `undefined` is what "not supplied" means
- * there. `foreignKey(...).onUpdate(Option.none())` would emit `ON UPDATE
- * [object Object]`.
- */
-/* oxlint-disable effect/prefer-option-over-null -- config type: `undefined` means "not supplied" (see ./derive.ts) */
-
 /**
  * Constraint-name templates, overriding the defaults
  * `${level}_id_type_unique`, `${level}_id_type_fk` and `${level}_type_valid`.
@@ -85,11 +75,11 @@ export interface TypedStable {
  */
 export interface DiscriminatorNames {
   /** Name of the `UNIQUE(id, type)` constraint. */
-  readonly unique?: ((level: string) => string) | undefined;
+  readonly unique?: (level: string) => string;
   /** Name of the composite `(id, type)` → parent `(id, type)` foreign key. */
-  readonly parentFk?: ((level: string) => string) | undefined;
+  readonly parentFk?: (level: string) => string;
   /** Name of the per-level `type` CHECK. */
-  readonly check?: ((level: string) => string) | undefined;
+  readonly check?: (level: string) => string;
 }
 
 /**
@@ -151,7 +141,7 @@ export interface DiscriminatorToolkit<Level extends string> {
     level: Level,
     stable: TypedStable,
     parent: TypedStable,
-    options?: { readonly refinable?: boolean | undefined },
+    options?: { readonly refinable?: boolean },
   ) => PgTableExtraConfigValue[];
 }
 
@@ -172,7 +162,7 @@ export interface DiscriminatorToolkit<Level extends string> {
  */
 export const makeDiscriminatorConstraints = <Level extends string>(options: {
   readonly leaves: (level: Level) => ReadonlyArray<string>;
-  readonly names?: DiscriminatorNames | undefined;
+  readonly names?: DiscriminatorNames;
 }): DiscriminatorToolkit<Level> => {
   const uniqueName = options.names?.unique ?? ((level: string) => `${level}_id_type_unique`);
   const parentFkName = options.names?.parentFk ?? ((level: string) => `${level}_id_type_fk`);
@@ -213,7 +203,7 @@ export const makeDiscriminatorConstraints = <Level extends string>(options: {
       level: Level,
       stable: TypedStable,
       parent: TypedStable,
-      { refinable = false }: { readonly refinable?: boolean | undefined } = {},
+      { refinable = false }: { readonly refinable?: boolean } = {},
     ): PgTableExtraConfigValue[] => [
       typeUnique(level, stable),
       typeParentFk(level, stable, parent, refinable ? "cascade" : undefined),
@@ -221,5 +211,3 @@ export const makeDiscriminatorConstraints = <Level extends string>(options: {
     ],
   };
 };
-
-/* oxlint-enable effect/prefer-option-over-null */

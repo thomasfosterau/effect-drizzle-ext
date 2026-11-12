@@ -29,6 +29,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
+import * as Option from "effect/Option";
 import * as P from "effect/Predicate";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
@@ -147,8 +148,9 @@ describe("isRetryableConnectFailure", () => {
     expect(isRetryableConnectFailure(new TestFault({ message: "boom" }))).toBe(false);
     expect(isRetryableConnectFailure({ _tag: "__effect_test_rollback__" })).toBe(false);
     expect(isRetryableConnectFailure(undefined)).toBe(false);
-    // oxlint-disable-next-line effect/prefer-option-over-null -- the predicate's contract is "any unknown value"; `null` is one of the values it must tolerate
-    expect(isRetryableConnectFailure(null)).toBe(false);
+    // A `null` as foreign data delivers it: the predicate takes `unknown`.
+    const foreignNull = Schema.decodeSync(Schema.fromJsonString(Schema.Unknown))("null");
+    expect(isRetryableConnectFailure(foreignNull)).toBe(false);
   });
 });
 
@@ -195,12 +197,10 @@ const noop = (): void => {};
  * captured (the "connection dropped on the rollback raise" shape the second
  * retry guard exists for).
  */
-/* oxlint-disable effect/prefer-option-over-null -- the fake mirrors the driver's own optional-member shape (`?: T | undefined`), which is what the code under test reads; wrapping these in `Option` would test a different contract. */
 const makeFake = (options: {
-  readonly failOpen?: ((attempt: number) => SqlError | undefined) | undefined;
-  readonly failAfterBody?: SqlError | undefined;
+  readonly failOpen?: (attempt: number) => Option.Option<SqlError>;
+  readonly failAfterBody?: SqlError;
 }): Fake => {
-  /* oxlint-enable effect/prefer-option-over-null */
   const events: Array<string> = [];
   let attempts = 0;
   // Nesting depth of the ONE pinned connection, not of a handle: the runner
@@ -222,10 +222,12 @@ const makeFake = (options: {
       Effect.suspend(() => {
         if (openBoundaries === 0) {
           attempts += 1;
-          const failure = options.failOpen?.(attempts);
-          if (failure !== undefined) {
+          const failure = Option.flatMap(Option.fromUndefinedOr(options.failOpen), (failOpen) =>
+            failOpen(attempts),
+          );
+          if (Option.isSome(failure)) {
             events.push(`open-failed:${attempts}`);
-            return Effect.fail(failure);
+            return Effect.fail(failure.value);
           }
         }
         openBoundaries += 1;
@@ -336,7 +338,7 @@ describe("runInTestTransaction", () => {
 
   it("retries a connect-seam failure that happened BEFORE the body ran", async () => {
     const fake = makeFake({
-      failOpen: (attempt) => (attempt === 1 ? connectSeamFailure() : undefined),
+      failOpen: (attempt) => (attempt === 1 ? Option.some(connectSeamFailure()) : Option.none()),
     });
     const { runInTestTransaction } = makeTestTransaction(fake.database);
 
@@ -361,7 +363,7 @@ describe("runInTestTransaction", () => {
   it("does NOT retry a failure that is not a connect-seam one", async () => {
     // Guard 1: a constraint rejection from the spec's own query is a real
     // failure. Nothing was captured, so the outer-failure branch reports it.
-    const fake = makeFake({ failOpen: () => queryFailure() });
+    const fake = makeFake({ failOpen: () => Option.some(queryFailure()) });
     const { runInTestTransaction } = makeTestTransaction(fake.database);
 
     await expect(runInTestTransaction(fake.runtime, Effect.succeed(1))).rejects.toThrow(

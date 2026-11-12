@@ -426,7 +426,6 @@ export const makeTestTransaction = <
  * purpose — a suite that cannot reach its database should fail at layer build
  * with one legible `SqlError`, not once per spec on the first query.
  */
-/* oxlint-disable effect/prefer-option-over-null -- driver-facing config: `connectTimeout` is forwarded verbatim to `pgClientFromUrl` and from there to `@effect/sql-pg`'s `PgPoolConfig`, which reads `undefined` as "not supplied". See `pgClientFromUrl`'s block in ./index.ts. */
 export const testDatabaseLayer = <Relations extends AnyRelations, Key extends string>(
   database: Pick<PgDatabase<Relations, Key>, "layer">,
   options: {
@@ -443,4 +442,3 @@ export const testDatabaseLayer = <Relations extends AnyRelations, Key extends st
       }),
     ),
   );
-/* oxlint-enable effect/prefer-option-over-null */

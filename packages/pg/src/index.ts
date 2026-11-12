@@ -166,7 +166,6 @@ export const makePgDatabase = <Relations extends AnyRelations, const Key extends
  * `PgClient.layerFrom` provides; a consumer that only needs `PgClient` can
  * ignore the extra service.
  */
-/* oxlint-disable effect/prefer-option-over-null -- `config` is handed STRAIGHT to `@effect/sql-pg`'s `PgPoolConfig`, whose optional members are `?: T | undefined`: the driver reads `undefined` as "not supplied" and would treat an `Option` object as a value. Same boundary rule as the Drizzle-facing config in packages/core/src/derive.ts. */
 export const pgClientFromUrl = (config: {
   readonly url: Redacted.Redacted<string>;
   readonly maxConnections?: number | undefined;
@@ -203,7 +202,6 @@ export const pgClientFromUrl = (config: {
  * dropped both the `pg` driver and `fromPool`, and its pool is lazy by
  * construction. The name is kept for the contract, not the mechanism.
  */
-/* oxlint-disable effect/prefer-option-over-null -- driver-facing config: every optional member is forwarded to `@effect/sql-pg`'s `PgPoolConfig`, which reads `undefined` as "not supplied". See `pgClientFromUrl`'s block. */
 export const pgClientFromPool = (options: {
   readonly connectionString: Redacted.Redacted<string>;
   readonly maxConnections?: number | undefined;
@@ -228,4 +226,3 @@ export const pgClientFromPool = (options: {
     types: options.types,
     prepare: options.prepare,
   });
-/* oxlint-enable effect/prefer-option-over-null */

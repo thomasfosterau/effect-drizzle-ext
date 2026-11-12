@@ -127,7 +127,6 @@ export class UnsupportedSortError extends Schema.TaggedError<UnsupportedSortErro
   }
 }
 
-/* oxlint-disable effect/prefer-option-over-null -- an options bag a caller forwards its own optionals into (a decoded `?sort=` is absent when the request carried none); `?: T | undefined` is what lets it pass `{ sort: query.sort }` under `exactOptionalPropertyTypes`, and an `Option` there would only be unwrapped on the next line. Same shape as the applications' signature. */
 /**
  * How {@link sortableColumnsFor} names the version-chain columns of a view.
  * Every member defaults to the convention `./versioned-chain`'s
@@ -136,21 +135,19 @@ export class UnsupportedSortError extends Schema.TaggedError<UnsupportedSortErro
  */
 export interface SortableColumnsOptions {
   /** Column keys never published as sort fields. Default `["action", "timestamp"]`. */
-  readonly internal?: ReadonlyArray<string> | undefined;
+  readonly internal?: ReadonlyArray<string>;
   /**
    * Aliased expressions (`SQL.Aliased`, which carry no `dataType`) admitted by
    * name. Default `["createdAt"]`.
    */
-  readonly aliased?: ReadonlyArray<string> | undefined;
+  readonly aliased?: ReadonlyArray<string>;
   /**
    * Public name → the view key it publishes. Applied after `internal`, so an
    * internal key can still be published under its resource-facing name.
    * Default `{ updatedAt: "timestamp" }`.
    */
-  readonly renamed?: Readonly<Record<string, string>> | undefined;
+  readonly renamed?: Readonly<Record<string, string>>;
 }
-
-/* oxlint-enable effect/prefer-option-over-null */
 
 const DEFAULT_INTERNAL: ReadonlyArray<string> = ["action", "timestamp"];
 const DEFAULT_ALIASED: ReadonlyArray<string> = ["createdAt"];
@@ -264,30 +261,27 @@ const endsInIdColumn = (order: ReadonlyArray<OrderTerm>, idColumn: PgColumn): bo
   return last.name === idColumn.name;
 };
 
-/* oxlint-disable effect/prefer-option-over-null -- an options bag a caller forwards its own optionals into (a decoded `?sort=` is absent when the request carried none); `?: T | undefined` is what lets it pass `{ sort: query.sort }` under `exactOptionalPropertyTypes`, and an `Option` there would only be unwrapped on the next line. Same shape as the applications' signature. */
 /** The options {@link resolveSortOrder} takes. */
 export interface ResolveSortOrderOptions {
   /** The relation sorted — the source of both the allow-list and the `id` tiebreak. */
   readonly view: SortableRelation;
   /** The caller's decoded sort keys; absent or empty when they asked for no order. */
-  readonly sort?: ReadonlyArray<SortKey> | undefined;
+  readonly sort?: ReadonlyArray<SortKey>;
   /**
    * The resource's intrinsic display order, used when the caller supplied no
    * `sort`. Need not be total: the `id` tiebreak is appended unless its last
    * term already *is* the relation's `id` column.
    */
-  readonly fallback?: ReadonlyArray<OrderTerm> | undefined;
+  readonly fallback?: ReadonlyArray<OrderTerm>;
   /**
    * Direction of the `id` tiebreak appended to a non-total `fallback`.
    * Defaults to the bare (ascending) column. A newest-first fallback passes
    * `"desc"` so the tiebreak mirrors it rather than fighting it.
    */
-  readonly tiebreak?: "asc" | "desc" | undefined;
+  readonly tiebreak?: "asc" | "desc";
   /** Overrides the derived allow-list for a resource whose sortable set the view can't express. */
-  readonly sortable?: SortableColumns | undefined;
+  readonly sortable?: SortableColumns;
 }
-
-/* oxlint-enable effect/prefer-option-over-null */
 
 /**
  * Resolve a list request's ordering: the caller's `?sort=` when present, the
@@ -336,20 +330,17 @@ export const resolveSortOrder = (
     });
   });
 
-/* oxlint-disable effect/prefer-option-over-null -- an options bag a caller forwards its own optionals into (a decoded `?sort=` is absent when the request carried none); `?: T | undefined` is what lets it pass `{ sort: query.sort }` under `exactOptionalPropertyTypes`, and an `Option` there would only be unwrapped on the next line. Same shape as the applications' signature. */
 /** The options {@link chronologicalOrder} takes. */
 export interface ChronologicalOrderOptions {
   /** The relation sorted; its `timestamp` column is the chronological axis. */
   readonly view: SortableRelation & { readonly timestamp: PgColumn };
   /** The caller's decoded sort keys, as for {@link resolveSortOrder}. */
-  readonly sort?: ReadonlyArray<SortKey> | undefined;
+  readonly sort?: ReadonlyArray<SortKey>;
   /** Chronological direction of the default order. Defaults to newest first. */
-  readonly direction?: "asc" | "desc" | undefined;
+  readonly direction?: "asc" | "desc";
   /** As for {@link resolveSortOrder}. */
-  readonly sortable?: SortableColumns | undefined;
+  readonly sortable?: SortableColumns;
 }
-
-/* oxlint-enable effect/prefer-option-over-null */
 
 /**
  * {@link resolveSortOrder} for the commonest default a list has:
@@ -360,12 +351,11 @@ export interface ChronologicalOrderOptions {
 export const chronologicalOrder = (
   options: ChronologicalOrderOptions,
 ): Effect.Effect<ReadonlyArray<OrderTerm>, UnsupportedSortError> => {
-  const direction = options.direction ?? "desc";
+  // The rest spread keeps an absent `sort` / `sortable` absent.
+  const { direction = "desc", ...rest } = options;
   return resolveSortOrder({
-    view: options.view,
-    sort: options.sort,
+    ...rest,
     fallback: [directed(options.view.timestamp, direction)],
     tiebreak: direction,
-    sortable: options.sortable,
   });
 };

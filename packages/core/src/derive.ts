@@ -108,8 +108,8 @@ export type DerivedColumns<Meta, B extends ColumnBuilders> = {
 /*
  * **The one statement of the `?: T | undefined` rule.** Every optional member
  * of a config type this library hands to Drizzle — `resolveReference` below,
- * `DiscriminatorNames`' templates in ./constraints.ts, the annotation entry's
- * `DbColumn.default` / `.references` / `.checkName` — is spelled
+ * the annotation entry's `DbColumn.default` / `.references` / `.checkName`,
+ * `./versioned-chain`'s table and view builder config — is spelled
  * `?: T | undefined`, never `Option`. Drizzle reads `undefined` as "not
  * supplied"; handed an `Option` it would emit the wrapper object as a literal
  * value (a DEFAULT of `{_tag: "None"}`, a referential action of `[Object]`) —
@@ -118,7 +118,6 @@ export type DerivedColumns<Meta, B extends ColumnBuilders> = {
  * owns (`readDbColumn`, `readDbTable`, `findPgError`, …) return `Option`; the
  * conversion happens at their boundary, not in Drizzle-facing config.
  */
-/* oxlint-disable effect/prefer-option-over-null -- Drizzle-facing config: Drizzle reads `undefined` as "not supplied" */
 
 /**
  * Optional hooks for {@link makeDeriveColumns}. `resolveReference` turns a
@@ -131,8 +130,6 @@ export type DerivedColumns<Meta, B extends ColumnBuilders> = {
 export interface DeriveOptions {
   readonly resolveReference?: ((reference: DbColumnReference) => () => AnyPgColumn) | undefined;
 }
-
-/* oxlint-enable effect/prefer-option-over-null */
 
 /**
  * A fluent view of a Drizzle column builder — the chainable `.notNull()` /

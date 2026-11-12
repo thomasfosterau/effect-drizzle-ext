@@ -201,7 +201,7 @@ describe("sortableColumnsFor", () => {
 
 describe("resolveSortOrder without a client sort", () => {
   it("keeps the resource's own order and closes it with the `id` tiebreak", () => {
-    expect(orderByFor({ sort: undefined, fallback: [postView.publishedAt] })).toBe(
+    expect(orderByFor({ fallback: [postView.publishedAt] })).toBe(
       `order by "post_view"."published_at", "post_view"."id"`,
     );
   });
@@ -209,15 +209,15 @@ describe("resolveSortOrder without a client sort", () => {
   it("does not double the tiebreak when the fallback already ends in `id`", () => {
     // Drizzle hands back a fresh proxy per column access, so this is matched
     // by column name — an identity check would silently never fire.
-    expect(orderByFor({ sort: undefined, fallback: [postView.publishedAt, postView.id] })).toBe(
+    expect(orderByFor({ fallback: [postView.publishedAt, postView.id] })).toBe(
       `order by "post_view"."published_at", "post_view"."id"`,
     );
   });
 
   it("mirrors the tiebreak direction for a newest-first fallback", () => {
-    expect(
-      orderByFor({ sort: undefined, fallback: [desc(postView.timestamp)], tiebreak: "desc" }),
-    ).toBe(`order by "post_view"."timestamp" desc, "post_view"."id" desc`);
+    expect(orderByFor({ fallback: [desc(postView.timestamp)], tiebreak: "desc" })).toBe(
+      `order by "post_view"."timestamp" desc, "post_view"."id" desc`,
+    );
   });
 
   it("treats an empty sort list as no sort at all", () => {

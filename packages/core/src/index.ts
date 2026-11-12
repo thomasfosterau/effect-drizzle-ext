@@ -91,7 +91,6 @@ export type ReferentialAction = "cascade" | "restrict" | "no action" | "set null
  * wrong DDL that no type error and no unit test catches. The boundary is stated
  * once in ./derive.ts; the readers this module owns return `Option`.
  */
-/* oxlint-disable effect/prefer-option-over-null -- Drizzle-facing config: Drizzle reads `undefined` as "not supplied" */
 
 /**
  * Reference / foreign-key metadata a column annotation may carry: the target
@@ -140,8 +139,6 @@ export interface DbColumn<Kind extends string = string> {
    */
   readonly checkName?: string | undefined;
 }
-
-/* oxlint-enable effect/prefer-option-over-null */
 
 /**
  * The annotation key under which {@link dbColumn} stores its metadata.
@@ -338,8 +335,6 @@ const isTableMeta = (value: unknown): value is TableMeta =>
 
 // ── Numeric bounds (schema checks → CHECK-constraint metadata) ────────
 
-/* oxlint-disable effect/prefer-option-over-null -- Drizzle-facing config: consumed by the CHECK derivation alongside DbColumn */
-
 /**
  * Numeric bounds recovered from a schema's checks — the JSON-Schema bound
  * vocabulary. The source of a derived SQL `CHECK` constraint: one declaration
@@ -347,13 +342,11 @@ const isTableMeta = (value: unknown): value is TableMeta =>
  * wire validation **and** the column's database constraint.
  */
 export interface NumericBounds {
-  readonly minimum?: number | undefined;
-  readonly maximum?: number | undefined;
-  readonly exclusiveMinimum?: number | undefined;
-  readonly exclusiveMaximum?: number | undefined;
+  readonly minimum?: number;
+  readonly maximum?: number;
+  readonly exclusiveMinimum?: number;
+  readonly exclusiveMaximum?: number;
 }
-
-/* oxlint-enable effect/prefer-option-over-null */
 
 /** The bounds of one column-backed attribute, paired with its column metadata. */
 export interface ColumnBounds extends NumericBounds {

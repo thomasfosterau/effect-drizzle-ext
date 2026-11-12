@@ -66,17 +66,6 @@ describe("checkMigrationDrift", () => {
     expect(report).toEqual({ snapshots: 6, baseRef: Option.none() });
   });
 
-  it("treats an explicit `base: undefined` as an absent base", async () => {
-    const report = await run(
-      checkMigrationDrift({
-        schema: fixtureSchema,
-        migrationsDir: FIXTURE_MIGRATIONS,
-        base: undefined,
-      }),
-    );
-    expect(report).toEqual({ snapshots: 6, baseRef: Option.none() });
-  });
-
   it("reads a full v8 snapshot as the latest state", async () => {
     // The pre-rc.5 format: the widget migration's original snapshot, alone. The
     // fixture schema has moved past it, so a correct read reports real drift,

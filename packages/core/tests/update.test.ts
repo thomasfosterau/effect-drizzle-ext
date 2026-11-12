@@ -23,7 +23,6 @@ describe("updateSetMap", () => {
   });
 
   it("clears a clearable column on a present null", () => {
-    // oxlint-disable-next-line effect/prefer-option-over-null -- update tri-state: `summary: null` IS the "clear it" arm this case pins
     expect(updateSetMap({ id: "x", summary: null, birthPlaceId: null }, writable)).toEqual({
       summary: null,
       birthPlaceId: null,
@@ -61,16 +60,13 @@ describe("updateSetMap", () => {
   });
 
   it("types the map as the writable keys, optional, without `undefined`", () => {
-    /* oxlint-disable effect/prefer-option-over-null -- the tri-state input shape under test */
     type Input = {
       readonly id: string;
       readonly name?: string | undefined;
       readonly summary?: string | null | undefined;
     };
-    /* oxlint-enable effect/prefer-option-over-null */
     const input: Input = { id: "x" };
     const set = updateSetMap(input, ["name", "summary"] as const);
-    // oxlint-disable-next-line effect/prefer-option-over-null -- the tri-state output shape under test
     expectTypeOf(set).toEqualTypeOf<{ readonly name?: string; readonly summary?: string | null }>();
     expectTypeOf(set).toEqualTypeOf<UpdateSet<Input, "name" | "summary">>();
   });

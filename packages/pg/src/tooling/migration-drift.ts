@@ -324,10 +324,7 @@ export const checkBaseAncestry = (
 };
 
 /** The environment {@link resolveBaseRef} reads — the shape of `process.env`. */
-export interface BaseRefEnvironment {
-  // oxlint-disable-next-line effect/prefer-option-over-null -- `process.env`'s shape (unset variables are missing keys), passed straight in
-  readonly [name: string]: string | undefined;
-}
+export type BaseRefEnvironment = Readonly<NodeJS.ProcessEnv>;
 
 /**
  * The base ref for the ancestry check, when one is knowable: an explicit
@@ -579,12 +576,11 @@ export interface MigrationDriftOptions {
   /** The committed drizzle-kit migrations directory. */
   readonly migrationsDir: string;
   /**
-   * The base branch to check ancestry against — `Option.none()` (or absent,
-   * or `undefined`) on pushes and local runs, which is what mapping
+   * The base branch to check ancestry against — `Option.none()` (or absent)
+   * on pushes and local runs, which is what mapping
    * {@link resolveBaseRef} gives outside a pull request.
    */
-  // oxlint-disable-next-line effect/prefer-option-over-null -- the `?: T | undefined` spelling (AGENTS.md → Conventions) lets a caller under `exactOptionalPropertyTypes` forward its own optional; read through `??`, so `undefined` means absent
-  readonly base?: Option.Option<GitBase> | undefined;
+  readonly base?: Option.Option<GitBase>;
 }
 
 /** What a passing run checked. */
