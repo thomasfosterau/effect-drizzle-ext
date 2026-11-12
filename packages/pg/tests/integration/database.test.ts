@@ -31,10 +31,10 @@ import { integer, pgTable } from "drizzle-orm/pg-core";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as ManagedRuntime from "effect/ManagedRuntime";
-import * as Redacted from "effect/Redacted";
 import { describe, expect, it } from "vite-plus/test";
+import { integrationDatabaseLayer } from "./database-url.ts";
 import { makePgDatabase } from "../../src/index.ts";
-import { makeTestTransaction, testDatabaseLayer } from "../../src/testing.ts";
+import { makeTestTransaction } from "../../src/testing.ts";
 
 /** This library is relations-agnostic; the specs need no relational graph. */
 const relations = {};
@@ -43,9 +43,8 @@ const database = makePgDatabase({ relations, key: "Database" });
 const { Database, CurrentTransaction, transact, readHandle } = database;
 
 /** The global setup resolved this; `provisioning.test.ts` proves it is set. */
-const url = Redacted.make(process.env.DATABASE_URL_TEST ?? process.env.DATABASE_URL ?? "");
 
-const runtime = ManagedRuntime.make(testDatabaseLayer(database, { url }));
+const runtime = ManagedRuntime.make(integrationDatabaseLayer(database));
 const { runInTestTransaction } = makeTestTransaction(database);
 
 /**

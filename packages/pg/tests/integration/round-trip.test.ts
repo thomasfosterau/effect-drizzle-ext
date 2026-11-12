@@ -21,13 +21,11 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
-import * as Redacted from "effect/Redacted";
 import * as Result from "effect/Result";
 import { describe, expect, it, onTestFinished } from "vite-plus/test";
 import { makePgDatabase, pgClientFromUrl } from "../../src/index.ts";
 import { makeTestTransaction } from "../../src/testing.ts";
-
-const url = Redacted.make(process.env.DATABASE_URL_TEST ?? process.env.DATABASE_URL ?? "");
+import { testDatabaseUrl } from "./database-url.ts";
 
 const mood = pgEnum("rt_mood", ["sad", "ok", "happy"]);
 const probe = pgTable("rt_probe", {
@@ -76,7 +74,13 @@ const roundTrip = Effect.fn("roundTrip")(function* () {
 const makeRuntime = (types?: PgTypes.Registry) =>
   ManagedRuntime.make(
     database.layer.pipe(
-      Layer.provide(pgClientFromUrl({ url, maxConnections: 1, types, prepare: false })),
+      Layer.provide(
+        Layer.unwrap(
+          Effect.map(testDatabaseUrl, (url) =>
+            pgClientFromUrl({ url, maxConnections: 1, types, prepare: false }),
+          ),
+        ),
+      ),
     ),
   );
 

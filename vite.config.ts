@@ -218,14 +218,16 @@ export default defineConfig({
       // is no `Config` provider to read from and no `FileSystem` service to
       // call, so `process.env` and `node:*` are the only things that work
       // there. The Effect preset's service rules have no satisfiable fix in
-      // these files.
+      // these files. The integration specs themselves run under an Effect
+      // runtime and read the database URL through `Config`
+      // (tests/integration/database-url.ts), so they are not listed.
       {
         files: [
           "vite.package.ts",
           "**/vite.config.ts",
           "**/vitest.config.ts",
           "**/vitest.integration.config.ts",
-          "**/tests/integration/**",
+          "packages/pg/tests/integration/global-setup.ts",
         ],
         rules: {
           "effect/avoid-node-imports": "off",
