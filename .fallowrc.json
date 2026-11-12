@@ -22,6 +22,7 @@
     "packages/pg/tests/integration/global-setup.ts",
     "packages/pg/vitest.integration.config.ts",
     "tests/dist-consumer/src/*.ts",
+    "tests/dist-consumer/scripts/*.ts",
     "**/vite.config.ts",
     "vitest.coverage.config.ts"
   ],

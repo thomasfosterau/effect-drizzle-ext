@@ -42,7 +42,7 @@ The [overview](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/d
 
 | Subpath | Drizzle? | Contents | Guide |
 | --- | --- | --- | --- |
-| `.` | no | The `dbColumn` / `dbTable` annotation vocabulary, phantoms, `Option` readers, numeric bounds, struct-field projection, and `defineTree`, the Drizzle-free ontology declaration. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/annotations.md) |
+| `.` | no | The `dbColumn` / `dbTable` annotation vocabulary, phantoms, `Option` readers, numeric bounds, struct-field projection, `defineTree` (the Drizzle-free ontology declaration), and the `VersionChainEntry` / `VersionSnapshot` read shapes `./versioned-chain` also exports. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/annotations.md) |
 | `./derive` | yes | The builder registry, `deriveColumnsWith`, CHECK derivation from bounds, `DerivationError`. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/derive.md) |
 | `./references` | yes | The lazy FK-reference registry a `resolveReference` hook is built from. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/references.md) |
 | `./constraints` | yes | `enumCheck` and the threaded `type`-discriminator toolkit. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/constraints.md) |

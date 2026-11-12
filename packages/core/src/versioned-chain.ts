@@ -43,7 +43,7 @@ import {
   sql,
   type Subquery,
 } from "drizzle-orm";
-import type { ColumnBuilderBase, GetColumnData, InferSelectModel, SQL } from "drizzle-orm";
+import type { ColumnBuilderBase, GetColumnData, SQL } from "drizzle-orm";
 import {
   alias,
   bigint,
@@ -88,6 +88,7 @@ import {
 } from "./derive.ts";
 import type { DbColumn } from "./index.ts";
 import { treeError, type LeafName, type MarkerName, type Tree } from "./tree.ts";
+import type { VersionAction } from "./version-chain-types.ts";
 
 // ── Subtype table pair ────────────────────────────────────────────────
 
@@ -617,49 +618,12 @@ export const makeCurrentVersionView =
 // ── Version-chain read shapes ─────────────────────────────────────────
 
 /**
- * The actions a version-chain row records by default: a chain appends a
- * `(version, action, timestamp)` row per edit rather than rewriting in place,
- * and a delete is a tombstone version.
+ * The version-chain read shapes: `VersionAction`, `VersionChainEntry` and
+ * `VersionSnapshot`. They live in a Drizzle-free module so the root entry
+ * (`.`) exports the same types without reaching Drizzle
+ * (effect-drizzle-ext#191); this subpath re-exports them unchanged.
  */
-export type VersionAction = "create" | "update" | "delete";
-
-/**
- * One entry in a node's append-only version chain — what a version-history
- * listing returns per row. `Action` is the chain's own action vocabulary
- * (default {@link VersionAction}).
- */
-export interface VersionChainEntry<Action extends string = VersionAction> {
-  /** The version number (0 is the create). */
-  readonly version: bigint;
-  /** The edit action this version recorded. */
-  readonly action: Action;
-  /** When the version was written. */
-  readonly timestamp: Date;
-}
-
-/**
- * One version's reconstructed state — what a browse / compare surface shows,
- * and what a restore re-applies as a new version. Every leaf-chain domain
- * column at `(id, version)`, keyed by column name (leaf-most level wins on a
- * shared name), plus the root chain's `action` / `timestamp`. Generated
- * columns (a search vector) are opaque and belong outside `columns`.
- *
- * `Extra` carries the branch-level facts a hierarchy adds to a snapshot (a
- * content branch's visibility and draft flag, say); the library knows none of
- * them.
- */
-export type VersionSnapshot<
-  Action extends string = VersionAction,
-  Extra extends object = Record<never, never>,
-> = VersionChainEntry<Action> &
-  Extra & {
-    /**
-     * Every leaf-chain domain column at this version, keyed by column name:
-     * a select row of an erased Drizzle table, since the column set is the
-     * consumer's.
-     */
-    readonly columns: Readonly<InferSelectModel<PgTable>>;
-  };
+export type { VersionAction, VersionChainEntry, VersionSnapshot } from "./version-chain-types.ts";
 
 /** The `createdAt` / `updatedAt` pair {@link versionTimestamps} returns. */
 export interface VersionTimestamps {

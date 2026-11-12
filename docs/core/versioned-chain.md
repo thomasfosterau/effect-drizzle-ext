@@ -50,6 +50,8 @@ Every derived view reads base tables only, never another view. Each view's row t
 
 The read shapes of a chain are structural types, so a history listing and the page that renders it can share them without depending on an operations module. `VersionChainEntry<Action>` is one `{ version, action, timestamp }` row. `VersionSnapshot<Action, Extra>` is one version's reconstructed state: the entry plus `columns` (every leaf-chain domain column at that version) and whatever branch-level facts `Extra` names. `Action` defaults to `"create" | "update" | "delete"`. `versionTimestamps(row)` reads a current-version row's `createdAt` / `updatedAt` pair: `updatedAt` is the current `timestamp`, and `createdAt` comes from the birth-row merge, falling back to `updatedAt` for a view that has none.
 
+The three read-shape types (`VersionAction`, `VersionChainEntry`, `VersionSnapshot`) are also exported from the Drizzle-free root entry, `@thomasfosterau/effect-drizzle-ext`, as the same types: a client-bundled package that only names them imports them from there and keeps `drizzle-orm` out of its module graph (effect-drizzle-ext#191).
+
 ```ts
 export const makeSubtypeTables: <TDiscriminator>(
   applyDiscriminator: (

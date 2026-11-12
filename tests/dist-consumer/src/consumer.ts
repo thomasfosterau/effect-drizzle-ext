@@ -16,9 +16,18 @@ import * as Schema from "effect/Schema";
 import * as PgClient from "@effect/sql-pg/PgClient";
 import type { SqlError } from "effect/sql/SqlError";
 import { Resource } from "@thomasfosterau/effect-jsonapi";
-import { sql, type SQL } from "drizzle-orm";
+import { sql, type InferSelectModel, type SQL } from "drizzle-orm";
 import type { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
-import { boolean, integer, pgSchema, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  integer,
+  pgSchema,
+  pgTable,
+  type PgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import {
   type DbColumnOf,
   dbColumn,
@@ -28,6 +37,8 @@ import {
   readDbColumn,
   readDbTable,
   defineTree,
+  type VersionChainEntry as RootVersionChainEntry,
+  type VersionSnapshot as RootVersionSnapshot,
 } from "@thomasfosterau/effect-drizzle-ext";
 import {
   DerivationError,
@@ -515,6 +526,23 @@ export type Checks = [
   /** _entryAction */ Assert<Equals<VersionChainEntry["action"], "create" | "update" | "delete">>,
   /** _snapshotDraft */ Assert<Equals<Snapshot["draft"], boolean | undefined>>,
   /** _snapshotVersion */ Assert<Equals<Snapshot["version"], bigint>>,
+  // The root entry (Drizzle-free) exports the same read shapes as
+  // `./versioned-chain` (effect-drizzle-ext#191).
+  /** _rootEntry */ Assert<Equals<RootVersionChainEntry, VersionChainEntry>>,
+  /** _rootEntryAction */ Assert<
+    Equals<RootVersionChainEntry<"publish">, VersionChainEntry<"publish">>
+  >,
+  /** _rootSnapshot */ Assert<Equals<RootVersionSnapshot, VersionSnapshot>>,
+  /** _rootSnapshotExtra */ Assert<
+    Equals<RootVersionSnapshot<"create", { readonly draft?: boolean }>, Snapshot>
+  >,
+  // `columns` is still Drizzle's erased select row, spelled without Drizzle.
+  /** _snapshotColumns */ Assert<
+    Equals<RootVersionSnapshot["columns"], Readonly<InferSelectModel<PgTable>>>
+  >,
+  /** _snapshotColumnsSchema */ Assert<
+    Equals<Snapshot["columns"], Schema.$Record<Schema.String, Schema.Unknown>["Type"]>
+  >,
   /** _migrated */ Assert<
     Equals<
       typeof migrated,
