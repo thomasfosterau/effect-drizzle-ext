@@ -11,6 +11,7 @@ import { describe, expect, expectTypeOf, it } from "vite-plus/test";
 import type { InferSelectModel } from "drizzle-orm";
 import { getTableConfig, type PgTable } from "drizzle-orm/pg-core";
 import * as Arr from "effect/Array";
+import * as DateTime from "effect/DateTime";
 import * as Order from "effect/Order";
 import {
   bigint,
@@ -337,10 +338,8 @@ describe("version-chain read shapes", () => {
 });
 
 describe("versionTimestamps", () => {
-  // oxlint-disable-next-line effect/use-clock-service -- fixed fixture instants, parsed from literals
-  const born = new Date("2024-01-01T00:00:00.000Z");
-  // oxlint-disable-next-line effect/use-clock-service -- as above
-  const edited = new Date("2024-06-01T00:00:00.000Z");
+  const born = DateTime.toDateUtc(DateTime.makeUnsafe("2024-01-01T00:00:00.000Z"));
+  const edited = DateTime.toDateUtc(DateTime.makeUnsafe("2024-06-01T00:00:00.000Z"));
 
   it("reads createdAt off the birth row and updatedAt off the current version", () => {
     expect(versionTimestamps({ timestamp: edited, createdAt: born })).toEqual({
