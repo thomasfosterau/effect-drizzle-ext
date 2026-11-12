@@ -211,7 +211,7 @@ const edit = transact(
 An always-rollback test transaction runner: every spec runs inside a real database transaction that is rolled back once it completes, so a suite needs no truncation, no fixture reset and no ordering discipline. The library owns no schema, so a spec creates whatever `TEMPORARY` tables it needs inside that transaction — DDL is transactional in PostgreSQL, so the always-rollback disposes of them with everything else.
 
 ```ts
-export const isRetryableConnectFailure: (error: unknown) => boolean;
+export const isRetryableConnectFailure: (cause: unknown) => boolean;
 
 export interface TestTransaction<Key extends string> {
   readonly runInTestTransaction: <R, A, E>(

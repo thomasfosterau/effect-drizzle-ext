@@ -194,7 +194,7 @@ const searchErrorGraph = <A>(
 };
 
 /**
- * The driver's Postgres error facts, recovered from anywhere in `error`'s graph:
+ * The driver's Postgres error facts, recovered from anywhere in `cause`'s graph:
  * a bare Postgres error, a bare `SqlError` (whose `reason` holds the driver
  * error as its `cause`), or drizzle's `EffectDrizzleQueryError` wrapping an
  * Effect `Cause` that holds the `SqlError`. `Option.none()` when the graph
@@ -203,9 +203,8 @@ const searchErrorGraph = <A>(
  * The walk is bounded (depth 8) and cycle-guarded, so a self-referential or
  * pathologically deep graph terminates.
  */
-// oxlint-disable-next-line effect/no-unknown-parameters -- public entry over an opaque failure graph (any caught value); narrowing it would break callers
-export const findPgError = (error: unknown): Option.Option<PgErrorFacts> =>
-  searchErrorGraph(error, pgErrorFactsOf, 0, new WeakSet());
+export const findPgError = (cause: unknown): Option.Option<PgErrorFacts> =>
+  searchErrorGraph(cause, pgErrorFactsOf, 0, new WeakSet());
 
 // ── The tagged classification ──────────────────────────────────────
 
@@ -355,11 +354,10 @@ const makeTransactionFailure = (
  * whose SQLSTATE is outside the classified families (a syntax error, a
  * connection failure — `SqlError.reason` already covers those well).
  */
-// oxlint-disable-next-line effect/no-unknown-parameters -- public entry over an opaque failure graph (any caught value); narrowing it would break callers
-export const classifyError = (error: unknown): Option.Option<ClassifiedError> =>
-  Option.flatMap(findPgError(error), (facts) =>
-    Option.orElse<ClassifiedError, ClassifiedError>(makeConstraintViolation(facts, error), () =>
-      makeTransactionFailure(facts, error),
+export const classifyError = (cause: unknown): Option.Option<ClassifiedError> =>
+  Option.flatMap(findPgError(cause), (facts) =>
+    Option.orElse<ClassifiedError, ClassifiedError>(makeConstraintViolation(facts, cause), () =>
+      makeTransactionFailure(facts, cause),
     ),
   );
 
@@ -390,7 +388,7 @@ const uniqueViolationNode = (node: ErrorNode): Option.Option<true> => {
 };
 
 /**
- * True when `error` is (or wraps) a unique-constraint violation.
+ * True when `cause` is (or wraps) a unique-constraint violation.
  *
  * Kept as its own predicate, with its own walk, for adoption parity: this is
  * the name and the semantics the consuming applications already call, and the
@@ -399,29 +397,26 @@ const uniqueViolationNode = (node: ErrorNode): Option.Option<true> => {
  * wrapping. It also matches a `23505` declared under a `code` that is not
  * SQLSTATE-shaped, which {@link classifyError} skips.
  */
-// oxlint-disable-next-line effect/no-unknown-parameters -- public predicate over an opaque failure graph (any caught value); narrowing it would break callers
-export const isUniqueViolation = (error: unknown): boolean =>
-  Option.isSome(searchErrorGraph(error, uniqueViolationNode, 0, new WeakSet()));
+export const isUniqueViolation = (cause: unknown): boolean =>
+  Option.isSome(searchErrorGraph(cause, uniqueViolationNode, 0, new WeakSet()));
 
 /**
- * True when `error` is (or wraps) an integrity-constraint violation — one of
+ * True when `cause` is (or wraps) an integrity-constraint violation — one of
  * the five `23xxx` classes {@link classifyError} recognises.
  */
-// oxlint-disable-next-line effect/no-unknown-parameters -- public predicate over an opaque failure graph (any caught value); narrowing it would break callers
-export const isConstraintViolation = (error: unknown): boolean =>
-  Option.isSome(constraintViolationOf(error));
+export const isConstraintViolation = (cause: unknown): boolean =>
+  Option.isSome(constraintViolationOf(cause));
 
 /**
- * True when `error` is (or wraps) a transaction failure that re-running the
+ * True when `cause` is (or wraps) a transaction failure that re-running the
  * whole transaction may clear: a serialization failure (`40001`) or a deadlock
  * (`40P01`). Retrying a {@link ConstraintViolation} is pointless; retrying
  * these is the documented remedy.
  */
-// oxlint-disable-next-line effect/no-unknown-parameters -- public predicate over an opaque failure graph (any caught value); narrowing it would break callers
-export const isRetryableTransactionFailure = (error: unknown): boolean =>
+export const isRetryableTransactionFailure = (cause: unknown): boolean =>
   Option.isSome(
     Option.filter(
-      findPgError(error),
+      findPgError(cause),
       (facts) => facts.code === SERIALIZATION_FAILURE || facts.code === DEADLOCK_DETECTED,
     ),
   );
