@@ -20,8 +20,8 @@
 #   comments say how). `@enfect/oxlint` is not in it: its `@oxlint/plugins`
 #   dependency is a caret range, not tied to vite-plus's oxlint.
 # - `effect`: the Effect 4 line is a lockstep-versioned singleton set
-#   (`effect`, `@effect/sql-pg`, `@effect/platform-node`, the language
-#   service, and `@effect/docgen`, which depends on `effect` and
+#   (`effect`, `@effect/sql-pg`, `@effect/platform-node`, `@effect/vitest`,
+#   the language service, and `@effect/docgen`, which depends on `effect` and
 #   `@effect/platform-node` of its own release); `@effect/tsgo` belongs to
 #   the toolchain set instead.
 # - `drizzle`: drizzle-kit is always the drizzle-orm pin. Both are

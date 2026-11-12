@@ -21,7 +21,8 @@
  * @module tests/database
  */
 
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { it } from "@effect/vitest";
+import { beforeEach, describe, expect } from "vite-plus/test";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -31,7 +32,6 @@ import {
   type ReadSurface,
   type TransactionalDatabase,
 } from "../src/database.ts";
-import { runPromise } from "./harness.ts";
 
 /**
  * A sentinel transaction handle: every read member reports the handle's label,
@@ -166,53 +166,65 @@ describe("makeDatabaseServices", () => {
 });
 
 describe("readHandle (#1883)", () => {
-  it("returns the ambient transaction when one is open", async () => {
-    expect(await runPromise(provideOpenTransaction(readHandle, TX_HANDLE))).toBe(TX_HANDLE);
-  });
+  it.effect("returns the ambient transaction when one is open", () =>
+    Effect.gen(function* () {
+      expect(yield* provideOpenTransaction(readHandle, TX_HANDLE)).toBe(TX_HANDLE);
+    }),
+  );
 
-  it("falls back to the Database client when no transaction is open", async () => {
-    expect(await runPromise(provideDatabase(readHandle))).toBe(DB_HANDLE);
-  });
+  it.effect("falls back to the Database client when no transaction is open", () =>
+    Effect.gen(function* () {
+      expect(yield* provideDatabase(readHandle)).toBe(DB_HANDLE);
+    }),
+  );
 
-  it("does not require CurrentTransaction to run — the fallback is total", async () => {
-    // The point of `Effect.serviceOption`: an unprovided `CurrentTransaction`
-    // is a `None`, not a defect. If this ever throws, the resolver has started
-    // yielding the key directly and every read-path caller has silently gained
-    // a "must be inside a transaction" requirement.
-    await expect(runPromise(provideDatabase(readHandle))).resolves.toBe(DB_HANDLE);
-  });
+  it.effect("does not require CurrentTransaction to run — the fallback is total", () =>
+    Effect.gen(function* () {
+      // The point of `Effect.serviceOption`: an unprovided `CurrentTransaction`
+      // is a `None`, not a defect. If this ever throws, the resolver has started
+      // yielding the key directly and every read-path caller has silently gained
+      // a "must be inside a transaction" requirement.
+      expect(yield* provideDatabase(readHandle)).toBe(DB_HANDLE);
+    }),
+  );
 
-  it("narrows to the read surface without losing the handle's own signatures", async () => {
-    const handle = await runPromise(provideOpenTransaction(readHandle, TX_HANDLE));
-    expect(handle.select()).toBe("transaction");
-    expect(handle.$count()).toBe("transaction".length);
-  });
+  it.effect("narrows to the read surface without losing the handle's own signatures", () =>
+    Effect.gen(function* () {
+      const handle = yield* provideOpenTransaction(readHandle, TX_HANDLE);
+      expect(handle.select()).toBe("transaction");
+      expect(handle.$count()).toBe("transaction".length);
+    }),
+  );
 
-  it("opens nothing — a read has no boundary to lose", async () => {
-    await runPromise(provideOpenTransaction(readHandle, TX_HANDLE));
-    await runPromise(provideDatabase(readHandle));
-    expect(opened).toHaveLength(0);
-  });
+  it.effect("opens nothing — a read has no boundary to lose", () =>
+    Effect.gen(function* () {
+      yield* provideOpenTransaction(readHandle, TX_HANDLE);
+      yield* provideDatabase(readHandle);
+      expect(opened).toHaveLength(0);
+    }),
+  );
 });
 
 describe("transact (#1883)", () => {
-  it("opens on the Database client and provides the new handle as CurrentTransaction", async () => {
-    const seen = await runPromise(provideDatabase(transact(CurrentTransaction)));
+  it.effect("opens on the Database client and provides the new handle as CurrentTransaction", () =>
+    Effect.gen(function* () {
+      const seen = yield* provideDatabase(transact(CurrentTransaction));
 
-    expect(opened).toHaveLength(1);
-    expect(opened[0]?.on).toBe("database");
-    expect(seen).toBe(opened[0]?.handle);
-  });
+      expect(opened).toHaveLength(1);
+      expect(opened[0]?.on).toBe("database");
+      expect(seen).toBe(opened[0]?.handle);
+    }),
+  );
 
-  it("opens a NESTED boundary on the ambient handle rather than joining it", async () => {
-    // A join-if-present helper would typecheck identically and record ONE
-    // boundary; the second entry here is the SAVEPOINT that preserves rollback
-    // granularity. Adjudicated on website #1883 (owner, 2026-09-07,
-    // condition 3). That the nested boundary is opened on the ambient handle
-    // rather than on the client is what makes it nest on a driver that does
-    // not pin the open connection to the fiber.
-    const [outer, inner] = await runPromise(
-      provideDatabase(
+  it.effect("opens a NESTED boundary on the ambient handle rather than joining it", () =>
+    Effect.gen(function* () {
+      // A join-if-present helper would typecheck identically and record ONE
+      // boundary; the second entry here is the SAVEPOINT that preserves rollback
+      // granularity. Adjudicated on website #1883 (owner, 2026-09-07,
+      // condition 3). That the nested boundary is opened on the ambient handle
+      // rather than on the client is what makes it nest on a driver that does
+      // not pin the open connection to the fiber.
+      const [outer, inner] = yield* provideDatabase(
         transact(
           Effect.gen(function* () {
             const outerHandle = yield* CurrentTransaction;
@@ -220,19 +232,19 @@ describe("transact (#1883)", () => {
             return [outerHandle, innerHandle] as const;
           }),
         ),
-      ),
-    );
+      );
 
-    expect(opened).toHaveLength(2);
-    expect(opened[0]?.on).toBe("database");
-    expect(opened[1]?.on).toBe(outer.label);
-    expect(inner).not.toBe(outer);
-    expect(inner).toBe(opened[1]?.handle);
-  });
+      expect(opened).toHaveLength(2);
+      expect(opened[0]?.on).toBe("database");
+      expect(opened[1]?.on).toBe(outer.label);
+      expect(inner).not.toBe(outer);
+      expect(inner).toBe(opened[1]?.handle);
+    }),
+  );
 
-  it("restores the outer handle once the inner boundary closes", async () => {
-    const restored = await runPromise(
-      provideDatabase(
+  it.effect("restores the outer handle once the inner boundary closes", () =>
+    Effect.gen(function* () {
+      const restored = yield* provideDatabase(
         transact(
           Effect.gen(function* () {
             const outerHandle = yield* CurrentTransaction;
@@ -240,28 +252,32 @@ describe("transact (#1883)", () => {
             return (yield* CurrentTransaction) === outerHandle;
           }),
         ),
-      ),
-    );
+      );
 
-    expect(restored).toBe(true);
-  });
+      expect(restored).toBe(true);
+    }),
+  );
 
-  it("opens on the ambient handle when one is already open outside transact", async () => {
-    // The ambient transaction need not have come from `transact` — a driver's
-    // own `db.transaction` callback, or a test harness that opens one and
-    // provides it, is the same case.
-    const seen = await runPromise(provideOpenTransaction(transact(CurrentTransaction), TX_HANDLE));
+  it.effect("opens on the ambient handle when one is already open outside transact", () =>
+    Effect.gen(function* () {
+      // The ambient transaction need not have come from `transact` — a driver's
+      // own `db.transaction` callback, or a test harness that opens one and
+      // provides it, is the same case.
+      const seen = yield* provideOpenTransaction(transact(CurrentTransaction), TX_HANDLE);
 
-    expect(opened).toHaveLength(1);
-    expect(opened[0]?.on).toBe("transaction");
-    expect(seen).toBe(opened[0]?.handle);
-    expect(seen).not.toBe(TX_HANDLE);
-  });
+      expect(opened).toHaveLength(1);
+      expect(opened[0]?.on).toBe("transaction");
+      expect(seen).toBe(opened[0]?.handle);
+      expect(seen).not.toBe(TX_HANDLE);
+    }),
+  );
 
-  it("leaves the body's failure in the error channel", async () => {
-    const exit = await Effect.runPromiseExit(provideDatabase(transact(Effect.fail("rolled back"))));
+  it.effect("leaves the body's failure in the error channel", () =>
+    Effect.gen(function* () {
+      const exit = yield* Effect.exit(provideDatabase(transact(Effect.fail("rolled back"))));
 
-    expect(exit._tag).toBe("Failure");
-    expect(opened).toHaveLength(1);
-  });
+      expect(exit._tag).toBe("Failure");
+      expect(opened).toHaveLength(1);
+    }),
+  );
 });

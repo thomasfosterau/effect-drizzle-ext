@@ -79,14 +79,8 @@ import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as P from "effect/Predicate";
 import * as R from "effect/Record";
+import { enumCheck, makeDiscriminatorConstraints, type TypedStable } from "./constraints.ts";
 import {
-  enumCheck,
-  // oxlint-disable-next-line effect/no-service-constructor-imports -- `makeDiscriminatorConstraints` is a plain DDL factory over a leaf-set callback, not an Effect service constructor; the rule keys on the `make*` name.
-  makeDiscriminatorConstraints,
-  type TypedStable,
-} from "./constraints.ts";
-import {
-  // oxlint-disable-next-line effect/no-service-constructor-imports -- `makeDeriveColumns` is a plain factory over a builder registry, not an Effect service constructor; the rule keys on the `make*` name.
   makeDeriveColumns,
   type ColumnBuilders,
   type DerivedColumns,

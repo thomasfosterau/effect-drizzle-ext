@@ -44,6 +44,11 @@ catalog:
   # three.
   "@effect/tsgo": 0.67.4
   "@effect/sql-pg": 4.1.2
+  # The unit suites' Effect runner (`it.effect`), so a test yields its Effect
+  # instead of calling `Effect.runPromise` in a test body
+  # (effect-drizzle-ext#105). Released in lockstep with `effect` (it peers on
+  # `effect ^4.1.2`, `vitest >=5 <6`), so it moves with the `effect` group.
+  "@effect/vitest": 4.1.2
   # The Node `FileSystem` / `Path` / `ChildProcessSpawner` layer the pg
   # package's tests provide to `./migrations`, `./testing`'s provisioning and
   # `./tooling` — a consumer provides its own (these modules only require the
