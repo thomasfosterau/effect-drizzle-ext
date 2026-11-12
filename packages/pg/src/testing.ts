@@ -187,22 +187,19 @@ const isRollback = (u: unknown): u is RollbackSignal =>
  * Effect causes are nested objects; this is a structural walk that finds the
  * rollback tag without depending on `Cause` internals.
  */
-const causeContainsRollback = (cause: unknown): boolean => {
+const causeContainsRollback = (cause: unknown): boolean =>
   // By reference: under `HashSet`'s structural `Equal`, distinct but equal
   // `Cause` nodes would collide.
-  const seen = new WeakSet<object>();
-  const stack: Array<unknown> = [cause];
-  // oxlint-disable-next-line effect/imperative-loops -- an explicit stack walk over an opaque object graph; the ported mechanism, unchanged.
-  while (Arr.isReadonlyArrayNonEmpty(stack)) {
-    const node = stack.pop();
-    if (!P.isObjectOrArray(node) || seen.has(node)) continue;
-    seen.add(node);
-    if (isRollback(node)) return true;
-    Arr.forEach(Array.isArray(node) ? node : R.values(node), (value) => {
-      stack.push(value);
-    });
-  }
-  return false;
+  containsRollback(cause, new WeakSet());
+
+/** The depth-first walk behind {@link causeContainsRollback}, visiting each node once. */
+const containsRollback = (cause: unknown, seen: WeakSet<object>): boolean => {
+  if (!P.isObjectOrArray(cause) || seen.has(cause)) return false;
+  seen.add(cause);
+  return (
+    isRollback(cause) ||
+    Arr.some(Arr.isArray(cause) ? cause : R.values(cause), (child) => containsRollback(child, seen))
+  );
 };
 
 // ── Connect-time retry policy ─────────────────────────────────────────

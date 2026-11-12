@@ -119,10 +119,11 @@ export const testDatabaseName = (options: {
     if (!DATABASE_PREFIX.test(options.prefix)) {
       return yield* new InvalidDatabasePrefix({ prefix: options.prefix });
     }
-    // oxlint-disable-next-line effect/effect-promise-vs-trypromise -- SHA-256 over a byte array cannot reject; a rejection would be a platform defect, not an error a caller could handle
-    const digest = yield* Effect.promise(() =>
-      crypto.subtle.digest("SHA-256", new TextEncoder().encode(options.migrationsDir)),
-    );
+    // SHA-256 over a byte array can't reject: a rejection is a platform defect.
+    const digest = yield* Effect.tryPromise({
+      try: () => crypto.subtle.digest("SHA-256", new TextEncoder().encode(options.migrationsDir)),
+      catch: (cause) => new PlatformDefect({ operation: "SHA-256 digest", cause }),
+    }).pipe(Effect.orDie);
     const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0"))
       .join("")
       .slice(0, 8);
@@ -241,6 +242,16 @@ export const resolveDatabaseSource = (
     return { _tag: "Container", image: options.image } as const;
   });
 
+/**
+ * A platform call that can't fail in a working environment failed anyway.
+ * Raised as a defect (`Effect.orDie`), never a typed failure; it names the
+ * operation so the squashed cause says what broke.
+ */
+class PlatformDefect extends Schema.TaggedError<PlatformDefect>()("PlatformDefect", {
+  operation: Schema.String,
+  cause: Schema.Defect(),
+}) {}
+
 /** Starting the Testcontainers fallback failed — most often, no Docker daemon. */
 export class ContainerStartFailed extends Schema.TaggedError<ContainerStartFailed>()(
   "ContainerStartFailed",
@@ -325,8 +336,13 @@ const startContainer = (
       },
       catch: (cause) => new ContainerStartFailed({ image, server, cause }),
     }),
-    // oxlint-disable-next-line effect/effect-promise-vs-trypromise -- an `acquireRelease` finalizer must have `never` in its error channel, so a failed stop has to be a defect
-    (container) => Effect.promise(() => container.stop()),
+    // An `acquireRelease` finalizer can't fail, so a failed stop is a defect.
+    (container) =>
+      Effect.tryPromise({
+        try: () => container.stop(),
+        catch: (cause) =>
+          new PlatformDefect({ operation: `stopping the ${image} container`, cause }),
+      }).pipe(Effect.orDie),
   ).pipe(Effect.map((container) => Redacted.make(container.getConnectionUri())));
 
 /**

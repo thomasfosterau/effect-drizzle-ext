@@ -9,6 +9,7 @@ import * as Redacted from "effect/Redacted";
 import type { SqlClient } from "effect/sql/SqlClient";
 import { afterAll, describe, expect, it } from "vite-plus/test";
 import { applyMigrations, MigrationError } from "../../src/migrations.ts";
+import { testDatabaseUrl } from "./database-url.ts";
 
 /**
  * The global setup provisioned this run's database through the exported
@@ -16,11 +17,13 @@ import { applyMigrations, MigrationError } from "../../src/migrations.ts";
  * `applyMigrations`: the smallest proof that both ran, that every other spec
  * can trust `DATABASE_URL_TEST`, and that a failing migration is named.
  */
-const url = Redacted.make(process.env.DATABASE_URL_TEST ?? "");
 
 /** The suite's runtime: one single-connection pool on `DATABASE_URL_TEST`, plus the Node services. */
 const runtime = ManagedRuntime.make(
-  Layer.merge(PgClient.layer({ url, maxConnections: 1 }), NodeServices.layer),
+  Layer.merge(
+    Layer.unwrap(Effect.map(testDatabaseUrl, (url) => PgClient.layer({ url, maxConnections: 1 }))),
+    NodeServices.layer,
+  ),
 );
 afterAll(() => runtime.dispose());
 
@@ -30,7 +33,7 @@ const run = <A, E>(
 
 describe("provisioning", () => {
   it("answers a query on DATABASE_URL_TEST", async () => {
-    expect(Redacted.value(url)).not.toBe("");
+    expect(Redacted.value(await run(testDatabaseUrl))).not.toBe("");
     const rows = await run(
       Effect.gen(function* () {
         const sql = yield* PgClient.PgClient;

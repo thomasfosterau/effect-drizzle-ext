@@ -18,7 +18,6 @@
 import type { ExtraConfigColumn, PgTableExtraConfigValue } from "drizzle-orm/pg-core";
 import {
   deriveCheckConstraintsFrom,
-  // oxlint-disable-next-line effect/no-service-constructor-imports -- `makeDeriveColumns` is a plain factory over a builder registry, not an Effect service constructor; the rule keys on the `make*` name.
   makeDeriveColumns,
   type ColumnBuilders,
   type DerivedColumns,

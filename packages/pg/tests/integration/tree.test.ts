@@ -19,16 +19,15 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
-import * as Redacted from "effect/Redacted";
 import { assert, describe, expect, it } from "vite-plus/test";
+import { integrationDatabaseLayer } from "./database-url.ts";
 import { makePgDatabase } from "../../src/index.ts";
-import { makeTestTransaction, testDatabaseLayer } from "../../src/testing.ts";
+import { makeTestTransaction } from "../../src/testing.ts";
 
 const database = makePgDatabase({ relations: {}, key: "Database" });
 const { CurrentTransaction } = database;
 
-const url = Redacted.make(process.env.DATABASE_URL_TEST ?? process.env.DATABASE_URL ?? "");
-const runtime = ManagedRuntime.make(testDatabaseLayer(database, { url }));
+const runtime = ManagedRuntime.make(integrationDatabaseLayer(database));
 const { runInTestTransaction, attemptInSavepoint } = makeTestTransaction(database);
 
 const BOOK = "00000000-0000-4000-8000-000000000001";

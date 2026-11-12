@@ -7,6 +7,7 @@
  * application. Never executed; type-checked only.
  */
 
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -257,8 +258,9 @@ export const filmView = currentVersionView(core, "film_view", {
 });
 type FilmViewRow = typeof filmView.$inferSelect;
 
-// oxlint-disable-next-line effect/use-clock-service -- a fixed instant; never executed
-export const filmTimestamps = versionTimestamps({ timestamp: new Date(0) });
+export const filmTimestamps = versionTimestamps({
+  timestamp: DateTime.toDateUtc(DateTime.makeUnsafe(0)),
+});
 type Snapshot = VersionSnapshot<"create", { readonly draft?: boolean }>;
 
 // ── tree views ────────────────────────────────────────────────────────────

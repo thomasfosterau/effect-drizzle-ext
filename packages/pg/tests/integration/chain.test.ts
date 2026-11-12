@@ -17,18 +17,17 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
-import * as Redacted from "effect/Redacted";
 import { afterAll, assert, describe, expect, it } from "vite-plus/test";
 import { makeVersionChain, MAX_HISTORY_LIMIT } from "../../src/chain.ts";
+import { integrationDatabaseLayer } from "./database-url.ts";
 import { makePgDatabase } from "../../src/index.ts";
-import { makeTestTransaction, testDatabaseLayer } from "../../src/testing.ts";
+import { makeTestTransaction } from "../../src/testing.ts";
 import { node, nodeVersion, ontologyTables, ontologyTree } from "../fixtures/schema.ts";
 
 const database = makePgDatabase({ relations: {}, key: "Database" });
 const { CurrentTransaction, transact } = database;
 
-const url = Redacted.make(process.env.DATABASE_URL_TEST ?? process.env.DATABASE_URL ?? "");
-const runtime = ManagedRuntime.make(testDatabaseLayer(database, { url }));
+const runtime = ManagedRuntime.make(integrationDatabaseLayer(database));
 const { runInTestTransaction } = makeTestTransaction(database);
 
 const chain = makeVersionChain({ tree: ontologyTree, tables: ontologyTables, CurrentTransaction });
@@ -439,8 +438,8 @@ describe("a chain that breaks its own contract", () => {
 describe("the concurrent-writer race", () => {
   const RACED = "00000000-0000-4000-8000-0000000000a2";
   // Two runtimes, two pools, two connections: real transactions that commit.
-  const first = ManagedRuntime.make(testDatabaseLayer(database, { url }));
-  const second = ManagedRuntime.make(testDatabaseLayer(database, { url }));
+  const first = ManagedRuntime.make(integrationDatabaseLayer(database));
+  const second = ManagedRuntime.make(integrationDatabaseLayer(database));
 
   afterAll(async () => {
     // Leaf-first: each stable delete cascades its own version rows.

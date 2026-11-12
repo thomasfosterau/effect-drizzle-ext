@@ -85,6 +85,12 @@ export default defineConfig({
       "typescript/ban-ts-comment": "off",
       "unicorn/no-empty-file": "off",
       "vite-plus/prefer-vite-plus-imports": "error",
+      // `@effect/vitest`'s Effect-running test blocks, so `expect` inside one
+      // is inside a test.
+      "vitest/no-standalone-expect": [
+        "error",
+        { additionalTestBlockFunctions: ["it.effect", "it.live", "it.layer"] },
+      ],
 
       // ---- type-aware rules (oxlint-tsgolint) -------------------------------
       // At `error` everywhere but the type-erasure seams (the first override
@@ -149,6 +155,30 @@ export default defineConfig({
           "effect/casting-awareness": "off",
         },
       },
+      // `no-service-constructor-imports` keys on a `make<Capability>` import
+      // name, to keep Effect service constructors out of runtime code. The
+      // two these files import, `makeDeriveColumns` and
+      // `makeDiscriminatorConstraints`, are this library's public plain
+      // factories (a builder registry in, column builders or DDL out); they
+      // build no service and need no Layer, so the rule's fix (import the
+      // owning Layer) has nothing to apply to.
+      {
+        files: ["packages/core/src/jsonapi/derive.ts", "packages/core/src/versioned-chain.ts"],
+        rules: {
+          "effect/no-service-constructor-imports": "off",
+        },
+      },
+      // The one seam no single `as` can name: `makeVersionChain`'s runtime
+      // operations take the untyped `Row` and its typed surface each leaf's
+      // own state, so the two share no overlap TypeScript accepts a direct
+      // assertion across, and the conversion goes through `unknown`.
+      {
+        files: ["packages/pg/src/chain.ts"],
+        rules: {
+          "effect/no-chained-type-assertions": "off",
+          "effect/avoid-any": "off",
+        },
+      },
       // The Drizzle and driver boundary for `prefer-option-over-null`
       // (effect-drizzle-ext#105): `Option` is the library's own absence
       // everywhere else, and options bags it reads itself spell an optional
@@ -188,14 +218,16 @@ export default defineConfig({
       // is no `Config` provider to read from and no `FileSystem` service to
       // call, so `process.env` and `node:*` are the only things that work
       // there. The Effect preset's service rules have no satisfiable fix in
-      // these files.
+      // these files. The integration specs themselves run under an Effect
+      // runtime and read the database URL through `Config`
+      // (tests/integration/database-url.ts), so they are not listed.
       {
         files: [
           "vite.package.ts",
           "**/vite.config.ts",
           "**/vitest.config.ts",
           "**/vitest.integration.config.ts",
-          "**/tests/integration/**",
+          "packages/pg/tests/integration/global-setup.ts",
         ],
         rules: {
           "effect/avoid-node-imports": "off",

@@ -8,7 +8,8 @@
  * @module tests/query
  */
 
-import { describe, expect, it } from "vite-plus/test";
+import { it } from "@effect/vitest";
+import { describe, expect } from "vite-plus/test";
 import { eq } from "drizzle-orm";
 import { PgDialect, pgTable, text } from "drizzle-orm/pg-core";
 import * as Effect from "effect/Effect";
@@ -22,7 +23,6 @@ import {
   pageWithTotal,
   TOTAL_COUNT_ALIAS,
 } from "../src/query.ts";
-import { runPromise } from "./harness.ts";
 
 describe("pageOf", () => {
   it("maps rows to resources and reads the total off the alias", () => {
@@ -161,43 +161,55 @@ describe("executeRows", () => {
   const ROWS = [{ id: "a" }, { id: "b" }];
   const IdRow = Schema.Struct({ id: Schema.String });
 
-  it("unwraps a pg.Result-shaped object to its rows (today's raw-mode runtime shape)", async () => {
-    const rows = await runPromise(
-      executeRows(clientResolving({ rows: ROWS, rowCount: 2 }), "SELECT 1", IdRow),
-    );
-    expect(rows).toEqual(ROWS);
-  });
+  it.effect("unwraps a pg.Result-shaped object to its rows (today's raw-mode runtime shape)", () =>
+    Effect.gen(function* () {
+      const rows = yield* executeRows(
+        clientResolving({ rows: ROWS, rowCount: 2 }),
+        "SELECT 1",
+        IdRow,
+      );
+      expect(rows).toEqual(ROWS);
+    }),
+  );
 
-  it("passes a bare rows array through unchanged (the typed shape)", async () => {
-    const rows = await runPromise(executeRows(clientResolving(ROWS), "SELECT 1", IdRow));
-    expect(rows).toEqual(ROWS);
-  });
+  it.effect("passes a bare rows array through unchanged (the typed shape)", () =>
+    Effect.gen(function* () {
+      const rows = yield* executeRows(clientResolving(ROWS), "SELECT 1", IdRow);
+      expect(rows).toEqual(ROWS);
+    }),
+  );
 
-  it("degrades a rows-less object to an empty array", async () => {
-    const rows = await runPromise(
-      executeRows(clientResolving({ command: "SELECT" }), "SELECT 1", IdRow),
-    );
-    expect(rows).toEqual([]);
-  });
+  it.effect("degrades a rows-less object to an empty array", () =>
+    Effect.gen(function* () {
+      const rows = yield* executeRows(clientResolving({ command: "SELECT" }), "SELECT 1", IdRow);
+      expect(rows).toEqual([]);
+    }),
+  );
 
-  it("fails with a SchemaError for an array of pg.Result objects, the single-statement boundary", async () => {
-    // Multi-statement queries make `pg` resolve an ARRAY of Result objects.
-    // This helper deliberately does not unwrap that shape (no call site
-    // issues multi-statement reads); decoding pins the boundary as a typed
-    // failure rather than silent misinterpretation.
-    const multi = [
-      { rows: [ROWS[0]], rowCount: 1 },
-      { rows: [ROWS[1]], rowCount: 1 },
-    ];
-    const error = await runPromise(
-      Effect.flip(executeRows(clientResolving(multi), "SELECT 1; SELECT 2", IdRow)),
-    );
-    expect(Schema.isSchemaError(error)).toBe(true);
-  });
+  it.effect(
+    "fails with a SchemaError for an array of pg.Result objects, the single-statement boundary",
+    () =>
+      Effect.gen(function* () {
+        // Multi-statement queries make `pg` resolve an ARRAY of Result objects.
+        // This helper deliberately does not unwrap that shape (no call site
+        // issues multi-statement reads); decoding pins the boundary as a typed
+        // failure rather than silent misinterpretation.
+        const multi = [
+          { rows: [ROWS[0]], rowCount: 1 },
+          { rows: [ROWS[1]], rowCount: 1 },
+        ];
+        const error = yield* Effect.flip(
+          executeRows(clientResolving(multi), "SELECT 1; SELECT 2", IdRow),
+        );
+        expect(Schema.isSchemaError(error)).toBe(true);
+      }),
+  );
 
-  it("fails with a SchemaError for a row the schema rejects", async () => {
-    const client = { execute: () => Effect.succeed([{ id: 1 }]) };
-    const error = await runPromise(Effect.flip(executeRows(client, "SELECT 1", IdRow)));
-    expect(Schema.isSchemaError(error)).toBe(true);
-  });
+  it.effect("fails with a SchemaError for a row the schema rejects", () =>
+    Effect.gen(function* () {
+      const client = { execute: () => Effect.succeed([{ id: 1 }]) };
+      const error = yield* Effect.flip(executeRows(client, "SELECT 1", IdRow));
+      expect(Schema.isSchemaError(error)).toBe(true);
+    }),
+  );
 });

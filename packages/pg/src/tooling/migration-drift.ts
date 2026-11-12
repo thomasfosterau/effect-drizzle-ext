@@ -209,24 +209,19 @@ const traverse = (
     MutableHashMap.set(state, id, "visiting");
     MutableHashSet.add(reachable, id);
     const next = [...path, label(id)];
-    // oxlint-disable-next-line effect/imperative-loops -- stops the whole recursive walk at the first cycle, leaving this node `visiting`; a fold can neither short-circuit nor leave that state behind
-    for (const prevId of Option.match(entryOf(id), {
+    const prevIds = Option.match(entryOf(id), {
       onNone: (): ReadonlyArray<string> => [],
       onSome: (entry) => entry.snapshot.prevIds,
-    })) {
-      const cycle = visit(prevId, next);
-      if (Option.isSome(cycle)) return cycle;
-    }
-    MutableHashMap.set(state, id, "done");
-    return Option.none();
+    });
+    // `findFirst` stops at the first cycle, leaving this node `visiting`.
+    const cycle = Arr.findFirst(prevIds, (prevId) => visit(prevId, next));
+    if (Option.isNone(cycle)) MutableHashMap.set(state, id, "done");
+    return cycle;
   };
 
-  // oxlint-disable-next-line effect/imperative-loops -- as above: stop at the first start whose walk finds a cycle
-  for (const start of starts) {
-    const cycle = visit(start.snapshot.id, []);
-    if (Option.isSome(cycle)) return { reachable, cycle };
-  }
-  return { reachable, cycle: Option.none() };
+  // Stop at the first start whose walk finds a cycle.
+  const cycle = Arr.findFirst(starts, (start) => visit(start.snapshot.id, []));
+  return { reachable, cycle };
 };
 
 /**
