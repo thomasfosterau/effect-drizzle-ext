@@ -1897,9 +1897,10 @@ const caseOverLeaves = (
  * down to the leaf at that `(id, version)`, and on `id` the stable table of
  * every level that has `stableColumns`, and LEFT JOINs each fact table. A
  * level with columns of its own is a plain join; a level with none (or one
- * `fenced` names), every stable row and every fact table sit inside one
- * fenced `CROSS JOIN LATERAL (… OFFSET 0) "tail"` keyed on the driver
- * (effect-drizzle-ext#207), out of the planner's join search. A filter or
+ * `fenced` names) and every stable row sit inside one fenced `CROSS JOIN
+ * LATERAL (… OFFSET 0) "tail"` keyed on the driver (effect-drizzle-ext#207),
+ * out of the planner's join search, and the fact tables join that tail when
+ * there is one (a view with nothing to fence LEFT JOINs its facts plainly). A filter or
  * sort on a plain join's column still reaches its index; one on a column
  * from the tail is checked row by row and can't drive an index or a sort.
  * A node whose head advanced past any
@@ -2263,6 +2264,8 @@ export const makeTreeViews = <
           Arr.some(tablesRead(value), (table) => Arr.contains(inside, table));
         const tailSelection = R.filter(selection, readsInside);
         const tailKeys = R.keys(tailSelection);
+        // A tail of pure markers selects no column: `select from …`, which
+        // PostgreSQL (unlike the SQL standard) accepts.
         const tailQuery = Arr.reduce(
           facts,
           Arr.reduce(rest, qb.select(tailSelection).from(first).$dynamic(), (q, [table, on]) =>
