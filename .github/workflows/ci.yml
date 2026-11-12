@@ -2,9 +2,9 @@ name: CI
 
 # ONE pipeline, defined once: the `ci` task in vite.config.ts runs every gate
 # in order (format and lint, type gates, unit, integration, build, docgen,
-# audit), so `vp run ci` locally is what this workflow runs. The `test` job
-# runs it once per Node version in the matrix; the `ci` job is the single
-# stable check name for required-check rulesets.
+# audit), so `vp run ci` locally is what this workflow runs. The `ci` job
+# runs it once per Node version in the matrix; each leg's check,
+# `ci (node <version>)`, is required by name in the ruleset.
 #
 # Integration runs against an EPHEMERAL LOCAL database (fresh per run,
 # provisioned by the suite's own global setup on the job's `postgres` service
@@ -27,7 +27,7 @@ concurrency:
 permissions: {}
 
 jobs:
-  test:
+  ci:
     name: ci (node ${{ matrix.node }})
     # Every supported line: the active LTS and the latest release. Both must
     # sit inside `engines.node` (>=22.18).
@@ -111,22 +111,3 @@ jobs:
       # Every gate, in order: vite.config.ts → `ci`.
       - name: CI
         run: vp run ci
-
-  # The one required check: green only when every matrix leg is.
-  ci:
-    name: ci
-    needs: [test]
-    if: always()
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - name: Every matrix leg passed
-        env:
-          RESULT: ${{ needs.test.result }}
-        run: |
-          if [ "$RESULT" != "success" ]; then
-            echo "::error::ci (node …) finished as ${RESULT}"
-            exit 1
-          fi

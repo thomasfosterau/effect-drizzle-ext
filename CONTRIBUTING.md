@@ -16,7 +16,7 @@ Hooks are managed by Vite+; the editable [.vite-hooks/pre-commit](.vite-hooks/pr
 
 ## CI expectations
 
-[ci.yml](.github/workflows/ci.yml) runs `vp run ci`, the `ci` task in `vite.config.ts` that chains the gates listed in [AGENTS.md → Verification](AGENTS.md#verification) in that order, once per Node version (`lts` and `latest`, checks `ci (node lts)` and `ci (node latest)`), with `vp run test:integration` against each job's `pgvector/pgvector` service container; a final `ci` job, the required check, passes only when both do. Run `vp run ci` locally for the same verdict (integration needs PostgreSQL or Docker; the audit needs the network). [release.yml](.github/workflows/release.yml) runs Changesets on `trunk` inside the protected `release` environment; the flow, its hardening and the owner's one-time setup are in [PUBLISHING.md](PUBLISHING.md). Vulnerability reports go through [SECURITY.md](SECURITY.md).
+[ci.yml](.github/workflows/ci.yml) runs `vp run ci`, the `ci` task in `vite.config.ts` that chains the gates listed in [AGENTS.md → Verification](AGENTS.md#verification) in that order, once per Node version (`lts` and `latest`, checks `ci (node lts)` and `ci (node latest)`), with `vp run test:integration` against each job's `pgvector/pgvector` service container; the ruleset requires both checks by name. Run `vp run ci` locally for the same verdict (integration needs PostgreSQL or Docker; the audit needs the network). [release.yml](.github/workflows/release.yml) runs Changesets on `trunk` inside the protected `release` environment; the flow, its hardening and the owner's one-time setup are in [PUBLISHING.md](PUBLISHING.md). Vulnerability reports go through [SECURITY.md](SECURITY.md).
 
 ## Fallow baseline
 
