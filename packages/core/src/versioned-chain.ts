@@ -79,9 +79,9 @@ import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as P from "effect/Predicate";
 import * as R from "effect/Record";
-import { enumCheck, makeDiscriminatorConstraints, type TypedStable } from "./constraints.ts";
+import { enumCheck, discriminatorConstraintsFor, type TypedStable } from "./constraints.ts";
 import {
-  makeDeriveColumns,
+  deriveColumnsWith,
   type ColumnBuilders,
   type DerivedColumns,
   type DeriveOptions,
@@ -1004,10 +1004,10 @@ export const makeTreeTables = <
   config: TreeTablesConfig<B, H, IE, VE, P>,
 ): TreeTables<S, M, B, H, IE, VE, P> => {
   const { schema } = config;
-  const derive = makeDeriveColumns(config.builders, { resolveReference: config.resolveReference });
+  const derive = deriveColumnsWith(config.builders, { resolveReference: config.resolveReference });
   const identityName = config.root?.identity ?? "node";
   const versionName = config.root?.version ?? `${identityName}_version`;
-  const toolkit = makeDiscriminatorConstraints<string>({
+  const toolkit = discriminatorConstraintsFor<string>({
     leaves: (level) =>
       Option.getOrElse(
         Option.map(
