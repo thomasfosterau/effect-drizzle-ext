@@ -31,6 +31,7 @@ export {
   resolveBaseRef,
   ROOT_SENTINEL_ID,
   SchemaDiffError,
+  type SchemaModule,
   type Snapshot,
   type SnapshotEntry,
 } from "./migration-drift.ts";

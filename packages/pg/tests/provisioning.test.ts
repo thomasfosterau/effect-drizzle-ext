@@ -15,7 +15,7 @@
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
-import * as Predicate from "effect/Predicate";
+import * as P from "effect/Predicate";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import { afterAll, assert, describe, expect, it } from "vite-plus/test";
@@ -86,7 +86,7 @@ describe("resolveDatabaseSource", () => {
       ),
     );
     expect(source._tag).toBe("Explicit");
-    assert(Predicate.isTagged(source, "Explicit"), "expected an Explicit source");
+    assert(P.isTagged(source, "Explicit"), "expected an Explicit source");
     expect(Redacted.value(source.url)).toBe("postgresql://explicit@db.example/test");
     expect(asked).toEqual([]);
   });
@@ -94,7 +94,7 @@ describe("resolveDatabaseSource", () => {
   it("accepts DATABASE_URL as the explicit escape hatch too, with DATABASE_URL_TEST winning", async () => {
     const { probe } = probeAnswering(false);
     const only = await run(resolve({ DATABASE_URL: "postgresql://only@db.example/app" }, probe));
-    expect(Predicate.isTagged(only, "Explicit") && Redacted.value(only.url)).toBe(
+    expect(P.isTagged(only, "Explicit") && Redacted.value(only.url)).toBe(
       "postgresql://only@db.example/app",
     );
     const both = await run(
@@ -106,7 +106,7 @@ describe("resolveDatabaseSource", () => {
         probe,
       ),
     );
-    expect(Predicate.isTagged(both, "Explicit") && Redacted.value(both.url)).toBe(
+    expect(P.isTagged(both, "Explicit") && Redacted.value(both.url)).toBe(
       "postgresql://test@db.example/test",
     );
   });
@@ -117,7 +117,7 @@ describe("resolveDatabaseSource", () => {
       resolve({ PGHOST: "localhost", PGPORT: "5434", PGUSER: "postgres" }, probe),
     );
     expect(asked).toEqual(["postgresql://postgres@localhost:5434/postgres"]);
-    assert(Predicate.isTagged(source, "LocalServer"), "expected a LocalServer source");
+    assert(P.isTagged(source, "LocalServer"), "expected a LocalServer source");
     expect(Redacted.value(source.adminUrl)).toBe("postgresql://postgres@localhost:5434/postgres");
     expect(source.database).toBe(
       await run(testDatabaseName({ prefix: "app", migrationsDir: MIGRATIONS_DIR })),

@@ -49,9 +49,9 @@ import * as Exit from "effect/Exit";
 import * as HashSet from "effect/HashSet";
 import * as Layer from "effect/Layer";
 import type * as ManagedRuntime from "effect/ManagedRuntime";
-import * as Predicate from "effect/Predicate";
+import * as P from "effect/Predicate";
 import type * as Redacted from "effect/Redacted";
-import * as Record from "effect/Record";
+import * as R from "effect/Record";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
 import { isSqlError, type SqlError } from "effect/sql/SqlError";
@@ -172,7 +172,7 @@ interface RollbackSignal {
 const rollback: RollbackSignal = { _tag: ROLLBACK_TAG };
 
 const isRollback = (u: unknown): u is RollbackSignal =>
-  Predicate.isObjectOrArray(u) && Predicate.isTagged(u, ROLLBACK_TAG);
+  P.isObjectOrArray(u) && P.isTagged(u, ROLLBACK_TAG);
 
 /**
  * Whether a captured failure cause carries the rollback sentinel.
@@ -187,10 +187,10 @@ const causeContainsRollback = (cause: unknown): boolean => {
   // oxlint-disable-next-line effect/imperative-loops -- an explicit stack walk over an opaque object graph; the ported mechanism, unchanged.
   while (Arr.isReadonlyArrayNonEmpty(stack)) {
     const node = stack.pop();
-    if (!Predicate.isObjectOrArray(node) || seen.has(node)) continue;
+    if (!P.isObjectOrArray(node) || seen.has(node)) continue;
     seen.add(node);
     if (isRollback(node)) return true;
-    Arr.forEach(Array.isArray(node) ? node : Record.values(node), (value) => {
+    Arr.forEach(Array.isArray(node) ? node : R.values(node), (value) => {
       stack.push(value);
     });
   }

@@ -84,10 +84,6 @@ export default defineConfig({
       // structurally require (the `FluentColumn` bridge in derive.ts, the
       // widened join chain in versioned-chain.ts). Stays visible as a warning.
       "effect/casting-awareness": "warn",
-      // Hard-codes abbreviations (`Arr`, `P`, `R`, …) with no options, so it is
-      // unsatisfiable under the full-name convention (`import * as Option from
-      // "effect/Option"`) this library shares with its consumers.
-      "effect/prefer-namespace-imports": "off",
 
       "typescript/no-explicit-any": "off",
       "typescript/no-empty-object-type": "off",

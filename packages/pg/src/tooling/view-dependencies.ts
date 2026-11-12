@@ -31,9 +31,9 @@ import { generateDrizzleJson, generateMigration } from "drizzle-kit/api-postgres
 import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Order from "effect/Order";
-import * as Record from "effect/Record";
+import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
-import { drizzleKit, type SchemaDiffError } from "./migration-drift.ts";
+import { drizzleKit, type SchemaDiffError, type SchemaModule } from "./migration-drift.ts";
 
 /** One view as drizzle-kit would create it. */
 export interface ViewDefinition {
@@ -109,7 +109,7 @@ export class ViewDependencyError extends Schema.TaggedError<ViewDependencyError>
   override get message(): string {
     const grouped = Arr.groupBy(this.edges, (edge) => edge.from);
     const listed = Arr.sort(
-      Record.toEntries(grouped).map(
+      R.toEntries(grouped).map(
         ([from, group]) =>
           `  ${from} selects from ${Arr.sort(
             group.map((edge) => edge.to),
@@ -152,7 +152,7 @@ export class ViewDependencyError extends Schema.TaggedError<ViewDependencyError>
  * ```
  */
 export const checkViewDependencies = (options: {
-  readonly schema: Record<string, unknown>;
+  readonly schema: SchemaModule;
 }): Effect.Effect<{ readonly viewCount: number }, ViewDependencyError | SchemaDiffError> =>
   Effect.gen(function* () {
     const cur = yield* drizzleKit(() => generateDrizzleJson(options.schema));

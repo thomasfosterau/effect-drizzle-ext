@@ -30,7 +30,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
-import * as Predicate from "effect/Predicate";
+import * as P from "effect/Predicate";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import {
@@ -306,7 +306,7 @@ describe("runInTestTransaction", () => {
 
     const opensTransactions = await runInTestTransaction(
       fake.runtime,
-      Effect.map(services.CurrentTransaction, (tx) => Predicate.isFunction(tx.transaction)),
+      Effect.map(services.CurrentTransaction, (tx) => P.isFunction(tx.transaction)),
     );
 
     expect(opensTransactions).toBe(true);

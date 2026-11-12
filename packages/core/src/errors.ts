@@ -33,11 +33,11 @@
  * @module errors
  */
 
-import * as Array from "effect/Array";
+import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
-import * as Predicate from "effect/Predicate";
-import * as Record from "effect/Record";
+import * as P from "effect/Predicate";
+import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
 
 // ── SQLSTATE vocabulary ────────────────────────────────────────────
@@ -87,7 +87,7 @@ const MAX_ERROR_DEPTH = 8;
  * `Record<K, V>` utility type is shadowed; this alias is what the walk's
  * signatures use in its place.
  */
-type ErrorNode = Record.ReadonlyRecord<string, unknown>;
+type ErrorNode = R.ReadonlyRecord<string, unknown>;
 
 // ── The facts a Postgres error carries ─────────────────────────────
 
@@ -119,7 +119,7 @@ export interface PgErrorFacts {
 /** Reads a string-valued property off an error node as an `Option`. */
 const readString = (node: ErrorNode, key: string): Option.Option<string> => {
   const value = node[key];
-  return Predicate.isString(value) ? Option.some(value) : Option.none();
+  return P.isString(value) ? Option.some(value) : Option.none();
 };
 
 /**
@@ -149,7 +149,7 @@ const pgErrorFactsOf = (node: ErrorNode): Option.Option<PgErrorFacts> =>
 
 /** True when `error` is a fresh object worth descending into (within depth, not yet visited). */
 const isSearchable = (error: unknown, depth: number, seen: Set<unknown>): error is ErrorNode =>
-  Predicate.isObjectOrArray(error) && depth < MAX_ERROR_DEPTH && !seen.has(error);
+  P.isObjectOrArray(error) && depth < MAX_ERROR_DEPTH && !seen.has(error);
 
 /**
  * The child error nodes reachable from a node: its `.cause` (read explicitly,
@@ -159,7 +159,7 @@ const isSearchable = (error: unknown, depth: number, seen: Set<unknown>): error 
  */
 const childErrorNodes = (node: ErrorNode): unknown[] => [
   node["cause"],
-  ...Array.flatMap(Record.values(node), (value) => (Array.isArray(value) ? value : [value])),
+  ...Arr.flatMap(R.values(node), (value) => (Arr.isArray(value) ? value : [value])),
 ];
 
 /**
@@ -183,7 +183,7 @@ const searchErrorGraph = <A>(
   if (!isSearchable(cause, depth, seen)) return Option.none();
   seen.add(cause);
   return Option.orElse(match(cause), () =>
-    Array.findFirst(childErrorNodes(cause), (child) =>
+    Arr.findFirst(childErrorNodes(cause), (child) =>
       searchErrorGraph(child, match, depth + 1, seen),
     ),
   );
@@ -305,7 +305,7 @@ const makeUniqueViolation = (facts: PgErrorFacts, cause: unknown): UniqueViolati
  * the SQLSTATE is the key the whole module dispatches on, and a lookup that
  * misses is exactly the `Option.none()` an unclassified code should produce.
  */
-const CONSTRAINT_VIOLATION_BY_CODE: Record.ReadonlyRecord<
+const CONSTRAINT_VIOLATION_BY_CODE: R.ReadonlyRecord<
   string,
   (facts: PgErrorFacts, cause: unknown) => ConstraintViolation
 > = {
@@ -326,7 +326,7 @@ const CONSTRAINT_VIOLATION_BY_CODE: Record.ReadonlyRecord<
 };
 
 /** SQLSTATE → retryable-transaction-failure constructor; a table, as above. */
-const TRANSACTION_FAILURE_BY_CODE: Record.ReadonlyRecord<
+const TRANSACTION_FAILURE_BY_CODE: R.ReadonlyRecord<
   string,
   (cause: unknown) => SerializationFailure | DeadlockDetected
 > = {
@@ -339,14 +339,14 @@ const makeConstraintViolation = (
   facts: PgErrorFacts,
   cause: unknown,
 ): Option.Option<ConstraintViolation> =>
-  Option.map(Record.get(CONSTRAINT_VIOLATION_BY_CODE, facts.code), (make) => make(facts, cause));
+  Option.map(R.get(CONSTRAINT_VIOLATION_BY_CODE, facts.code), (make) => make(facts, cause));
 
 /** The retryable-transaction classification for these facts, if the SQLSTATE is one of the two. */
 const makeTransactionFailure = (
   facts: PgErrorFacts,
   cause: unknown,
 ): Option.Option<SerializationFailure | DeadlockDetected> =>
-  Option.map(Record.get(TRANSACTION_FAILURE_BY_CODE, facts.code), (make) => make(cause));
+  Option.map(R.get(TRANSACTION_FAILURE_BY_CODE, facts.code), (make) => make(cause));
 
 /**
  * Classifies any value into one of the seven tagged errors, by finding the
