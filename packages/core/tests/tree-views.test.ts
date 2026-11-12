@@ -93,18 +93,56 @@ describe("makeTreeViews: leaf views", () => {
     // No grouped head: the head is a primary-key probe, not an aggregate.
     expect(query).not.toContain("max(");
     expect(query).not.toContain("group by");
+    // `work` carries columns, so it stays a plain join (effect-drizzle-ext#207):
+    // an index on `title` can still drive a page.
     expect(query).toContain(
       `inner join "ontology"."work_version" on (("ontology"."book_version"."id" = "ontology"."work_version"."id") and ("ontology"."book_version"."version" = "ontology"."work_version"."version"))`,
     );
     expect(query).toContain(`inner join "ontology"."node_version" "version_zero"`);
     expect(query).not.toContain("left join");
+    expect(query).not.toContain("lateral");
   });
 
-  it("LEFT JOINs a fact-scoped level's facts and INNER JOINs its spine", () => {
+  it("moves a level `fenced` names into one inner CROSS JOIN LATERAL (… OFFSET 0) keyed on the driver", () => {
+    const views = makeTreeViews(frbrTree, frbrTables, { schema, fenced: ["work"] });
+    const query = sqlOf(views.leaves.book);
+    // effect-drizzle-ext#207: outside the planner's join search; the root
+    // version, identity and birth rows stay plain joins.
+    expect(query).toContain(
+      `inner join "ontology"."node" on "ontology"."book_version"."id" = "ontology"."node"."id" cross join lateral (select "title", "url" from "ontology"."work_version" where (("ontology"."book_version"."id" = "ontology"."work_version"."id") and ("ontology"."book_version"."version" = "ontology"."work_version"."version")) offset 0) "tail" inner join "ontology"."node_version" "version_zero"`,
+    );
+    expect(query).toContain(`"tail"."title", "tail"."url", "ontology"."book_version"."pages"`);
+  });
+
+  it("throws DerivationError for a fenced name that is not a marker level", () => {
+    Arr.forEach(["nope", "book"], (name) => {
+      expect(() => makeTreeViews(frbrTree, frbrTables, { schema, fenced: [name] })).toThrow(
+        DerivationError,
+      );
+    });
+  });
+
+  it("fences a level with no columns of its own, and its facts, in the tail", () => {
     const query = sqlOf(frbrViews.leaves.edition);
-    expect(query).toContain(`inner join "ontology"."manifestation_version"`);
-    expect(query).toContain(`left join "ontology"."manifestation_format"`);
-    expect(query).toContain(`left join "ontology"."manifestation_isbn"`);
+    expect(query).toContain(
+      `cross join lateral (select "ontology"."manifestation_format"."format" as "format", "ontology"."manifestation_isbn"."isbn" as "isbn" from "ontology"."manifestation_version" left join "ontology"."manifestation_format" on`,
+    );
+    expect(query).toContain(
+      `left join "ontology"."manifestation_isbn" on (("ontology"."edition_version"."id" = "ontology"."manifestation_isbn"."id") and ("ontology"."edition_version"."version" = "ontology"."manifestation_isbn"."version")) where (("ontology"."edition_version"."id" = "ontology"."manifestation_version"."id") and ("ontology"."edition_version"."version" = "ontology"."manifestation_version"."version")) offset 0) "tail"`,
+    );
+    expect(query).toContain(`"tail"."format" as "format", "tail"."isbn" as "isbn"`);
+  });
+
+  it("throws DerivationError for a root table named like the fenced tail's alias", () => {
+    const tree = defineTree({ m: {}, note: { parent: "m", leaf: {} } });
+    const tables = makeTreeTables(tree, { schema, builders, root: { identity: "tail" } });
+    expect(() => makeTreeViews(tree, tables, { schema })).toThrow(DerivationError);
+  });
+
+  it("joins a leaf with nothing above it directly, with no fenced tail", () => {
+    const tree = defineTree({ note: { leaf: {} } });
+    const views = makeTreeViews(tree, makeTreeTables(tree, { schema, builders }), { schema });
+    expect(sqlOf(views.leaves.note)).not.toContain("lateral");
   });
 
   it("reads base tables only, never another view", () => {
@@ -576,13 +614,10 @@ describe("makeTreeViews: stable-table columns (effect-drizzle-ext#188)", () => {
     ]);
   });
 
-  it("INNER JOINs on id the stable table of each level with stable columns, and no other", () => {
+  it("INNER JOINs on id the stable table of each level with stable columns, and no other, in the fenced tail", () => {
     const query = sqlOf(views.leaves.person);
     expect(query).toContain(
-      `inner join "ontology"."agent" on "ontology"."person_version"."id" = "ontology"."agent"."id"`,
-    );
-    expect(query).toContain(
-      `inner join "ontology"."person" on "ontology"."person_version"."id" = "ontology"."person"."id"`,
+      `cross join lateral (select "ontology"."agent"."external_key", "ontology"."person"."wikidata_id" from "ontology"."agent" inner join "ontology"."person" on "ontology"."person_version"."id" = "ontology"."person"."id" where "ontology"."person_version"."id" = "ontology"."agent"."id" offset 0) "tail"`,
     );
     expect(sqlOf(views.leaves.book)).toBe(sqlOf(frbrViews.leaves.book));
     expect(query).not.toMatch(/_view"/);
