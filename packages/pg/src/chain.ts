@@ -989,6 +989,5 @@ export const makeVersionChain = <
   // operations were built above over the same tables `T` types, reading and
   // writing exactly the fields `ChainState` / `ChainCreateState` name; only the
   // per-leaf precision was erased by assembling them from the runtime tree.
-  // oxlint-disable-next-line effect/no-chained-type-assertions, effect/avoid-any -- the seam above: the runtime operations take the untyped `Row`, the typed surface each leaf's own state, so the two share no overlap TypeScript can check
   return chains as unknown as VersionChain<S, T, QueryError<PgTransaction<Relations>>, I>;
 };

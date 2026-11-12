@@ -149,6 +149,17 @@ export default defineConfig({
           "effect/casting-awareness": "off",
         },
       },
+      // The one seam no single `as` can name: `makeVersionChain`'s runtime
+      // operations take the untyped `Row` and its typed surface each leaf's
+      // own state, so the two share no overlap TypeScript accepts a direct
+      // assertion across, and the conversion goes through `unknown`.
+      {
+        files: ["packages/pg/src/chain.ts"],
+        rules: {
+          "effect/no-chained-type-assertions": "off",
+          "effect/avoid-any": "off",
+        },
+      },
       // The Drizzle and driver boundary for `prefer-option-over-null`
       // (effect-drizzle-ext#105): `Option` is the library's own absence
       // everywhere else, and options bags it reads itself spell an optional
