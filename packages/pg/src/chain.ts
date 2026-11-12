@@ -61,6 +61,7 @@ import {
   getTableName,
   sql,
   type AnyRelations,
+  type InferSelectModel,
   type SQL,
 } from "drizzle-orm";
 import type { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
@@ -440,14 +441,11 @@ export type VersionChain<S, T extends ChainTables, E, I> = {
 };
 
 /** A runtime row: column values keyed by field. */
-// oxlint-disable-next-line effect/no-unsafe-dictionary-type -- a Drizzle row seam: values are whatever the consumer's column builders decode; the typed surface is `ChainState`
-type Row = Readonly<Record<string, unknown>>;
+type Row = Readonly<InferSelectModel<PgTable>>;
 
 /** A keyed level as the runtime holds it: each key's columns, keyed by key. */
-// oxlint-disable-next-line effect/no-unsafe-dictionary-type -- the runtime form of `ChainKeyedLevel`: each key's `Row`, typed per leaf on the surface
 type KeyedRows = Readonly<Record<string, Row>>;
 
-// oxlint-disable-next-line effect/no-unsafe-dictionary-type -- the runtime form of `ChainKeyedPatch`: `null` drops a key, `undefined` carries it, each key's `Row` typed per leaf on the surface
 type KeyedPatchRows = Readonly<Record<string, Row | null | undefined>>;
 
 /** What one version stores: the shared state and the keyed level. */

@@ -43,7 +43,7 @@ import {
   sql,
   type Subquery,
 } from "drizzle-orm";
-import type { ColumnBuilderBase, GetColumnData, SQL } from "drizzle-orm";
+import type { ColumnBuilderBase, GetColumnData, InferSelectModel, SQL } from "drizzle-orm";
 import {
   alias,
   bigint,
@@ -609,9 +609,12 @@ export type VersionSnapshot<
   Extra extends object = Record<never, never>,
 > = VersionChainEntry<Action> &
   Extra & {
-    /** Every leaf-chain domain column at this version, keyed by column name. */
-    // oxlint-disable-next-line effect/no-unsafe-dictionary-type -- public type: column values are whatever the driver decodes for the consumer's columns; narrowing it would break producers
-    readonly columns: Readonly<Record<string, unknown>>;
+    /**
+     * Every leaf-chain domain column at this version, keyed by column name:
+     * a select row of an erased Drizzle table, since the column set is the
+     * consumer's.
+     */
+    readonly columns: Readonly<InferSelectModel<PgTable>>;
   };
 
 /** The `createdAt` / `updatedAt` pair {@link versionTimestamps} returns. */

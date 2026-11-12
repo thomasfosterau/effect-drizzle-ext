@@ -8,7 +8,8 @@
  */
 
 import { describe, expect, expectTypeOf, it } from "vite-plus/test";
-import { getTableConfig } from "drizzle-orm/pg-core";
+import type { InferSelectModel } from "drizzle-orm";
+import { getTableConfig, type PgTable } from "drizzle-orm/pg-core";
 import * as Arr from "effect/Array";
 import * as Order from "effect/Order";
 import {
@@ -330,8 +331,7 @@ describe("version-chain read shapes", () => {
   it("carries a hierarchy's extra snapshot facts without knowing them", () => {
     type Snapshot = VersionSnapshot<"create" | "update", { readonly draft?: boolean }>;
     expectTypeOf<Snapshot["draft"]>().toEqualTypeOf<boolean | undefined>();
-    // oxlint-disable-next-line effect/no-unsafe-dictionary-type -- asserts the public `VersionSnapshot["columns"]` type, which is this open dictionary
-    expectTypeOf<Snapshot["columns"]>().toEqualTypeOf<Readonly<Record<string, unknown>>>();
+    expectTypeOf<Snapshot["columns"]>().toEqualTypeOf<Readonly<InferSelectModel<PgTable>>>();
     expectTypeOf<Snapshot["version"]>().toEqualTypeOf<bigint>();
   });
 });
