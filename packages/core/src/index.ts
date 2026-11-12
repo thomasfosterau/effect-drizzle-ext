@@ -77,6 +77,13 @@ export type {
 } from "./tree.ts";
 
 /**
+ * The version-chain read shapes — `VersionAction`, `VersionChainEntry` and
+ * `VersionSnapshot` — the same types `./versioned-chain` exports, here so a
+ * client-bundled package can name them without importing Drizzle.
+ */
+export type { VersionAction, VersionChainEntry, VersionSnapshot } from "./version-chain-types.ts";
+
+/**
  * A referential action for a derived foreign-key column — the Drizzle
  * `onDelete` / `onUpdate` vocabulary, restated as plain data so the annotation
  * layer stays Drizzle-free.

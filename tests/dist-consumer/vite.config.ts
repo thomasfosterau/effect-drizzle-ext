@@ -13,8 +13,15 @@ export default defineConfig({
       // and TypeScript fell back to the hoisted workspace symlink — whose
       // `exports` point at `src/` — so the check passed against the SOURCES,
       // never the emitted declarations it exists to gate.
+      //
+      // Then walks the root entry's BUILT module graph (scripts/
+      // root-entry-graph.ts; effect-drizzle-ext#191): the `.` entry is the
+      // Drizzle-free one a client bundle imports, so a `drizzle-orm` import in
+      // any file its `dist/` JavaScript or declarations reach, a shared chunk
+      // included, fails the check. Node runs the script with its built-in type
+      // stripping (engines: node >= 22.18).
       check: {
-        command: "tsc -p tsconfig.json",
+        command: "tsc -p tsconfig.json && node scripts/root-entry-graph.ts",
         dependsOn: [
           "@thomasfosterau/effect-drizzle-ext#build",
           "@thomasfosterau/effect-drizzle-ext-pg#build",
