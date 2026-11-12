@@ -278,6 +278,28 @@ describe("resolveSortOrder with a client sort", () => {
     }),
   );
 
+  it.effect("keeps a repeated field's first occurrence, and the tiebreak follows it", () =>
+    Effect.gen(function* () {
+      const repeated = yield* orderByFor({ sort: keys("name", "-name") });
+      expect(repeated).toBe(yield* orderByFor({ sort: keys("name") }));
+      expect(repeated).toBe(`order by "post_view"."name" asc, "post_view"."id" asc`);
+    }),
+  );
+
+  it.effect("drops a repeat between other keys without reordering them", () =>
+    Effect.gen(function* () {
+      expect(yield* orderByFor({ sort: keys("-publishedAt", "name", "publishedAt") })).toBe(
+        `order by "post_view"."published_at" desc, "post_view"."name" asc, "post_view"."id" asc`,
+      );
+    }),
+  );
+
+  it.effect("a repeated `id` still counts as the caller's own total order", () =>
+    Effect.gen(function* () {
+      expect(yield* orderByFor({ sort: keys("-id", "id") })).toBe(`order by "post_view"."id" desc`);
+    }),
+  );
+
   it.effect("does not append a second `id` term when the caller sorted by `id`", () =>
     Effect.gen(function* () {
       expect(yield* orderByFor({ sort: keys("-id") })).toBe(`order by "post_view"."id" desc`);
