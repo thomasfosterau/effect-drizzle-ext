@@ -10,8 +10,10 @@ import {
 import * as Arr from "effect/Array";
 import * as DateTime from "effect/DateTime";
 import * as R from "effect/Record";
+import * as Schema from "effect/Schema";
 import { describe, expect, expectTypeOf, it } from "vite-plus/test";
-import type { ColumnBuilders } from "../src/derive.ts";
+import { DerivationError, type ColumnBuilders } from "../src/derive.ts";
+import { dbColumn, defineTree } from "../src/index.ts";
 import { makeTreeTables, makeTreeViews } from "../src/versioned-chain.ts";
 import { bfoTree, frbrTree } from "./fixtures/trees.ts";
 
@@ -212,5 +214,66 @@ describe("makeTreeViews: as-of reads", () => {
     const asOf = frbrViews.asOf("book", { version: 0n });
     expectTypeOf(asOf.pages).not.toBeAny();
     expectTypeOf(asOf.title).not.toBeAny();
+  });
+});
+
+const textColumn = <const C extends string>(column: C) =>
+  dbColumn(Schema.String, { column, pg: "text", notNull: false });
+
+describe("makeTreeViews: a column key two sources share (effect-drizzle-ext#164)", () => {
+  const withSlug = { identityColumns: { slug: text("slug") } };
+
+  it("throws for a level column shadowing an identity column", () => {
+    const tree = defineTree({
+      work: { columns: { slug: textColumn("work_slug") } },
+      book: { parent: "work", leaf: {} },
+    });
+    const tables = makeTreeTables(tree, { schema, builders, root: withSlug });
+    expect(() => makeTreeViews(tree, tables, { schema })).toThrow(DerivationError);
+    expect(() => makeTreeViews(tree, tables, { schema })).toThrow(
+      /view "book_view" selects "slug" from both root.identityColumns and level "work"/,
+    );
+  });
+
+  it("throws for a level column shadowing the chain's createdAt", () => {
+    const tree = defineTree({
+      work: { columns: { title: textColumn("title") } },
+      book: { parent: "work", leaf: { createdAt: textColumn("created") } },
+    });
+    const tables = makeTreeTables(tree, { schema, builders });
+    expect(() => makeTreeViews(tree, tables, { schema })).toThrow(
+      /selects "createdAt" from both level "book" and the chain's timestamps/,
+    );
+  });
+
+  it("throws for a branch projection reusing a selected key", () => {
+    expect(() =>
+      makeTreeViews(frbrTree, frbrTables, {
+        schema,
+        branches: { work: { project: () => ({ title: sql<string>`'x'`.as("title") }) } },
+      }),
+    ).toThrow(/view "work_view" \(arm "book"\) selects "title" from both level "work" and project/);
+  });
+
+  it("passes once the clash is renamed, or projected under another key", () => {
+    const tree = defineTree({
+      work: { columns: { workSlug: textColumn("work_slug") } },
+      book: { parent: "work", leaf: {} },
+    });
+    const tables = makeTreeTables(tree, { schema, builders, root: withSlug });
+    const views = makeTreeViews(tree, tables, {
+      schema,
+      branches: { work: { project: () => ({ heading: sql<string>`'x'`.as("heading") }) } },
+    });
+    expect(keysOf(views.leaves.book)).toEqual([
+      "id",
+      "version",
+      "action",
+      "slug",
+      "workSlug",
+      "timestamp",
+      "createdAt",
+    ]);
+    expect(keysOf(views.branches.work).at(-1)).toBe("heading");
   });
 });

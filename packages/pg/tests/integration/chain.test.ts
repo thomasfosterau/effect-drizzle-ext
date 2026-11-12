@@ -602,3 +602,51 @@ describe("head", () => {
     );
   });
 });
+
+describe("an id that isn't a UUID (effect-drizzle-ext#165)", () => {
+  const MALFORMED = "not-a-uuid";
+
+  it("is an unknown node for every operation, and never reaches the database", async () => {
+    await run(
+      Effect.gen(function* () {
+        expect(yield* chain.book.head(MALFORMED)).toEqual(Option.none());
+        expect(yield* tagOf(chain.book.getVersion(MALFORMED, 0n))).toEqual(
+          Option.some("VersionNotFound"),
+        );
+        expect(yield* tagOf(chain.book.history(MALFORMED))).toEqual(Option.some("NodeNotFound"));
+        expect(yield* tagOf(chain.book.update({ id: MALFORMED, patch: {}, actor: ACTOR }))).toEqual(
+          Option.some("NodeNotFound"),
+        );
+        expect(
+          yield* tagOf(chain.book.restore({ id: MALFORMED, patch: {}, actor: ACTOR })),
+        ).toEqual(Option.some("NodeNotFound"));
+        expect(yield* tagOf(chain.book.delete(MALFORMED, { actor: ACTOR }))).toEqual(
+          Option.some("NodeNotFound"),
+        );
+        expect(yield* tagOf(chain.book.restoreVersion(MALFORMED, 0n, { actor: ACTOR }))).toEqual(
+          Option.some("VersionNotFound"),
+        );
+        // A `22P02` would have aborted the transaction; it is still usable.
+        expect(yield* createBook).toEqual({ id: ID, version: 0n });
+      }),
+    );
+  });
+
+  it("still finds a node through any spelling PostgreSQL's uuid input accepts", async () => {
+    await run(
+      Effect.gen(function* () {
+        yield* createBook;
+        const heads = yield* Effect.forEach(
+          [ID.toUpperCase(), `{${ID}}`, ID.replaceAll("-", "")],
+          (spelling) => chain.book.head(spelling),
+          { concurrency: 1 },
+        );
+        expect(heads.map(Option.map((entry) => entry.version))).toEqual([
+          Option.some(0n),
+          Option.some(0n),
+          Option.some(0n),
+        ]);
+      }),
+    );
+  });
+});

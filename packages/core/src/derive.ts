@@ -77,10 +77,31 @@ type Builder<B extends ColumnBuilders, P extends keyof B> = ReturnType<B[P]>;
 type NotNull<X> = X extends { notNull(): infer R } ? R : X;
 
 /**
+ * The `.default(value)` form of a builder (Drizzle's `HasDefault`, which makes
+ * the column optional on `$inferInsert`).
+ */
+type HasDefault<X> = X extends { default(value: never): infer R } ? R : X;
+
+/** A builder with `.notNull()` applied exactly when `N` is `true`. */
+type WithNotNull<X, N> = N extends true ? NotNull<X> : X;
+
+/**
+ * A builder with `.default()` applied exactly when metadata `M` declares a
+ * `default` value: the runtime applies it whenever `meta.default` is not
+ * `undefined`.
+ */
+type WithDefault<X, M> = M extends { readonly default: boolean | number | string }
+  ? HasDefault<X>
+  : X;
+
+/**
  * The Drizzle column builder a single db-column annotation produces against
  * registry `B`. Total over any `M` (a widened `unknown` metadata falls back to
  * the base builder type), computing the precise builder type for a concrete
- * `{ pg, notNull }` metadata.
+ * `{ pg, notNull, default? }` metadata: `.notNull()` when `notNull` is `true`,
+ * then `.default()` when a `default` is declared, the order the derivation
+ * applies them in. A defaulted column is therefore optional on the table's
+ * `$inferInsert`, as it is at runtime.
  *
  * Exported so a projection-specific derivation (the `./jsonapi/derive` entry)
  * can name this type without restating it.
@@ -90,9 +111,7 @@ export type BuilderFor<M, B extends ColumnBuilders> = M extends {
   readonly notNull: infer N;
 }
   ? P extends keyof B
-    ? N extends true
-      ? NotNull<Builder<B, P>>
-      : Builder<B, P>
+    ? WithDefault<WithNotNull<Builder<B, P>, N>, M>
     : ColumnBuilderBase
   : ColumnBuilderBase;
 
@@ -213,7 +232,8 @@ export const makeDeriveColumns = <B extends ColumnBuilders>(
     fromMeta: <Meta extends Record<string, DbColumn>>(metas: Meta): DerivedColumns<Meta, B> =>
       // SAFETY: `buildColumns` maps every key of `metas` to the builder its
       // `pg` kind selects, with `.notNull()` applied exactly when `notNull`
-      // is true — the per-entry computation `DerivedColumns` describes.
+      // is true and `.default()` exactly when a `default` is declared — the
+      // per-entry computation `DerivedColumns` describes.
       buildColumns(metas) as DerivedColumns<Meta, B>,
     fromFields: <F extends Schema.Struct.Fields>(
       fields: F,
