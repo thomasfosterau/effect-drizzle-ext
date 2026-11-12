@@ -149,6 +149,19 @@ export default defineConfig({
           "effect/casting-awareness": "off",
         },
       },
+      // `no-service-constructor-imports` keys on a `make<Capability>` import
+      // name, to keep Effect service constructors out of runtime code. The
+      // two these files import, `makeDeriveColumns` and
+      // `makeDiscriminatorConstraints`, are this library's public plain
+      // factories (a builder registry in, column builders or DDL out); they
+      // build no service and need no Layer, so the rule's fix (import the
+      // owning Layer) has nothing to apply to.
+      {
+        files: ["packages/core/src/jsonapi/derive.ts", "packages/core/src/versioned-chain.ts"],
+        rules: {
+          "effect/no-service-constructor-imports": "off",
+        },
+      },
       // The one seam no single `as` can name: `makeVersionChain`'s runtime
       // operations take the untyped `Row` and its typed surface each leaf's
       // own state, so the two share no overlap TypeScript accepts a direct
