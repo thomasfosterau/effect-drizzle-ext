@@ -1,0 +1,2034 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "d2a6c4d9-5621-41db-87ad-58d65921a45e",
+  "prevIds": [
+    "137c20ed-ae88-495b-9b2f-16f0996efa32"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "collection"
+      ],
+      "writes": [
+        "s|tbl|ontology.collection",
+        "n|tbl|ontology.collection",
+        "e|tbl|ontology.collection",
+        "n|rel|ontology.collection",
+        "n|type|ontology.collection",
+        "n|rel|ontology.collection_pkey",
+        "n|rel|ontology.collection_id_type_unique"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "collection_version"
+      ],
+      "writes": [
+        "s|tbl|ontology.collection_version",
+        "n|tbl|ontology.collection_version",
+        "e|tbl|ontology.collection_version",
+        "n|rel|ontology.collection_version",
+        "n|type|ontology.collection_version",
+        "n|rel|ontology.collection_version_pkey"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "pamphlet"
+      ],
+      "writes": [
+        "s|tbl|ontology.pamphlet",
+        "n|tbl|ontology.pamphlet",
+        "e|tbl|ontology.pamphlet",
+        "n|rel|ontology.pamphlet",
+        "n|type|ontology.pamphlet",
+        "n|rel|ontology.pamphlet_pkey",
+        "n|rel|ontology.pamphlet_id_type_unique"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "pamphlet_version"
+      ],
+      "writes": [
+        "s|tbl|ontology.pamphlet_version",
+        "n|tbl|ontology.pamphlet_version",
+        "e|tbl|ontology.pamphlet_version",
+        "n|rel|ontology.pamphlet_version",
+        "n|type|ontology.pamphlet_version",
+        "n|rel|ontology.pamphlet_version_pkey"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "series"
+      ],
+      "writes": [
+        "s|tbl|ontology.series",
+        "n|tbl|ontology.series",
+        "e|tbl|ontology.series",
+        "n|rel|ontology.series",
+        "n|type|ontology.series",
+        "n|rel|ontology.series_pkey",
+        "n|rel|ontology.series_id_type_unique"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "series_version"
+      ],
+      "writes": [
+        "s|tbl|ontology.series_version",
+        "n|tbl|ontology.series_version",
+        "e|tbl|ontology.series_version",
+        "n|rel|ontology.series_version",
+        "n|type|ontology.series_version",
+        "n|rel|ontology.series_version_pkey"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "supplement"
+      ],
+      "writes": [
+        "s|tbl|ontology.supplement",
+        "n|tbl|ontology.supplement",
+        "e|tbl|ontology.supplement",
+        "n|rel|ontology.supplement",
+        "n|type|ontology.supplement",
+        "n|rel|ontology.supplement_pkey",
+        "n|rel|ontology.supplement_id_type_unique"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "supplement_version"
+      ],
+      "writes": [
+        "s|tbl|ontology.supplement_version",
+        "n|tbl|ontology.supplement_version",
+        "e|tbl|ontology.supplement_version",
+        "n|rel|ontology.supplement_version",
+        "n|type|ontology.supplement_version",
+        "n|rel|ontology.supplement_version_pkey"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "volume"
+      ],
+      "writes": [
+        "s|tbl|ontology.volume",
+        "n|tbl|ontology.volume",
+        "e|tbl|ontology.volume",
+        "n|rel|ontology.volume",
+        "n|type|ontology.volume",
+        "n|rel|ontology.volume_pkey",
+        "n|rel|ontology.volume_id_type_unique"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "volume_version"
+      ],
+      "writes": [
+        "s|tbl|ontology.volume_version",
+        "n|tbl|ontology.volume_version",
+        "e|tbl|ontology.volume_version",
+        "n|rel|ontology.volume_version",
+        "n|type|ontology.volume_version",
+        "n|rel|ontology.volume_version_pkey"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "collection"
+      ],
+      "writes": [
+        "s|fk|ontology.collection.collection_id_node_id_fkey",
+        "n|fk|ontology.collection.collection_id_node_id_fkey",
+        "e|fk|ontology.collection.collection_id_node_id_fkey",
+        "n|con|ontology.collection.collection_id_node_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.collection",
+        "n|sch|ontology",
+        "n|tbl|ontology.node",
+        "n|sch|ontology",
+        "n|col|ontology.collection.id",
+        "n|col|ontology.node.id",
+        "e|uniqueness|ontology.node.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "collection"
+      ],
+      "writes": [
+        "s|fk|ontology.collection.collection_id_type_fk",
+        "n|fk|ontology.collection.collection_id_type_fk",
+        "e|fk|ontology.collection.collection_id_type_fk",
+        "n|con|ontology.collection.collection_id_type_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.collection",
+        "n|sch|ontology",
+        "n|tbl|ontology.node",
+        "n|sch|ontology",
+        "n|col|ontology.collection.id",
+        "n|col|ontology.collection.type",
+        "n|col|ontology.node.id",
+        "n|col|ontology.node.type",
+        "e|uniqueness|ontology.node.id.type"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "collection_version"
+      ],
+      "writes": [
+        "s|fk|ontology.collection_version.collection_version_id_collection_id_fkey",
+        "n|fk|ontology.collection_version.collection_version_id_collection_id_fkey",
+        "e|fk|ontology.collection_version.collection_version_id_collection_id_fkey",
+        "n|con|ontology.collection_version.collection_version_id_collection_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.collection_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.collection",
+        "n|sch|ontology",
+        "n|col|ontology.collection_version.id",
+        "n|col|ontology.collection.id",
+        "e|uniqueness|ontology.collection.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "collection_version"
+      ],
+      "writes": [
+        "s|fk|ontology.collection_version.collection_version_node_version_fk",
+        "n|fk|ontology.collection_version.collection_version_node_version_fk",
+        "e|fk|ontology.collection_version.collection_version_node_version_fk",
+        "n|con|ontology.collection_version.collection_version_node_version_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.collection_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.node_version",
+        "n|sch|ontology",
+        "n|col|ontology.collection_version.id",
+        "n|col|ontology.collection_version.version",
+        "n|col|ontology.node_version.id",
+        "n|col|ontology.node_version.version",
+        "e|uniqueness|ontology.node_version.id.version"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "pamphlet"
+      ],
+      "writes": [
+        "s|fk|ontology.pamphlet.pamphlet_id_collection_id_fkey",
+        "n|fk|ontology.pamphlet.pamphlet_id_collection_id_fkey",
+        "e|fk|ontology.pamphlet.pamphlet_id_collection_id_fkey",
+        "n|con|ontology.pamphlet.pamphlet_id_collection_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.pamphlet",
+        "n|sch|ontology",
+        "n|tbl|ontology.collection",
+        "n|sch|ontology",
+        "n|col|ontology.pamphlet.id",
+        "n|col|ontology.collection.id",
+        "e|uniqueness|ontology.collection.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "pamphlet"
+      ],
+      "writes": [
+        "s|fk|ontology.pamphlet.pamphlet_id_type_fk",
+        "n|fk|ontology.pamphlet.pamphlet_id_type_fk",
+        "e|fk|ontology.pamphlet.pamphlet_id_type_fk",
+        "n|con|ontology.pamphlet.pamphlet_id_type_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.pamphlet",
+        "n|sch|ontology",
+        "n|tbl|ontology.collection",
+        "n|sch|ontology",
+        "n|col|ontology.pamphlet.id",
+        "n|col|ontology.pamphlet.type",
+        "n|col|ontology.collection.id",
+        "n|col|ontology.collection.type",
+        "e|uniqueness|ontology.collection.id.type"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "pamphlet_version"
+      ],
+      "writes": [
+        "s|fk|ontology.pamphlet_version.pamphlet_version_id_pamphlet_id_fkey",
+        "n|fk|ontology.pamphlet_version.pamphlet_version_id_pamphlet_id_fkey",
+        "e|fk|ontology.pamphlet_version.pamphlet_version_id_pamphlet_id_fkey",
+        "n|con|ontology.pamphlet_version.pamphlet_version_id_pamphlet_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.pamphlet_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.pamphlet",
+        "n|sch|ontology",
+        "n|col|ontology.pamphlet_version.id",
+        "n|col|ontology.pamphlet.id",
+        "e|uniqueness|ontology.pamphlet.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "pamphlet_version"
+      ],
+      "writes": [
+        "s|fk|ontology.pamphlet_version.pamphlet_version_collection_version_fk",
+        "n|fk|ontology.pamphlet_version.pamphlet_version_collection_version_fk",
+        "e|fk|ontology.pamphlet_version.pamphlet_version_collection_version_fk",
+        "n|con|ontology.pamphlet_version.pamphlet_version_collection_version_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.pamphlet_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.collection_version",
+        "n|sch|ontology",
+        "n|col|ontology.pamphlet_version.id",
+        "n|col|ontology.pamphlet_version.version",
+        "n|col|ontology.collection_version.id",
+        "n|col|ontology.collection_version.version",
+        "e|uniqueness|ontology.collection_version.id.version"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "series"
+      ],
+      "writes": [
+        "s|fk|ontology.series.series_id_collection_id_fkey",
+        "n|fk|ontology.series.series_id_collection_id_fkey",
+        "e|fk|ontology.series.series_id_collection_id_fkey",
+        "n|con|ontology.series.series_id_collection_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.series",
+        "n|sch|ontology",
+        "n|tbl|ontology.collection",
+        "n|sch|ontology",
+        "n|col|ontology.series.id",
+        "n|col|ontology.collection.id",
+        "e|uniqueness|ontology.collection.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "series"
+      ],
+      "writes": [
+        "s|fk|ontology.series.series_id_type_fk",
+        "n|fk|ontology.series.series_id_type_fk",
+        "e|fk|ontology.series.series_id_type_fk",
+        "n|con|ontology.series.series_id_type_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.series",
+        "n|sch|ontology",
+        "n|tbl|ontology.collection",
+        "n|sch|ontology",
+        "n|col|ontology.series.id",
+        "n|col|ontology.series.type",
+        "n|col|ontology.collection.id",
+        "n|col|ontology.collection.type",
+        "e|uniqueness|ontology.collection.id.type"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "series_version"
+      ],
+      "writes": [
+        "s|fk|ontology.series_version.series_version_id_series_id_fkey",
+        "n|fk|ontology.series_version.series_version_id_series_id_fkey",
+        "e|fk|ontology.series_version.series_version_id_series_id_fkey",
+        "n|con|ontology.series_version.series_version_id_series_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.series_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.series",
+        "n|sch|ontology",
+        "n|col|ontology.series_version.id",
+        "n|col|ontology.series.id",
+        "e|uniqueness|ontology.series.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "series_version"
+      ],
+      "writes": [
+        "s|fk|ontology.series_version.series_version_collection_version_fk",
+        "n|fk|ontology.series_version.series_version_collection_version_fk",
+        "e|fk|ontology.series_version.series_version_collection_version_fk",
+        "n|con|ontology.series_version.series_version_collection_version_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.series_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.collection_version",
+        "n|sch|ontology",
+        "n|col|ontology.series_version.id",
+        "n|col|ontology.series_version.version",
+        "n|col|ontology.collection_version.id",
+        "n|col|ontology.collection_version.version",
+        "e|uniqueness|ontology.collection_version.id.version"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "supplement"
+      ],
+      "writes": [
+        "s|fk|ontology.supplement.supplement_id_series_id_fkey",
+        "n|fk|ontology.supplement.supplement_id_series_id_fkey",
+        "e|fk|ontology.supplement.supplement_id_series_id_fkey",
+        "n|con|ontology.supplement.supplement_id_series_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.supplement",
+        "n|sch|ontology",
+        "n|tbl|ontology.series",
+        "n|sch|ontology",
+        "n|col|ontology.supplement.id",
+        "n|col|ontology.series.id",
+        "e|uniqueness|ontology.series.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "supplement"
+      ],
+      "writes": [
+        "s|fk|ontology.supplement.supplement_id_type_fk",
+        "n|fk|ontology.supplement.supplement_id_type_fk",
+        "e|fk|ontology.supplement.supplement_id_type_fk",
+        "n|con|ontology.supplement.supplement_id_type_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.supplement",
+        "n|sch|ontology",
+        "n|tbl|ontology.series",
+        "n|sch|ontology",
+        "n|col|ontology.supplement.id",
+        "n|col|ontology.supplement.type",
+        "n|col|ontology.series.id",
+        "n|col|ontology.series.type",
+        "e|uniqueness|ontology.series.id.type"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "supplement_version"
+      ],
+      "writes": [
+        "s|fk|ontology.supplement_version.supplement_version_id_supplement_id_fkey",
+        "n|fk|ontology.supplement_version.supplement_version_id_supplement_id_fkey",
+        "e|fk|ontology.supplement_version.supplement_version_id_supplement_id_fkey",
+        "n|con|ontology.supplement_version.supplement_version_id_supplement_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.supplement_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.supplement",
+        "n|sch|ontology",
+        "n|col|ontology.supplement_version.id",
+        "n|col|ontology.supplement.id",
+        "e|uniqueness|ontology.supplement.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "supplement_version"
+      ],
+      "writes": [
+        "s|fk|ontology.supplement_version.supplement_version_series_version_fk",
+        "n|fk|ontology.supplement_version.supplement_version_series_version_fk",
+        "e|fk|ontology.supplement_version.supplement_version_series_version_fk",
+        "n|con|ontology.supplement_version.supplement_version_series_version_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.supplement_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.series_version",
+        "n|sch|ontology",
+        "n|col|ontology.supplement_version.id",
+        "n|col|ontology.supplement_version.version",
+        "n|col|ontology.series_version.id",
+        "n|col|ontology.series_version.version",
+        "e|uniqueness|ontology.series_version.id.version"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "volume"
+      ],
+      "writes": [
+        "s|fk|ontology.volume.volume_id_series_id_fkey",
+        "n|fk|ontology.volume.volume_id_series_id_fkey",
+        "e|fk|ontology.volume.volume_id_series_id_fkey",
+        "n|con|ontology.volume.volume_id_series_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.volume",
+        "n|sch|ontology",
+        "n|tbl|ontology.series",
+        "n|sch|ontology",
+        "n|col|ontology.volume.id",
+        "n|col|ontology.series.id",
+        "e|uniqueness|ontology.series.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "volume"
+      ],
+      "writes": [
+        "s|fk|ontology.volume.volume_id_type_fk",
+        "n|fk|ontology.volume.volume_id_type_fk",
+        "e|fk|ontology.volume.volume_id_type_fk",
+        "n|con|ontology.volume.volume_id_type_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.volume",
+        "n|sch|ontology",
+        "n|tbl|ontology.series",
+        "n|sch|ontology",
+        "n|col|ontology.volume.id",
+        "n|col|ontology.volume.type",
+        "n|col|ontology.series.id",
+        "n|col|ontology.series.type",
+        "e|uniqueness|ontology.series.id.type"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "volume_version"
+      ],
+      "writes": [
+        "s|fk|ontology.volume_version.volume_version_id_volume_id_fkey",
+        "n|fk|ontology.volume_version.volume_version_id_volume_id_fkey",
+        "e|fk|ontology.volume_version.volume_version_id_volume_id_fkey",
+        "n|con|ontology.volume_version.volume_version_id_volume_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.volume_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.volume",
+        "n|sch|ontology",
+        "n|col|ontology.volume_version.id",
+        "n|col|ontology.volume.id",
+        "e|uniqueness|ontology.volume.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "volume_version"
+      ],
+      "writes": [
+        "s|fk|ontology.volume_version.volume_version_series_version_fk",
+        "n|fk|ontology.volume_version.volume_version_series_version_fk",
+        "e|fk|ontology.volume_version.volume_version_series_version_fk",
+        "n|con|ontology.volume_version.volume_version_series_version_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.volume_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.series_version",
+        "n|sch|ontology",
+        "n|col|ontology.volume_version.id",
+        "n|col|ontology.volume_version.version",
+        "n|col|ontology.series_version.id",
+        "n|col|ontology.series_version.version",
+        "e|uniqueness|ontology.series_version.id.version"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "collection_view"
+      ],
+      "writes": [
+        "s|view|ontology.collection_view",
+        "n|view|ontology.collection_view",
+        "e|view|ontology.collection_view",
+        "n|rel|ontology.collection_view",
+        "n|type|ontology.collection_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "pamphlet_view"
+      ],
+      "writes": [
+        "s|view|ontology.pamphlet_view",
+        "n|view|ontology.pamphlet_view",
+        "e|view|ontology.pamphlet_view",
+        "n|rel|ontology.pamphlet_view",
+        "n|type|ontology.pamphlet_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "series_view"
+      ],
+      "writes": [
+        "s|view|ontology.series_view",
+        "n|view|ontology.series_view",
+        "e|view|ontology.series_view",
+        "n|rel|ontology.series_view",
+        "n|type|ontology.series_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "supplement_view"
+      ],
+      "writes": [
+        "s|view|ontology.supplement_view",
+        "n|view|ontology.supplement_view",
+        "e|view|ontology.supplement_view",
+        "n|rel|ontology.supplement_view",
+        "n|type|ontology.supplement_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "volume_view"
+      ],
+      "writes": [
+        "s|view|ontology.volume_view",
+        "n|view|ontology.volume_view",
+        "e|view|ontology.volume_view",
+        "n|rel|ontology.volume_view",
+        "n|type|ontology.volume_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "collection",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "collection_version",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "pamphlet",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "pamphlet_version",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "series",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "series_version",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "supplement",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "supplement_version",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "volume",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "volume_version",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "collection",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "collection",
+        "name": "type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "collection_version",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "collection_version",
+        "name": "version",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "collection_version",
+        "name": "name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "pamphlet",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "pamphlet",
+        "name": "type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "pamphlet_version",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "pamphlet_version",
+        "name": "version",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "pamphlet_version",
+        "name": "label",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "series",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "series",
+        "name": "type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "series",
+        "name": "code",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "series_version",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "series_version",
+        "name": "version",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "series_version",
+        "name": "cadence",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "supplement",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "supplement",
+        "name": "type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "supplement_version",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "supplement_version",
+        "name": "version",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "supplement_version",
+        "name": "label",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "volume",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "volume",
+        "name": "type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "volume_version",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "volume_version",
+        "name": "version",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "volume_version",
+        "name": "label",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "collection",
+        "name": "collection_id_node_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "node",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "collection",
+        "name": "collection_id_type_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "node",
+        "columnsTo": [
+          "id",
+          "type"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "collection_version",
+        "name": "collection_version_id_collection_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "collection",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "collection_version",
+        "name": "collection_version_node_version_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "version"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "node_version",
+        "columnsTo": [
+          "id",
+          "version"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "pamphlet",
+        "name": "pamphlet_id_collection_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "collection",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "pamphlet",
+        "name": "pamphlet_id_type_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "collection",
+        "columnsTo": [
+          "id",
+          "type"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "pamphlet_version",
+        "name": "pamphlet_version_id_pamphlet_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "pamphlet",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "pamphlet_version",
+        "name": "pamphlet_version_collection_version_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "version"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "collection_version",
+        "columnsTo": [
+          "id",
+          "version"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "series",
+        "name": "series_id_collection_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "collection",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "series",
+        "name": "series_id_type_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "collection",
+        "columnsTo": [
+          "id",
+          "type"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "series_version",
+        "name": "series_version_id_series_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "series",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "series_version",
+        "name": "series_version_collection_version_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "version"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "collection_version",
+        "columnsTo": [
+          "id",
+          "version"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "supplement",
+        "name": "supplement_id_series_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "series",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "supplement",
+        "name": "supplement_id_type_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "series",
+        "columnsTo": [
+          "id",
+          "type"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "supplement_version",
+        "name": "supplement_version_id_supplement_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "supplement",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "supplement_version",
+        "name": "supplement_version_series_version_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "version"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "series_version",
+        "columnsTo": [
+          "id",
+          "version"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "volume",
+        "name": "volume_id_series_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "series",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "volume",
+        "name": "volume_id_type_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "series",
+        "columnsTo": [
+          "id",
+          "type"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "volume_version",
+        "name": "volume_version_id_volume_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "volume",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "volume_version",
+        "name": "volume_version_series_version_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "version"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "series_version",
+        "columnsTo": [
+          "id",
+          "version"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "collection_version",
+        "name": "collection_version_pkey",
+        "columns": [
+          "id",
+          "version"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "pamphlet_version",
+        "name": "pamphlet_version_pkey",
+        "columns": [
+          "id",
+          "version"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "series_version",
+        "name": "series_version_pkey",
+        "columns": [
+          "id",
+          "version"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "supplement_version",
+        "name": "supplement_version_pkey",
+        "columns": [
+          "id",
+          "version"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "volume_version",
+        "name": "volume_version_pkey",
+        "columns": [
+          "id",
+          "version"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "collection",
+        "name": "collection_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "pamphlet",
+        "name": "pamphlet_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "series",
+        "name": "series_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "supplement",
+        "name": "supplement_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "volume",
+        "name": "volume_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "collection",
+        "name": "collection_id_type_unique",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "pamphlet",
+        "name": "pamphlet_id_type_unique",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "series",
+        "name": "series_id_type_unique",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "supplement",
+        "name": "supplement_id_type_unique",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "volume",
+        "name": "volume_id_type_unique",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "collection",
+        "name": "collection_type_valid",
+        "value": "\"type\" IN ('volume', 'supplement', 'pamphlet')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "pamphlet",
+        "name": "pamphlet_type_valid",
+        "value": "\"type\" IN ('pamphlet')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "series",
+        "name": "series_type_valid",
+        "value": "\"type\" IN ('volume', 'supplement')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "supplement",
+        "name": "supplement_type_valid",
+        "value": "\"type\" IN ('supplement')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "volume",
+        "name": "volume_type_valid",
+        "value": "\"type\" IN ('volume')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "collection_view",
+        "definition": "((select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"node\".\"type\", \"ontology\".\"collection_version\".\"name\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\", \"ontology\".\"volume_version\".\"label\" from \"ontology\".\"volume_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"volume_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"volume_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"volume_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"collection_version\" on ((\"ontology\".\"volume_version\".\"id\" = \"ontology\".\"collection_version\".\"id\") and (\"ontology\".\"volume_version\".\"version\" = \"ontology\".\"collection_version\".\"version\")) inner join \"ontology\".\"series_version\" on ((\"ontology\".\"volume_version\".\"id\" = \"ontology\".\"series_version\".\"id\") and (\"ontology\".\"volume_version\".\"version\" = \"ontology\".\"series_version\".\"version\")) inner join \"ontology\".\"series\" on \"ontology\".\"volume_version\".\"id\" = \"ontology\".\"series\".\"id\" inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"volume_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"volume_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"volume_version\".\"version\")))) union all (select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"node\".\"type\", \"ontology\".\"collection_version\".\"name\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\", \"ontology\".\"supplement_version\".\"label\" from \"ontology\".\"supplement_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"supplement_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"supplement_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"supplement_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"collection_version\" on ((\"ontology\".\"supplement_version\".\"id\" = \"ontology\".\"collection_version\".\"id\") and (\"ontology\".\"supplement_version\".\"version\" = \"ontology\".\"collection_version\".\"version\")) inner join \"ontology\".\"series_version\" on ((\"ontology\".\"supplement_version\".\"id\" = \"ontology\".\"series_version\".\"id\") and (\"ontology\".\"supplement_version\".\"version\" = \"ontology\".\"series_version\".\"version\")) inner join \"ontology\".\"series\" on \"ontology\".\"supplement_version\".\"id\" = \"ontology\".\"series\".\"id\" inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"supplement_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"supplement_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"supplement_version\".\"version\"))))) union all (select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"node\".\"type\", \"ontology\".\"collection_version\".\"name\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\", \"ontology\".\"pamphlet_version\".\"label\" from \"ontology\".\"pamphlet_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"pamphlet_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"pamphlet_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"pamphlet_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"collection_version\" on ((\"ontology\".\"pamphlet_version\".\"id\" = \"ontology\".\"collection_version\".\"id\") and (\"ontology\".\"pamphlet_version\".\"version\" = \"ontology\".\"collection_version\".\"version\")) inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"pamphlet_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"pamphlet_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"pamphlet_version\".\"version\"))))",
+        "with": null,
+        "withNoData": null,
+        "using": null,
+        "tablespace": null,
+        "materialized": false,
+        "entityType": "views"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "pamphlet_view",
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"collection_version\".\"name\", \"ontology\".\"pamphlet_version\".\"label\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from \"ontology\".\"pamphlet_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"pamphlet_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"pamphlet_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"pamphlet_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"collection_version\" on ((\"ontology\".\"pamphlet_version\".\"id\" = \"ontology\".\"collection_version\".\"id\") and (\"ontology\".\"pamphlet_version\".\"version\" = \"ontology\".\"collection_version\".\"version\")) inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"pamphlet_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"pamphlet_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"pamphlet_version\".\"version\")))",
+        "with": null,
+        "withNoData": null,
+        "using": null,
+        "tablespace": null,
+        "materialized": false,
+        "entityType": "views"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "series_view",
+        "definition": "(select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"node\".\"type\", \"ontology\".\"collection_version\".\"name\", \"ontology\".\"series\".\"code\", \"ontology\".\"series_version\".\"cadence\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from \"ontology\".\"volume_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"volume_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"volume_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"volume_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"collection_version\" on ((\"ontology\".\"volume_version\".\"id\" = \"ontology\".\"collection_version\".\"id\") and (\"ontology\".\"volume_version\".\"version\" = \"ontology\".\"collection_version\".\"version\")) inner join \"ontology\".\"series_version\" on ((\"ontology\".\"volume_version\".\"id\" = \"ontology\".\"series_version\".\"id\") and (\"ontology\".\"volume_version\".\"version\" = \"ontology\".\"series_version\".\"version\")) inner join \"ontology\".\"series\" on \"ontology\".\"volume_version\".\"id\" = \"ontology\".\"series\".\"id\" inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"volume_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"volume_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"volume_version\".\"version\")))) union all (select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"node\".\"type\", \"ontology\".\"collection_version\".\"name\", \"ontology\".\"series\".\"code\", \"ontology\".\"series_version\".\"cadence\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from \"ontology\".\"supplement_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"supplement_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"supplement_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"supplement_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"collection_version\" on ((\"ontology\".\"supplement_version\".\"id\" = \"ontology\".\"collection_version\".\"id\") and (\"ontology\".\"supplement_version\".\"version\" = \"ontology\".\"collection_version\".\"version\")) inner join \"ontology\".\"series_version\" on ((\"ontology\".\"supplement_version\".\"id\" = \"ontology\".\"series_version\".\"id\") and (\"ontology\".\"supplement_version\".\"version\" = \"ontology\".\"series_version\".\"version\")) inner join \"ontology\".\"series\" on \"ontology\".\"supplement_version\".\"id\" = \"ontology\".\"series\".\"id\" inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"supplement_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"supplement_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"supplement_version\".\"version\"))))",
+        "with": null,
+        "withNoData": null,
+        "using": null,
+        "tablespace": null,
+        "materialized": false,
+        "entityType": "views"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "supplement_view",
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"collection_version\".\"name\", \"ontology\".\"series\".\"code\", \"ontology\".\"series_version\".\"cadence\", \"ontology\".\"supplement_version\".\"label\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from \"ontology\".\"supplement_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"supplement_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"supplement_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"supplement_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"collection_version\" on ((\"ontology\".\"supplement_version\".\"id\" = \"ontology\".\"collection_version\".\"id\") and (\"ontology\".\"supplement_version\".\"version\" = \"ontology\".\"collection_version\".\"version\")) inner join \"ontology\".\"series_version\" on ((\"ontology\".\"supplement_version\".\"id\" = \"ontology\".\"series_version\".\"id\") and (\"ontology\".\"supplement_version\".\"version\" = \"ontology\".\"series_version\".\"version\")) inner join \"ontology\".\"series\" on \"ontology\".\"supplement_version\".\"id\" = \"ontology\".\"series\".\"id\" inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"supplement_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"supplement_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"supplement_version\".\"version\")))",
+        "with": null,
+        "withNoData": null,
+        "using": null,
+        "tablespace": null,
+        "materialized": false,
+        "entityType": "views"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "volume_view",
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"collection_version\".\"name\", \"ontology\".\"series\".\"code\", \"ontology\".\"series_version\".\"cadence\", \"ontology\".\"volume_version\".\"label\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from \"ontology\".\"volume_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"volume_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"volume_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"volume_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"collection_version\" on ((\"ontology\".\"volume_version\".\"id\" = \"ontology\".\"collection_version\".\"id\") and (\"ontology\".\"volume_version\".\"version\" = \"ontology\".\"collection_version\".\"version\")) inner join \"ontology\".\"series_version\" on ((\"ontology\".\"volume_version\".\"id\" = \"ontology\".\"series_version\".\"id\") and (\"ontology\".\"volume_version\".\"version\" = \"ontology\".\"series_version\".\"version\")) inner join \"ontology\".\"series\" on \"ontology\".\"volume_version\".\"id\" = \"ontology\".\"series\".\"id\" inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"volume_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"volume_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"volume_version\".\"version\")))",
+        "with": null,
+        "withNoData": null,
+        "using": null,
+        "tablespace": null,
+        "materialized": false,
+        "entityType": "views"
+      }
+    }
+  ]
+}

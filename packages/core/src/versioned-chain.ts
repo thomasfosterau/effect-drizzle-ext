@@ -35,19 +35,28 @@
 
 import {
   and,
+  Column,
   desc,
   eq,
+  getColumnFromDecoder,
   getTableColumns,
   getTableName,
   gt,
+  is,
+  isNotNull,
   lte,
   notExists,
+  or,
+  SQL,
   sql,
+  StringChunk,
+  type DriverValueDecoder,
   type Subquery,
 } from "drizzle-orm";
-import type { ColumnBuilderBase, GetColumnData, SQL } from "drizzle-orm";
+import type { ColumnBuilderBase, GetColumnData } from "drizzle-orm";
 import {
   alias,
+  PgColumn,
   bigint,
   foreignKey,
   primaryKey,
@@ -1471,11 +1480,16 @@ export type TreeView<TSelection extends ViewColumns> = Omit<
 };
 
 /**
- * One branch view's options. `project` adds per-leaf columns to every arm of
- * the union (a search vector, a search text): it receives the leaf's name and
- * every column the leaf's chain joins (level, leaf, hook, stable and fact columns,
- * keyed by field), and must return the same keys, in the same order, for
- * every leaf.
+ * One branch view's options. `project` adds per-leaf columns (a search vector,
+ * a search text): it receives the leaf's name and every column the leaf's
+ * chain joins (level, leaf, hook, stable and fact columns, keyed by field),
+ * and must return the same keys, in the same order, for every leaf, each a
+ * column or an aliased expression (`sql\`…\`.as(name)`). Each key becomes
+ * one `CASE` on the row's `type` with an arm per leaf, named and decoded as
+ * the first leaf's value (a column every leaf returns as itself is selected
+ * bare). Leaves whose values name columns of different SQL types throw
+ * `DerivationError` at module load; computed values that name no column are
+ * left to PostgreSQL's `CASE` type resolution.
  */
 export interface TreeBranchViewConfig<P = ViewColumns> {
   readonly project?:
@@ -1671,15 +1685,117 @@ const noExtras: ArmExtras = { keyed: Option.none(), tail: {} };
 /** The projection of a view with no per-leaf columns. */
 const noProjection = (): RuntimeSelection => ({});
 
+/** A projected value's view column name: a column's own name, or an aliased expression's alias. */
+const projectedName = (
+  where: string,
+  key: string,
+  value: AnyPgColumn | SQL | SQL.Aliased,
+): string =>
+  is(value, Column)
+    ? value.name
+    : is(value, SQL.Aliased)
+      ? value.fieldAlias
+      : treeError(
+          `${where} returns an unaliased expression for "${key}"; alias it (sql\`…\`.as("${key}"))`,
+        );
+
+/** The SQL an aliased value stands for; a column or a bare expression is its own. */
+const expressionOf = (value: AnyPgColumn | SQL | SQL.Aliased): AnyPgColumn | SQL =>
+  is(value, SQL.Aliased) ? value.sql : value;
+
+/**
+ * The column a projected value reads, when one can be named: the value itself,
+ * the column an expression decodes with (`.mapWith(column)`), or the one
+ * column a `sql\`${column}\`` wrapper holds. A computed expression with
+ * neither (a literal, a function call) names none.
+ */
+const columnBehind = (value: AnyPgColumn | SQL | SQL.Aliased): Option.Option<Column> => {
+  if (is(value, Column)) return Option.some(value);
+  const decoded = Option.fromNullishOr(getColumnFromDecoder(value));
+  if (Option.isSome(decoded)) return decoded;
+  const chunks = Arr.filter(
+    value.getSQL().queryChunks,
+    (chunk) => !(is(chunk, StringChunk) && chunk.value === ""),
+  );
+  return chunks.length === 1 && is(chunks[0], Column) ? Option.some(chunks[0]) : Option.none();
+};
+
+/** A column's SQL type, array dimensions included (`text[]`). */
+const sqlTypeOf = (column: Column): string =>
+  `${column.getSQLType()}${is(column, PgColumn) ? "[]".repeat(column.dimensions) : ""}`;
+
+/** Whether `value` decodes a driver value: Drizzle's `DriverValueDecoder` shape. */
+const isDecoder = (value: unknown): value is DriverValueDecoder<unknown, unknown> =>
+  P.hasProperty(value, "mapFromDriverValue") && P.isFunction(value.mapFromDriverValue);
+
+/**
+ * How a projected value decodes: a column decodes as itself; an expression
+ * with the decoder its `.mapWith` set. Drizzle keeps that decoder on the SQL
+ * object without exposing it (its own `unqualifyColumns` copies it the same
+ * way), so it is read by property; absent, the value decodes as is.
+ */
+const decoderOf = (
+  value: AnyPgColumn | SQL | SQL.Aliased,
+): Option.Option<DriverValueDecoder<unknown, unknown>> => {
+  if (is(value, Column)) return Option.some(value);
+  const expression = value.getSQL();
+  return P.hasProperty(expression, "decoder") && isDecoder(expression.decoder)
+    ? Option.some(expression.decoder)
+    : Option.none();
+};
+
+/**
+ * One projected key of a branch view: `CASE <type> WHEN '<leaf>' THEN <that
+ * leaf's expression> … END`, decoded as the first leaf's value and named as
+ * it (its column's name, or its alias). Every leaf returning the same column
+ * selects it bare. Throws `DerivationError` at module load when two leaves'
+ * values name columns (see {@link columnBehind}) of different SQL types: a
+ * `CASE` would coerce one to the other, or fail at migration time, where the
+ * union it replaces kept each arm's own type. Values that name no column are
+ * not compared here; PostgreSQL's `CASE` type resolution rejects
+ * incompatible ones when the view is created.
+ */
+const caseOverLeaves = (
+  where: string,
+  key: string,
+  type: AnyPgColumn,
+  values: ReadonlyArray<readonly [string, AnyPgColumn | SQL | SQL.Aliased]>,
+): AnyPgColumn | SQL | SQL.Aliased => {
+  const [[firstLeaf, first], ...rest] = Arr.isReadonlyArrayNonEmpty(values)
+    ? values
+    : treeError(`${where} has no leaf to project "${key}" for`);
+  const firstType = Option.map(columnBehind(first), sqlTypeOf);
+  Arr.forEach(rest, ([leaf, value]) => {
+    const valueType = Option.map(columnBehind(value), sqlTypeOf);
+    if (
+      Option.isSome(firstType) &&
+      Option.isSome(valueType) &&
+      firstType.value !== valueType.value
+    ) {
+      treeError(
+        `${where} returns "${key}" as ${valueType.value} for "${leaf}" but as ${firstType.value} for "${firstLeaf}"; project the same SQL type for every leaf`,
+      );
+    }
+  });
+  if (is(first, Column) && Arr.every(rest, ([, value]) => value === first)) return first;
+  const arms = Arr.map(values, ([leaf, value]) => sql`when ${leaf} then ${expressionOf(value)}`);
+  const chosen = sql`case ${type} ${sql.join(arms, sql` `)} end`;
+  return Option.match(decoderOf(first), {
+    onNone: () => chosen,
+    onSome: (decoder) => chosen.mapWith(decoder),
+  }).as(projectedName(where, key, first));
+};
+
 /**
  * Derive every read view of a tree from its {@link makeTreeTables} output: per
  * leaf a fail-closed current-version view (`${leaf}_view`), per opted-in
- * marker a branch view (`${level}_view`, a `UNION ALL` over its subtree's
+ * marker a branch view (`${level}_view`, one row per node of its subtree's
  * leaves), and `asOf`, the leaf view at an older version or time.
  *
- * Every view drives from the leaf's own version table (each arm of a branch
- * view from its leaf's) and keeps only head rows with an anti-join on the
- * root version key: `NOT EXISTS` a root version of the same node newer than
+ * Every leaf view drives from the leaf's own version table, and every branch
+ * view from the branch level's (so an index on a branch-level column serves
+ * a paged `ORDER BY … LIMIT`, effect-drizzle-ext#200); each keeps only head
+ * rows with an anti-join on the root version key: `NOT EXISTS` a root version of the same node newer than
  * the row (bounded the same way for `asOf`). That probes the primary key per
  * row, where a grouped `MAX(version)` head would aggregate the whole root
  * version table before a filter or `LIMIT` could apply
@@ -1693,7 +1809,15 @@ const noProjection = (): RuntimeSelection => ({});
  * with `action = 'delete'`. Columns follow declaration order: `id`,
  * `version`, `action` (and a branch view's `type`), the identity extras, each
  * level's columns root-most first (its `stableColumns`, then its version and
- * fact columns), `timestamp`, `createdAt`.
+ * fact columns), `timestamp`, `createdAt` (then a branch view's `project`
+ * columns).
+ *
+ * A branch view is one SELECT, not a `UNION ALL` of per-leaf arms: past its
+ * spine it LEFT JOINs each marker below the branch and each subtree leaf (and
+ * their stable and fact tables) at the head, and keeps a row only when every
+ * level on the path to the leaf its `type` names joined, so it fails closed
+ * exactly where a leaf view would, and a node whose `type` names a leaf with
+ * no row at the head has no row.
  *
  * A keyed leaf also gets `${leaf}_${keyed}_view`: the leaf view LEFT JOINed
  * to its keyed table at the head, one row per key, and one row with a `NULL`
@@ -1709,7 +1833,9 @@ const noProjection = (): RuntimeSelection => ({});
  * Every view reads base tables only, never another view, so drizzle-kit's
  * view-on-view DROP ordering can't bite (website #1228). Throws
  * `DerivationError` at module load for a `branches` entry naming a leaf or no
- * level, a `project` whose keys differ between leaves, or a column key two of
+ * level, a `project` whose keys differ between leaves (or whose values for a
+ * key name columns of different SQL types, or are unaliased expressions), or
+ * a column key two of
  * a view's sources share (a level or `stableColumns` column named like a
  * `root.identityColumns` extra, another level's column or `createdAt`, or a
  * `project` key the view already selects), naming
@@ -1792,6 +1918,27 @@ export const makeTreeViews = <
     }),
   });
 
+  /** The levels of `levels` that have `stableColumns`, so a view joins their stable row. */
+  const stableLevels = (levels: ReadonlyArray<string>) =>
+    Arr.filter(levels, (level) => !R.isEmptyRecord(stableSelection(level)));
+
+  /** Level `name`'s path from its branch root down to itself. */
+  const pathOf = (name: string): ReadonlyArray<string> => [...levelOf(name).ancestors, name];
+
+  /** Each level's selection parts, root-most first: its `stableColumns`, then its version and fact columns. */
+  const levelSources = (levels: ReadonlyArray<string>): ReadonlyArray<SourcedSelection> =>
+    Arr.flatMap(levels, (name) => [
+      { source: `levels.${name}.stableColumns`, selection: stableSelection(name) },
+      { source: `level "${name}"`, selection: levelSelection(name) },
+    ]);
+
+  /** The columns every view opens with: the head's `id`, `version` and `action`. */
+  const leafLead = {
+    id: rootId,
+    version: rootVersionNumber,
+    action: columnOf(rootVersion, "action"),
+  };
+
   /**
    * `NOT EXISTS` a root version newer than `version` for node `id` (within
    * `bound`, for `asOf`): the anti-join that keeps only head rows. It probes
@@ -1821,43 +1968,48 @@ export const makeTreeViews = <
     );
   };
 
+  /** Every column `leaf`'s chain joins, keyed by field: what a branch's `project` receives. */
+  const pathColumns = (leaf: string): RuntimeSelection =>
+    R.fromEntries(
+      Arr.flatMap(pathOf(leaf), (name) => [
+        ...R.toEntries(stableSelection(name)),
+        ...R.toEntries(levelSelection(name)),
+      ]),
+    );
+
+  /** The view's closing columns: the head's `timestamp`, then the birth row's as `createdAt`. */
+  const timestampsOf = (versionZero: PgTable) => {
+    const zeroTimestamp = columnOf(getTableColumns(versionZero), "timestamp");
+    return {
+      timestamp: columnOf(rootVersion, "timestamp"),
+      createdAt: sql<Date>`${zeroTimestamp}`.mapWith(zeroTimestamp).as("created_at"),
+    };
+  };
+
+  /** The `version_zero` join condition: node `id`'s birth row. */
+  const atBirth = (versionZero: PgTable, id: AnyPgColumn): SQL | undefined =>
+    and(
+      eq(id, columnOf(getTableColumns(versionZero), "id")),
+      eq(columnOf(getTableColumns(versionZero), "version"), 0n),
+    );
+
   /**
-   * One arm. A head arm drives the FROM from the leaf's version table and
-   * keeps only rows at the node's head (no newer root version, within the
-   * as-of bound); a pointer arm drives it from the pointer's effective fact.
-   * The root version row, the identity row and every other level on `leaf`'s
-   * path join at the driver's `(id, version)`. `cut` is the deepest level
-   * whose columns are projected (the leaf, or a branch's marker); the levels
-   * below it still INNER JOIN, so the arm fails closed.
+   * One leaf's view query. A head arm drives the FROM from the leaf's version
+   * table and keeps only rows at the node's head (no newer root version,
+   * within the as-of bound); a pointer arm drives it from the pointer's
+   * effective fact. The root version row, the identity row and every other
+   * level on `leaf`'s path join at the driver's `(id, version)`, so the view
+   * fails closed.
    */
   const armOf = (
     qb: QueryBuilder,
     view: string,
     driver: ArmDriver,
     leaf: string,
-    cut: string,
-    lead: RuntimeSelection,
-    project: (columns: RuntimeSelection) => RuntimeSelection,
     extras: ArmExtras = noExtras,
   ) => {
-    const path = [...levelOf(leaf).ancestors, leaf];
-    const projected = Arr.take(
-      path,
-      Arr.findFirstIndex(path, (name) => name === cut).pipe(
-        Option.map((i) => i + 1),
-        Option.getOrElse(() => path.length),
-      ),
-    );
+    const path = pathOf(leaf);
     const versionZero = alias(tables.root.version, "version_zero");
-    const zeroTimestamp = columnOf(getTableColumns(versionZero), "timestamp");
-    const projection = project(
-      R.fromEntries(
-        Arr.flatMap(path, (name) => [
-          ...R.toEntries(stableSelection(name)),
-          ...R.toEntries(levelSelection(name)),
-        ]),
-      ),
-    );
     const plan = ArmDriver.$match(driver, {
       // A head arm drives from the leaf's own version table and keys every
       // join off its row; only the levels above the leaf join.
@@ -1916,7 +2068,7 @@ export const makeTreeViews = <
       // `action` stays third either way.
       {
         source: "the chain's head",
-        selection: Option.isSome(headRow) ? R.remove(lead, "action") : lead,
+        selection: Option.isSome(headRow) ? R.remove(leafLead, "action") : leafLead,
       },
       {
         source: "the head row",
@@ -1926,20 +2078,10 @@ export const makeTreeViews = <
         }),
       },
       { source: "root.identityColumns", selection: identityExtras },
-      ...Arr.flatMap(projected, (name) => [
-        { source: `levels.${name}.stableColumns`, selection: stableSelection(name) },
-        { source: `level "${name}"`, selection: levelSelection(name) },
-      ]),
+      ...levelSources(path),
       { source: "the keyed table", selection: keyedColumns },
-      {
-        source: "the chain's timestamps",
-        selection: {
-          timestamp: columnOf(rootVersion, "timestamp"),
-          createdAt: sql<Date>`${zeroTimestamp}`.mapWith(zeroTimestamp).as("created_at"),
-        },
-      },
+      { source: "the chain's timestamps", selection: timestampsOf(versionZero) },
       { source: "the pointer", selection: extras.tail },
-      { source: "project", selection: projection },
     ]);
     const atKey = plan.on;
     const joined = Arr.reduce(
@@ -1955,14 +2097,10 @@ export const makeTreeViews = <
     // A level with stable columns joins its stable row on `id` (one per node,
     // written at create). A level without any joins nothing here, so a tree
     // with no `stableColumns` emits exactly the SQL it did before them.
-    const withStable = Arr.reduce(
-      Arr.filter(path, (name) => !R.isEmptyRecord(stableSelection(name))),
-      joined,
-      (q, name) => {
-        const stable = tablesOf(name).stable;
-        return q.innerJoin(stable, eq(plan.id, columnOf(getTableColumns(stable), "id")));
-      },
-    );
+    const withStable = Arr.reduce(stableLevels(path), joined, (q, name) => {
+      const stable = tablesOf(name).stable;
+      return q.innerJoin(stable, eq(plan.id, columnOf(getTableColumns(stable), "id")));
+    });
     const withFacts = Arr.reduce(
       Arr.flatMap(path, (name) => R.values(factsOf(name))),
       withStable,
@@ -1976,13 +2114,7 @@ export const makeTreeViews = <
       onNone: () => withKeyed,
       onSome: (row) => withKeyed.innerJoin(row, eq(plan.id, columnOf(getTableColumns(row), "id"))),
     });
-    const query = withHead.innerJoin(
-      versionZero,
-      and(
-        eq(plan.id, columnOf(getTableColumns(versionZero), "id")),
-        eq(columnOf(getTableColumns(versionZero), "version"), 0n),
-      ),
-    );
+    const query = withHead.innerJoin(versionZero, atBirth(versionZero, plan.id));
     // The head filter. A head arm keeps the leaf row no newer root version
     // supersedes; an as-of arm bounds both the row and the newer one, so it
     // keeps the latest within the bound. A pointer arm keeps the head row its
@@ -1992,18 +2124,12 @@ export const makeTreeViews = <
       ...Arr.fromOption(Option.map(bound, (within) => within(tables.root.version))),
       noNewerVersion(qb, head.id, head.version, bound),
     );
-    return { keys: R.keys(projection), query: query.where(where) };
-  };
-
-  const leafLead = {
-    id: rootId,
-    version: rootVersionNumber,
-    action: columnOf(rootVersion, "action"),
+    return query.where(where);
   };
 
   const leafView = (leaf: string): PgView =>
     schema.view(`${leaf}_view`).as((qb) => {
-      return armOf(qb, `view "${leaf}_view"`, atHead, leaf, leaf, leafLead, noProjection).query;
+      return armOf(qb, `view "${leaf}_view"`, atHead, leaf);
     });
 
   const branchEntries: Readonly<Record<string, RuntimeBranchConfig | true>> = config.branches ?? {};
@@ -2022,33 +2148,125 @@ export const makeTreeViews = <
     },
   );
 
+  /**
+   * A branch view (effect-drizzle-ext#200): one SELECT, not a `UNION ALL` of
+   * per-leaf arms, so an index on a branch-level column can serve a paged
+   * `ORDER BY … LIMIT`. It drives from the branch level's own version table
+   * with the same anti-join head as a leaf view, INNER JOINs the root version
+   * row, the identity row, the birth row and every level from the branch root
+   * down to the branch at the driver's `(id, version)`, then LEFT JOINs each
+   * marker strictly between the branch and a subtree leaf (once each) and
+   * each subtree leaf, in declaration order. The fail-closed predicate keeps a
+   * row only when, for the leaf `type` names, every level below the branch on
+   * its path joined (the levels the arm form INNER JOINed): a head that
+   * advanced past one of them, or whose `type` names a leaf with no row at
+   * the head, yields no row.
+   */
   const branchView = (name: string, entry: RuntimeBranchConfig): PgView => {
-    const leaves = levelOf(name).subtreeLeaves;
-    const projectFor =
-      (leaf: string) =>
-      (columns: RuntimeSelection): RuntimeSelection =>
-        entry.project === undefined ? {} : entry.project(leaf, columns);
+    const branch = levelOf(name);
+    const leaves = branch.subtreeLeaves;
+    const view = `view "${name}_view"`;
+    const spine = pathOf(name);
+    /** The levels strictly below the branch on `leaf`'s path, the leaf included. */
+    const below = (leaf: string) => Arr.drop(pathOf(leaf), spine.length);
+    const lower = Arr.filter(
+      Arr.map(tree.levels, (level) => level.name),
+      (level) => Arr.some(leaves, (leaf) => Arr.contains(below(leaf), level)),
+    );
+    const markers = Arr.filter(lower, (level) => !Arr.contains(leaves, level));
+    const typeColumn = columnOf(identity, "type");
+    const projections = Arr.map(leaves, (leaf) =>
+      entry.project === undefined ? noProjection() : entry.project(leaf, pathColumns(leaf)),
+    );
+    const [firstKeys, ...restKeys] = Arr.map(projections, R.keys);
+    Arr.forEach(restKeys, (keys, i) => {
+      if (keys.join(",") !== firstKeys.join(",")) {
+        treeError(
+          `branch "${name}"'s project returns columns (${keys.join(", ")}) for "${leaves[i + 1]}" but (${firstKeys.join(", ")}) for "${leaves[0]}"`,
+        );
+      }
+    });
+    const projection: RuntimeSelection = R.fromEntries(
+      Arr.map(firstKeys, (key): readonly [string, AnyPgColumn | SQL | SQL.Aliased] => [
+        key,
+        caseOverLeaves(
+          `branch "${name}"'s project`,
+          key,
+          typeColumn,
+          Arr.zip(
+            leaves,
+            Arr.map(projections, (projected) =>
+              Option.getOrElse(R.get(projected, key), () =>
+                treeError(`branch "${name}"'s project returns no "${key}"`),
+              ),
+            ),
+          ),
+        ),
+      ]),
+    );
     return schema.view(`${name}_view`).as((qb) => {
-      const arms = Arr.map(leaves, (leaf) =>
-        armOf(
-          qb,
-          `view "${name}_view" (arm "${leaf}")`,
-          atHead,
-          leaf,
-          name,
-          { ...leafLead, type: columnOf(identity, "type") },
-          projectFor(leaf),
+      const versionZero = alias(tables.root.version, "version_zero");
+      const driver = tablesOf(name).version;
+      const id = columnOf(getTableColumns(driver), "id");
+      const version = columnOf(getTableColumns(driver), "version");
+      const atKey = (table: PgTable) => {
+        const target = getTableColumns(table);
+        return and(eq(id, columnOf(target, "id")), eq(version, columnOf(target, "version")));
+      };
+      const onId = (table: PgTable) => eq(id, columnOf(getTableColumns(table), "id"));
+      const selection = mergeSelections(view, [
+        { source: "the chain's head", selection: { ...leafLead, type: typeColumn } },
+        { source: "root.identityColumns", selection: identityExtras },
+        ...levelSources(spine),
+        { source: "the chain's timestamps", selection: timestampsOf(versionZero) },
+        { source: "project", selection: projection },
+      ]);
+      // INNER: the head row, the identity, the birth row and the spine.
+      const inner = Arr.reduce(
+        stableLevels(spine),
+        Arr.reduce(
+          branch.ancestors,
+          qb
+            .select(selection)
+            .from(driver)
+            .$dynamic()
+            .innerJoin(tables.root.version, atKey(tables.root.version))
+            .innerJoin(tables.root.identity, onId(tables.root.identity))
+            .innerJoin(versionZero, atBirth(versionZero, id)),
+          (q, level) => q.innerJoin(tablesOf(level).version, atKey(tablesOf(level).version)),
+        ),
+        (q, level) => q.innerJoin(tablesOf(level).stable, onId(tablesOf(level).stable)),
+      );
+      // LEFT: the spine's facts, then every level below the branch (markers,
+      // then leaves), their stable rows and their facts.
+      const withSpineFacts = Arr.reduce(
+        Arr.flatMap(spine, (level) => R.values(factsOf(level))),
+        inner,
+        (q, fact) => q.leftJoin(fact, atKey(fact)),
+      );
+      const withLower = Arr.reduce(
+        stableLevels([...markers, ...leaves]),
+        Arr.reduce([...markers, ...leaves], withSpineFacts, (q, level) =>
+          q.leftJoin(tablesOf(level).version, atKey(tablesOf(level).version)),
+        ),
+        (q, level) => q.leftJoin(tablesOf(level).stable, onId(tablesOf(level).stable)),
+      );
+      const query = Arr.reduce(
+        Arr.flatMap(lower, (level) => R.values(factsOf(level))),
+        withLower,
+        (q, fact) => q.leftJoin(fact, atKey(fact)),
+      );
+      const joinedId = (table: PgTable) => isNotNull(columnOf(getTableColumns(table), "id"));
+      const failClosed = or(
+        ...Arr.map(leaves, (leaf) =>
+          and(
+            eq(typeColumn, leaf),
+            ...Arr.map(below(leaf), (level) => joinedId(tablesOf(level).version)),
+            ...Arr.map(stableLevels(below(leaf)), (level) => joinedId(tablesOf(level).stable)),
+          ),
         ),
       );
-      const [first, ...rest] = arms;
-      Arr.forEach(rest, (arm, i) => {
-        if (arm.keys.join(",") !== first.keys.join(",")) {
-          treeError(
-            `branch "${name}"'s project returns columns (${arm.keys.join(", ")}) for "${leaves[i + 1]}" but (${first.keys.join(", ")}) for "${leaves[0]}"`,
-          );
-        }
-      });
-      return Arr.reduce(rest, first.query, (union, arm) => union.unionAll(arm.query));
+      return query.where(and(noNewerVersion(qb, id, version, Option.none()), failClosed));
     });
   };
 
@@ -2062,9 +2280,7 @@ export const makeTreeViews = <
         : lte(columnOf(columns, "timestamp"), point.at);
     };
     const driver = ArmDriver.Head({ bound: Option.some(within) });
-    return armOf(qb, `asOf("${leaf}")`, driver, leaf, leaf, leafLead, noProjection).query.as(
-      `${leaf}_as_of`,
-    );
+    return armOf(qb, `asOf("${leaf}")`, driver, leaf).as(`${leaf}_as_of`);
   };
 
   /** A keyed leaf's key name and table; none for a leaf with no keyed level. */
@@ -2082,19 +2298,10 @@ export const makeTreeViews = <
     keyed: { readonly name: string; readonly table: PgTable },
   ): PgView =>
     schema.view(`${leaf}_${keyed.name}_view`).as((qb) => {
-      return armOf(
-        qb,
-        `view "${leaf}_${keyed.name}_view"`,
-        atHead,
-        leaf,
-        leaf,
-        leafLead,
-        noProjection,
-        {
-          ...noExtras,
-          keyed: Option.some(keyed.table),
-        },
-      ).query;
+      return armOf(qb, `view "${leaf}_${keyed.name}_view"`, atHead, leaf, {
+        ...noExtras,
+        keyed: Option.some(keyed.table),
+      });
     });
 
   /**
@@ -2131,14 +2338,14 @@ export const makeTreeViews = <
     return schema.view(view).as((qb) => {
       const point = pointerOf(qb, pointer);
       const driver = ArmDriver.Pointer({ fact: point });
-      return armOf(qb, `view "${view}"`, driver, leaf, leaf, leafLead, noProjection, {
+      return armOf(qb, `view "${view}"`, driver, leaf, {
         keyed: Option.map(keyed, ({ table }) => table),
         tail: {
           [`${pointer}At`]: sql<Date>`${point.at}`
             .mapWith(columnOf(getTableColumns(tables.root.version), "timestamp"))
             .as(`${pointer}_at`),
         },
-      }).query;
+      });
     });
   };
 

@@ -33,7 +33,7 @@ The chain writes stable columns once, at `create`; no later write touches them. 
 `makeTreeViews(tree, tables, { schema, branches?, pointers? })` derives the read views:
 
 - **Per leaf, a fail-closed current-version view** (`${leaf}_view`). It drives from the leaf's version table, keeps the head row (see [Head resolution](#head-resolution)) and INNER JOINs every other level's version table at it, so ancestor level columns appear with no per-anchor factory. Each level's stable columns come before its version columns. A node whose head advanced past any level yields **no row**.
-- **Per marker named in `branches`, a `UNION ALL` branch view.** An optional per-leaf `project` builds a search union.
+- **Per marker named in `branches`, a branch view** (`${level}_view`): one row per node of the marker's subtree leaves, with the marker's path and the leaf `type` (see [Branch views](#branch-views)). An optional per-leaf `project` adds columns such as a search text.
 - **Per keyed leaf, a keyed view** (one row per key, and one `NULL`-key row for a head with none).
 - **Per pointer and leaf named in `pointers`, the leaf view at the pointer's effective fact.** It projects the head's `action` and `${pointer}At`, and composes with the keyed view.
 - **`asOf(leaf, { version } | { at })`:** the leaf view at an older point, as a subquery.
@@ -56,11 +56,31 @@ WHERE NOT EXISTS (
 
 The anti-join probes the primary key once per candidate row, so a paged list (`ORDER BY title, id LIMIT 20` with an index on the leaf's ordering column) reads a page's worth of rows. Before 0.4 every view drove from a grouped `SELECT id, max(version) … GROUP BY id` head instead. PostgreSQL cannot push a filter or a `LIMIT` into a grouped subquery, so every read not filtered by `id` aggregated the whole root version table first. On the fixture chain with 150,000 root version rows, `book_view ORDER BY title, id LIMIT 20` went from 531 ms (551,771 buffers) to 2.7 ms (628 buffers).
 
-The set of rows is the same as the `max` head's: a row exists when every joined level has a row at the node's maximum root version. A head that moved to another leaf, or advanced past a level, has a newer root version, so the old leaf's view yields no row. A tombstone is the head, so it shows with `action = 'delete'`. Each arm of a branch view drives from its own leaf with its own anti-join. `asOf` bounds both sides, the joined root row and the `newer` one (`version <= v`, or `timestamp <= at`), so it resolves the latest version within the bound. A pointer view still drives from the effective pointer fact; the head row it reads `action` from is found by the same anti-join.
-
-A branch view's paged list still sorts the union: PostgreSQL plans each `UNION ALL` arm with joins as its own subquery, so no index order reaches the top. Each arm now runs without the aggregate.
+The set of rows is the same as the `max` head's: a row exists when every joined level has a row at the node's maximum root version. A head that moved to another leaf, or advanced past a level, has a newer root version, so the old leaf's view yields no row. A tombstone is the head, so it shows with `action = 'delete'`. A branch view drives from the branch level's own version table with the same anti-join (see [Branch views](#branch-views)). `asOf` bounds both sides, the joined root row and the `newer` one (`version <= v`, or `timestamp <= at`), so it resolves the latest version within the bound. A pointer view still drives from the effective pointer fact; the head row it reads `action` from is found by the same anti-join.
 
 **Upgrading.** Every derived view's SQL changed, `makeCurrentVersionView`'s included. A consumer's next `drizzle-kit generate` emits a `DROP VIEW` and a `CREATE VIEW` for each derived view, with no table or data change. Regenerate and apply that migration. drizzle-kit does not order view drops by dependency, so an application view that selects from a derived view must be dropped before that migration and recreated after it: hand-edit the generated migration, or better, remove the edge. `checkViewDependencies` in [`@thomasfosterau/effect-drizzle-ext-pg/tooling`](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tooling.md) fails on any such edge before a migration is generated.
+
+#### Branch views
+
+A branch view is one SELECT driven from the branch level's own version table (effect-drizzle-ext#200), not a `UNION ALL` of one arm per subtree leaf:
+
+```sql
+FROM <branch>_version
+JOIN <root>_version, <root> (identity), version_zero, every level above the branch  -- INNER, at (id, version)
+LEFT JOIN <marker>_version  -- each marker between the branch and a leaf, once
+LEFT JOIN <leaf>_version    -- each subtree leaf, in declaration order
+WHERE NOT EXISTS (a newer <root>_version of the node)
+  AND (   (<root>.type = '<leaf 1>' AND <its markers>.id IS NOT NULL AND <leaf 1>_version.id IS NOT NULL)
+       OR (<root>.type = '<leaf 2>' AND ...))
+```
+
+The predicate keeps the view fail-closed: a row needs every level on the path to the leaf its `type` names, at the head, so a head that skipped the leaf or a marker below the branch yields no row, as a leaf view's would. A node whose `type` names a leaf with no row at the head, while another leaf's row is there (old leaf rows kept past a move), yields no row either; the `UNION ALL` form showed that other leaf's row under the stale `type`. Stable and fact tables below the branch LEFT JOIN too, and a level with `stableColumns` adds its stable row to the predicate. Columns, their order and the row type are unchanged. A `project` key becomes `CASE <root>.type WHEN '<leaf>' THEN <that leaf's value> … END`, named and decoded as the first leaf's value (a column every leaf returns as itself is selected bare). Leaves whose values name columns of different SQL types are a thrown `DerivationError`; a computed value that names no column is left to PostgreSQL's `CASE` type resolution.
+
+**Indexing.** Index the branch-level column a branch view is sorted by, through `levels.<branch>.extraConstraints` (`index("work_version_title_idx").on(table.title, table.id)`). Then `work_view ORDER BY title, id LIMIT 20` walks that index and stops after a page: the union sorted every branch row, since PostgreSQL plans each `UNION ALL` arm with joins as its own subquery. Sorting a branch view by a leaf-only (or `project`ed) column can't be served by an index: the value comes through a LEFT JOIN or a `CASE`, so it sorts.
+
+On the fixture chain (PostgreSQL 16, 100,000 works at two versions, half books and half essays, a `work_version (title, id)` index, `EXPLAIN (ANALYZE, BUFFERS)`, second run), `work_view ORDER BY title, id LIMIT 20` went from 391 ms (a Sort over every row) to about 2.3 ms (the index, roughly 500 buffers). On a synthetic branch of 20 leaves the page went from 2,385 ms to 4.9 ms. Past `join_collapse_limit` the planner keeps the written join order, which is already the good one.
+
+**Upgrading.** Only branch views' SQL changed: a consumer's next `drizzle-kit generate` emits a `DROP VIEW` and a `CREATE VIEW` for each branch view, with no table or data change, and leaves every other view alone. The [head-resolution upgrade note](#head-resolution) on dependent application views applies the same way.
 
 ### Per-leaf builders
 
