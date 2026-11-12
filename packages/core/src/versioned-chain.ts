@@ -18,8 +18,9 @@
  *   semantics, configures its own.
  *
  * - {@link makeCurrentVersionView} — the uniform fail-closed current-version
- *   view. Resolves each node's current version from a **root version table**,
- *   then INNER JOINs the leaf (and any intermediate version tables) at exactly
+ *   view. Resolves each node's current version from a **root version table**
+ *   (the row no newer version supersedes), then INNER JOINs the leaf (and
+ *   any intermediate version tables) at exactly
  *   that `(id, version)`; a node whose root version advanced past its leaf (a
  *   partial-chain tombstone) yields **no row** — the view fails closed rather
  *   than surfacing a stale older leaf row. The root version table and the
@@ -38,8 +39,9 @@ import {
   eq,
   getTableColumns,
   getTableName,
+  gt,
   lte,
-  max,
+  notExists,
   sql,
   type Subquery,
 } from "drizzle-orm";
@@ -75,6 +77,7 @@ import {
 } from "drizzle-orm/pg-core";
 import * as LiteralExact from "@thomasfosterau/effect-ext/LiteralExact";
 import * as Arr from "effect/Array";
+import * as Data from "effect/Data";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as P from "effect/Predicate";
@@ -487,10 +490,11 @@ export interface CurrentVersionViewDeps<
   TMerge extends ViewColumns,
 > {
   /**
-   * The root version table currency resolves from — a `MAX(version)` sub-select
-   * groups it by `id`, and the leaf / intermediate version tables INNER JOIN at
-   * that current `(id, version)`. Also joined for the current row's own columns
-   * (e.g. an `action` soft-delete gate and a `timestamp`).
+   * The root version table currency resolves from — its row with no newer
+   * version of the same node (`NOT EXISTS`) drives the FROM, and the leaf /
+   * intermediate version tables INNER JOIN at that current `(id, version)`.
+   * It also supplies the current row's own columns (e.g. an `action`
+   * soft-delete gate and a `timestamp`).
    */
   rootVersion: TRoot;
   /** The always-joined identity row (joined on `id`). */
@@ -536,14 +540,17 @@ const isMergeFunction = <TRoot, TMerge>(
  * `columns` + the injected `merge` via {@link CurrentVersionViewResult}. The
  * runtime query is assembled untyped (the chain alternates join shapes), which
  * is why the return type is asserted rather than inferred: letting `.as()` infer
- * the selection through `.from(current)` collapses every column to `never`.
+ * the selection through the untyped join chain collapses every column to `never`.
  *
- * Currency is resolved from `rootVersion` (fail-closed): a `MAX(version)`
- * sub-select drives the FROM, and the leaf / intermediate version tables INNER
- * JOIN at that current `(id, version)`. One row per node (the sub-select groups
- * by id) landing on unique `(id, version)` PKs, so no `DISTINCT ON` / `ORDER BY`
- * is needed. A leaf missing at the current version drops out of the INNER JOIN —
- * the view yields no row.
+ * Currency is resolved from `rootVersion` (fail-closed): its rows drive the
+ * FROM, kept only where `NOT EXISTS` a newer version of the same node (an
+ * anti-join on the root's `(id, version)` key, so a read filtered or paged by
+ * a leaf column never aggregates the whole root table first;
+ * effect-drizzle-ext#199), and the leaf / intermediate version tables INNER
+ * JOIN at that current `(id, version)`. One row per node landing on unique
+ * `(id, version)` PKs, so no `DISTINCT ON` / `ORDER BY` is needed. A leaf
+ * missing at the current version drops out of the INNER JOIN — the view yields
+ * no row.
  */
 export const makeCurrentVersionView =
   <TRoot extends PgTable & VersionTable, TMerge extends ViewColumns>({
@@ -557,17 +564,28 @@ export const makeCurrentVersionView =
     { leaf, through = [], optional = [], on = [], columns }: CurrentVersionViewConfig<TColumns>,
   ): CurrentVersionViewResult<TColumns, TMerge> => {
     // `.from()` infers its selection from the table's generic; pinned to the
-    // `PgTable` base it is, the sub-select keeps its explicit selection.
+    // `PgTable` base it is, the select keeps its explicit selection.
     const rootTable: PgTable = rootVersion;
     const view = schema.view(name).as((qb) => {
-      // Current version per node, resolved from the root version table — the
-      // single home of currency. This sub-select drives the FROM so the leaf
-      // join below fails closed on a partial chain.
-      const current = qb
-        .select({ id: rootVersion.id, version: max(rootVersion.version).as("current_version") })
-        .from(rootTable)
-        .groupBy(rootVersion.id)
-        .as("current_version");
+      // The node's current root version row drives the FROM: a root version
+      // no newer version of the same node supersedes (an anti-join on the
+      // root's `(id, version)` key, not a grouped `max(version)`, which would
+      // aggregate the whole table before any filter applies;
+      // effect-drizzle-ext#199). The leaf join below fails closed on a partial
+      // chain.
+      const newer = alias(rootTable, "newer");
+      const newerColumns = getTableColumns(newer);
+      const current = notExists(
+        qb
+          .select({ one: sql`1` })
+          .from(newer)
+          .where(
+            and(
+              eq(rootColumnOf(newerColumns, "id"), rootVersion.id),
+              gt(rootColumnOf(newerColumns, "version"), rootVersion.version),
+            ),
+          ),
+      );
       // A function `merge` additionally resolves the node's birth row (`version
       // = 0`) via an aliased join, so it can merge in a true `createdAt`. A
       // plain-object `merge` skips this entirely — no extra join, no change to
@@ -584,28 +602,23 @@ export const makeCurrentVersionView =
       // `columns` + `merge`. The injected `merge` columns ride along on every
       // view — merged into the fixed selection here, resolved via the identity
       // (and, if present, version-zero) join below.
-      const select = qb.select({ ...columns, ...mergeColumns }).from(current);
+      const select = qb.select({ ...columns, ...mergeColumns }).from(rootTable);
       // reason: dynamic join chain.
       let q: any = select;
-      q = q.innerJoin(leaf, and(eq(current.id, leaf.id), eq(current.version, leaf.version)));
-      q = Arr.reduce(through, q, (acc, t) =>
-        acc.innerJoin(t, and(eq(current.id, t.id), eq(current.version, t.version))),
-      );
-      q = Arr.reduce(optional, q, (acc, t) =>
-        acc.leftJoin(t, and(eq(current.id, t.id), eq(current.version, t.version))),
-      );
-      q = Arr.reduce(on, q, (acc, t) => acc.innerJoin(t, eq(current.id, t.id)));
-      q = q.innerJoin(identity, eq(current.id, identity.id));
-      q = q.innerJoin(
-        rootVersion,
-        and(eq(current.id, rootVersion.id), eq(current.version, rootVersion.version)),
-      );
+      const atCurrent = (t: VersionTable) =>
+        and(eq(rootVersion.id, t.id), eq(rootVersion.version, t.version));
+      q = q.innerJoin(leaf, atCurrent(leaf));
+      q = Arr.reduce(through, q, (acc, t) => acc.innerJoin(t, atCurrent(t)));
+      q = Arr.reduce(optional, q, (acc, t) => acc.leftJoin(t, atCurrent(t)));
+      q = Arr.reduce(on, q, (acc, t) => acc.innerJoin(t, eq(rootVersion.id, t.id)));
+      q = q.innerJoin(identity, eq(rootVersion.id, identity.id));
       if (versionZero) {
         q = q.innerJoin(
           versionZero,
-          and(eq(current.id, versionZero.id), eq(versionZero.version, 0n)),
+          and(eq(rootVersion.id, versionZero.id), eq(versionZero.version, 0n)),
         );
       }
+      q = q.where(current);
       // SAFETY: the joins only widen the FROM clause; the selection is still
       // exactly `select`'s.
       return q as typeof select;
@@ -1552,11 +1565,42 @@ export interface TreeViews<S, T extends AnyTreeTables, BR, PV = Record<never, ne
   ) => SubqueryWithSelection<TreeLeafSelection<S, T, K>, `${K}_as_of`>;
 }
 
-/** A head subquery: one `(id, version)` row per node (the head, an as-of bound, or a pointer's fact). */
-type HeadSubquery = Subquery & {
+/** A pointer's effective-fact subquery: one `(id, version)` row per node. */
+type PointerFact = Subquery & {
   readonly id: AnyPgColumn;
   readonly version: SQL.Aliased<unknown>;
 };
+
+/**
+ * What an arm drives its FROM from. A head arm drives from the leaf's own
+ * version table, keeping only head rows by an anti-join on the root version
+ * key (optionally bounded, for `asOf`); a pointer arm drives from the
+ * pointer's effective fact and resolves the head separately, for `action`.
+ */
+type ArmDriver = Data.TaggedEnum<{
+  Head: { readonly bound: Option.Option<(table: PgTable) => SQL> };
+  Pointer: { readonly fact: PointerFact };
+}>;
+const ArmDriver = Data.taggedEnum<ArmDriver>();
+
+/**
+ * How an arm is assembled from its {@link ArmDriver}: the FROM source, the id
+ * and `(id, version)` condition its joins key off, the levels it joins, the
+ * head row (a pointer arm's `action` source) and the head the anti-join
+ * checks, within `bound`.
+ */
+interface ArmPlan {
+  readonly from: PgTable | Subquery;
+  readonly id: AnyPgColumn;
+  readonly on: (table: PgTable) => SQL | undefined;
+  readonly levels: ReadonlyArray<string>;
+  readonly headRow: Option.Option<PgTable>;
+  readonly head: { readonly id: AnyPgColumn; readonly version: AnyPgColumn };
+  readonly bound: Option.Option<(table: PgTable) => SQL>;
+}
+
+/** A head arm, unbounded: the current version of every node. */
+const atHead = ArmDriver.Head({ bound: Option.none() });
 
 /** A runtime view selection, assembled from the tree. */
 type RuntimeSelection = ViewColumns;
@@ -1572,9 +1616,8 @@ interface RuntimeBranchConfig {
   readonly project?: ((leaf: string, columns: Readonly<ViewColumns>) => ViewColumns) | undefined;
 }
 
-/** What an arm adds beyond the leaf chain: a head to read `action` from, a keyed table, trailing columns. */
+/** What an arm adds beyond the leaf chain: a keyed table, trailing columns. */
 interface ArmExtras {
-  readonly actionHead: Option.Option<HeadSubquery>;
   readonly keyed: Option.Option<PgTable>;
   readonly tail: RuntimeSelection;
 }
@@ -1623,7 +1666,7 @@ const byName = (
 ): Readonly<Record<string, PgView>> => R.fromEntries(entries);
 
 /** An arm with nothing beyond the leaf chain. */
-const noExtras: ArmExtras = { actionHead: Option.none(), keyed: Option.none(), tail: {} };
+const noExtras: ArmExtras = { keyed: Option.none(), tail: {} };
 
 /** The projection of a view with no per-leaf columns. */
 const noProjection = (): RuntimeSelection => ({});
@@ -1634,10 +1677,16 @@ const noProjection = (): RuntimeSelection => ({});
  * marker a branch view (`${level}_view`, a `UNION ALL` over its subtree's
  * leaves), and `asOf`, the leaf view at an older version or time.
  *
- * Every view resolves the head from the root version table (`MAX(version)`
- * per node), then INNER JOINs the root version row, the identity row and
- * **every level's version table** from the branch root down to the leaf at
- * that `(id, version)`, INNER JOINs on `id` the stable table of every level
+ * Every view drives from the leaf's own version table (each arm of a branch
+ * view from its leaf's) and keeps only head rows with an anti-join on the
+ * root version key: `NOT EXISTS` a root version of the same node newer than
+ * the row (bounded the same way for `asOf`). That probes the primary key per
+ * row, where a grouped `MAX(version)` head would aggregate the whole root
+ * version table before a filter or `LIMIT` could apply
+ * (effect-drizzle-ext#199). It then INNER JOINs the root version row, the
+ * identity row and **every other level's version table** from the branch
+ * root down to the leaf at that `(id, version)`, INNER JOINs on `id` the
+ * stable table of every level
  * that has `stableColumns`, LEFT JOINs each fact table, and INNER JOINs the
  * version-0 root row for `createdAt`. A node whose head advanced past any
  * level yields **no row**, never a stale older one; a tombstone yields its row
@@ -1651,8 +1700,9 @@ const noProjection = (): RuntimeSelection => ({});
  * key for a head that carries none. Each leaf `pointers[name]` lists gets
  * `${leaf}_${name}_view` (and `${leaf}_${keyed}_${name}_view` when keyed):
  * the leaf view resolved at the version the pointer's effective fact names
- * (the latest by `seq` whose `at` has arrived), failing closed there, with
- * `action` read off the head (so a tombstone shows) and the fact's `at` as
+ * (the latest by `seq` whose `at` has arrived, which drives its FROM),
+ * failing closed there, with `action` read off the head row (found by the
+ * same anti-join, so a tombstone shows) and the fact's `at` as
  * `${name}At`. A node whose effective fact names no version, or that has
  * none, has no row.
  *
@@ -1743,15 +1793,47 @@ export const makeTreeViews = <
   });
 
   /**
-   * One arm: the head drives the FROM; the root version row, the identity row
-   * and every level on `leaf`'s path join at the head's `(id, version)`. `cut`
-   * is the deepest level whose columns are projected (the leaf, or a branch's
-   * marker); the levels below it still INNER JOIN, so the arm fails closed.
+   * `NOT EXISTS` a root version newer than `version` for node `id` (within
+   * `bound`, for `asOf`): the anti-join that keeps only head rows. It probes
+   * the root version table's `(id, version)` primary key once per candidate
+   * row, where a grouped `max(version)` would aggregate the whole table first
+   * (effect-drizzle-ext#199).
+   */
+  const noNewerVersion = (
+    qb: QueryBuilder,
+    id: AnyPgColumn,
+    version: AnyPgColumn,
+    bound: Option.Option<(table: PgTable) => SQL>,
+  ): SQL => {
+    const newer = alias(tables.root.version, "newer");
+    const columns = getTableColumns(newer);
+    return notExists(
+      qb
+        .select({ one: sql`1` })
+        .from(newer)
+        .where(
+          and(
+            eq(columnOf(columns, "id"), id),
+            gt(columnOf(columns, "version"), version),
+            ...Arr.fromOption(Option.map(bound, (within) => within(newer))),
+          ),
+        ),
+    );
+  };
+
+  /**
+   * One arm. A head arm drives the FROM from the leaf's version table and
+   * keeps only rows at the node's head (no newer root version, within the
+   * as-of bound); a pointer arm drives it from the pointer's effective fact.
+   * The root version row, the identity row and every other level on `leaf`'s
+   * path join at the driver's `(id, version)`. `cut` is the deepest level
+   * whose columns are projected (the leaf, or a branch's marker); the levels
+   * below it still INNER JOIN, so the arm fails closed.
    */
   const armOf = (
     qb: QueryBuilder,
     view: string,
-    head: HeadSubquery,
+    driver: ArmDriver,
     leaf: string,
     cut: string,
     lead: RuntimeSelection,
@@ -1776,9 +1858,51 @@ export const makeTreeViews = <
         ]),
       ),
     );
-    // A pointer arm reads `action` off the real head, so a tombstone hides
-    // the node at every pointed version.
-    const headRow = Option.map(extras.actionHead, () => alias(tables.root.version, "head_row"));
+    const plan = ArmDriver.$match(driver, {
+      // A head arm drives from the leaf's own version table and keys every
+      // join off its row; only the levels above the leaf join.
+      Head: ({ bound }): ArmPlan => {
+        const leafVersion = tablesOf(leaf).version;
+        const columns = getTableColumns(leafVersion);
+        const id = columnOf(columns, "id");
+        const version = columnOf(columns, "version");
+        return {
+          from: leafVersion,
+          id,
+          on: (table) => {
+            const target = getTableColumns(table);
+            return and(eq(id, columnOf(target, "id")), eq(version, columnOf(target, "version")));
+          },
+          levels: Arr.filter(path, (name) => name !== leaf),
+          headRow: Option.none(),
+          head: { id, version },
+          bound,
+        };
+      },
+      // A pointer arm drives from the effective fact and keys every join off
+      // the pointed version; it reads `action` off the real head row, so a
+      // tombstone hides the node at every pointed version.
+      Pointer: ({ fact }): ArmPlan => {
+        const row = alias(tables.root.version, "head_row");
+        const columns = getTableColumns(row);
+        return {
+          from: fact,
+          id: fact.id,
+          on: (table) => {
+            const target = getTableColumns(table);
+            return and(
+              eq(fact.id, columnOf(target, "id")),
+              eq(fact.version, columnOf(target, "version")),
+            );
+          },
+          levels: path,
+          headRow: Option.some(row),
+          head: { id: columnOf(columns, "id"), version: columnOf(columns, "version") },
+          bound: Option.none(),
+        };
+      },
+    });
+    const { headRow } = plan;
     const keyedColumns = Option.match(extras.keyed, {
       onNone: () => ({}),
       onSome: (table) =>
@@ -1789,7 +1913,7 @@ export const makeTreeViews = <
     });
     const selection = mergeSelections(view, [
       // A pointer arm's `action` is the head row's, not the pointed version's;
-      // `action` stays third either way, so the emitted SQL is unchanged.
+      // `action` stays third either way.
       {
         source: "the chain's head",
         selection: Option.isSome(headRow) ? R.remove(lead, "action") : lead,
@@ -1817,22 +1941,16 @@ export const makeTreeViews = <
       { source: "the pointer", selection: extras.tail },
       { source: "project", selection: projection },
     ]);
-    const atHead = (table: PgTable) => {
-      const columns = getTableColumns(table);
-      return and(
-        eq(head.id, columnOf(columns, "id")),
-        eq(head.version, columnOf(columns, "version")),
-      );
-    };
+    const atKey = plan.on;
     const joined = Arr.reduce(
-      path,
+      plan.levels,
       qb
         .select(selection)
-        .from(head)
+        .from(plan.from)
         .$dynamic()
-        .innerJoin(tables.root.version, atHead(tables.root.version))
-        .innerJoin(tables.root.identity, eq(head.id, columnOf(identity, "id"))),
-      (q, name) => q.innerJoin(tablesOf(name).version, atHead(tablesOf(name).version)),
+        .innerJoin(tables.root.version, atKey(tables.root.version))
+        .innerJoin(tables.root.identity, eq(plan.id, columnOf(identity, "id"))),
+      (q, name) => q.innerJoin(tablesOf(name).version, atKey(tablesOf(name).version)),
     );
     // A level with stable columns joins its stable row on `id` (one per node,
     // written at create). A level without any joins nothing here, so a tree
@@ -1842,56 +1960,39 @@ export const makeTreeViews = <
       joined,
       (q, name) => {
         const stable = tablesOf(name).stable;
-        return q.innerJoin(stable, eq(head.id, columnOf(getTableColumns(stable), "id")));
+        return q.innerJoin(stable, eq(plan.id, columnOf(getTableColumns(stable), "id")));
       },
     );
     const withFacts = Arr.reduce(
       Arr.flatMap(path, (name) => R.values(factsOf(name))),
       withStable,
-      (q, fact) => q.leftJoin(fact, atHead(fact)),
+      (q, fact) => q.leftJoin(fact, atKey(fact)),
     );
     const withKeyed = Option.match(extras.keyed, {
       onNone: () => withFacts,
-      onSome: (table) => withFacts.leftJoin(table, atHead(table)),
+      onSome: (table) => withFacts.leftJoin(table, atKey(table)),
     });
-    const withHead = Option.match(
-      Option.zipWith(extras.actionHead, headRow, (h, row) => [h, row] as const),
-      {
-        onNone: () => withKeyed,
-        onSome: ([actionHead, row]) =>
-          withKeyed
-            .innerJoin(actionHead, eq(head.id, actionHead.id))
-            .innerJoin(
-              row,
-              and(
-                eq(actionHead.id, columnOf(getTableColumns(row), "id")),
-                eq(actionHead.version, columnOf(getTableColumns(row), "version")),
-              ),
-            ),
-      },
-    );
+    const withHead = Option.match(headRow, {
+      onNone: () => withKeyed,
+      onSome: (row) => withKeyed.innerJoin(row, eq(plan.id, columnOf(getTableColumns(row), "id"))),
+    });
     const query = withHead.innerJoin(
       versionZero,
       and(
-        eq(head.id, columnOf(getTableColumns(versionZero), "id")),
+        eq(plan.id, columnOf(getTableColumns(versionZero), "id")),
         eq(columnOf(getTableColumns(versionZero), "version"), 0n),
       ),
     );
-    return { keys: R.keys(projection), query };
-  };
-
-  /** The head per node: `MAX(version)` from the root version table, optionally bounded. */
-  const headOf = (qb: QueryBuilder, bound: Option.Option<SQL>, name: string): HeadSubquery => {
-    const select = qb
-      .select({ id: rootId, version: max(rootVersionNumber).as("head_version") })
-      .from(tables.root.version)
-      .$dynamic();
-    return Option.match(bound, {
-      onNone: () => select,
-      onSome: (where) => select.where(where),
-    })
-      .groupBy(rootId)
-      .as(name);
+    // The head filter. A head arm keeps the leaf row no newer root version
+    // supersedes; an as-of arm bounds both the row and the newer one, so it
+    // keeps the latest within the bound. A pointer arm keeps the head row its
+    // `action` is read from.
+    const { bound, head } = plan;
+    const where = and(
+      ...Arr.fromOption(Option.map(bound, (within) => within(tables.root.version))),
+      noNewerVersion(qb, head.id, head.version, bound),
+    );
+    return { keys: R.keys(projection), query: query.where(where) };
   };
 
   const leafLead = {
@@ -1902,8 +2003,7 @@ export const makeTreeViews = <
 
   const leafView = (leaf: string): PgView =>
     schema.view(`${leaf}_view`).as((qb) => {
-      const head = headOf(qb, Option.none(), "head");
-      return armOf(qb, `view "${leaf}_view"`, head, leaf, leaf, leafLead, noProjection).query;
+      return armOf(qb, `view "${leaf}_view"`, atHead, leaf, leaf, leafLead, noProjection).query;
     });
 
   const branchEntries: Readonly<Record<string, RuntimeBranchConfig | true>> = config.branches ?? {};
@@ -1929,12 +2029,11 @@ export const makeTreeViews = <
       (columns: RuntimeSelection): RuntimeSelection =>
         entry.project === undefined ? {} : entry.project(leaf, columns);
     return schema.view(`${name}_view`).as((qb) => {
-      const head = headOf(qb, Option.none(), "head");
       const arms = Arr.map(leaves, (leaf) =>
         armOf(
           qb,
           `view "${name}_view" (arm "${leaf}")`,
-          head,
+          atHead,
           leaf,
           name,
           { ...leafLead, type: columnOf(identity, "type") },
@@ -1955,12 +2054,15 @@ export const makeTreeViews = <
 
   const asOf = (leaf: string, point: AsOfPoint) => {
     const qb = new QueryBuilder();
-    const bound =
-      "version" in point
-        ? lte(rootVersionNumber, point.version)
-        : lte(columnOf(rootVersion, "timestamp"), point.at);
-    const head = headOf(qb, Option.some(bound), "head");
-    return armOf(qb, `asOf("${leaf}")`, head, leaf, leaf, leafLead, noProjection).query.as(
+    // The bound applies to a root version table or its `newer` alias alike.
+    const within = (table: PgTable): SQL => {
+      const columns = getTableColumns(table);
+      return "version" in point
+        ? lte(columnOf(columns, "version"), point.version)
+        : lte(columnOf(columns, "timestamp"), point.at);
+    };
+    const driver = ArmDriver.Head({ bound: Option.some(within) });
+    return armOf(qb, `asOf("${leaf}")`, driver, leaf, leaf, leafLead, noProjection).query.as(
       `${leaf}_as_of`,
     );
   };
@@ -1980,11 +2082,10 @@ export const makeTreeViews = <
     keyed: { readonly name: string; readonly table: PgTable },
   ): PgView =>
     schema.view(`${leaf}_${keyed.name}_view`).as((qb) => {
-      const head = headOf(qb, Option.none(), "head");
       return armOf(
         qb,
         `view "${leaf}_${keyed.name}_view"`,
-        head,
+        atHead,
         leaf,
         leaf,
         leafLead,
@@ -2029,9 +2130,8 @@ export const makeTreeViews = <
     });
     return schema.view(view).as((qb) => {
       const point = pointerOf(qb, pointer);
-      const head = headOf(qb, Option.none(), "head");
-      return armOf(qb, `view "${view}"`, point, leaf, leaf, leafLead, noProjection, {
-        actionHead: Option.some(head),
+      const driver = ArmDriver.Pointer({ fact: point });
+      return armOf(qb, `view "${view}"`, driver, leaf, leaf, leafLead, noProjection, {
         keyed: Option.map(keyed, ({ table }) => table),
         tail: {
           [`${pointer}At`]: sql<Date>`${point.at}`
