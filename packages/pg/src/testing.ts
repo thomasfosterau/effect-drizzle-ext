@@ -189,8 +189,9 @@ const isRollback = (u: unknown): u is RollbackSignal =>
  * rollback tag without depending on `Cause` internals.
  */
 const causeContainsRollback = (cause: unknown): boolean => {
-  // oxlint-disable-next-line effect/avoid-native-object-helpers -- the visited set must compare by REFERENCE (cycle detection over an opaque graph); `HashSet` compares by `Equal`, under which distinct but structurally equal `Cause` nodes collide
-  const seen = new Set<unknown>();
+  // By reference: under `HashSet`'s structural `Equal`, distinct but equal
+  // `Cause` nodes would collide.
+  const seen = new WeakSet<object>();
   const stack: Array<unknown> = [cause];
   // oxlint-disable-next-line effect/imperative-loops -- an explicit stack walk over an opaque object graph; the ported mechanism, unchanged.
   while (Arr.isReadonlyArrayNonEmpty(stack)) {

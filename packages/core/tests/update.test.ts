@@ -55,8 +55,8 @@ describe("updateSetMap", () => {
 
   it("accepts any iterable of writable keys", () => {
     expect(updateSetMap({ id: "x", name: "N" }, ["name"])).toEqual({ name: "N" });
-    // oxlint-disable-next-line effect/avoid-native-object-helpers -- pins the native `Set` a consumer passes; `writable` already covers `HashSet`
-    expect(updateSetMap({ id: "x", name: "N" }, new Set(["name"]))).toEqual({ name: "N" });
+    // An iterator that is neither an array nor a `HashSet`.
+    expect(updateSetMap({ id: "x", name: "N" }, ["name"].values())).toEqual({ name: "N" });
   });
 
   it("types the map as the writable keys, optional, without `undefined`", () => {

@@ -148,7 +148,7 @@ const pgErrorFactsOf = (node: ErrorNode): Option.Option<PgErrorFacts> =>
 // ── The bounded, cycle-guarded walk ────────────────────────────────
 
 /** True when `error` is a fresh object worth descending into (within depth, not yet visited). */
-const isSearchable = (error: unknown, depth: number, seen: Set<unknown>): error is ErrorNode =>
+const isSearchable = (error: unknown, depth: number, seen: WeakSet<object>): error is ErrorNode =>
   P.isObjectOrArray(error) && depth < MAX_ERROR_DEPTH && !seen.has(error);
 
 /**
@@ -173,12 +173,16 @@ const childErrorNodes = (node: ErrorNode): unknown[] => [
  * graph — reading `.cause` explicitly (for the non-enumerable wrappers) and
  * sweeping enumerable values / arrays (for the Cause `reasons`) — rather than
  * a cause chain.
+ *
+ * `seen` is a `WeakSet` because the cycle guard compares by reference:
+ * `HashSet`'s structural `Equal` would merge distinct but equal nodes, and
+ * hash (walk) the cyclic values it exists to stop.
  */
 const searchErrorGraph = <A>(
   cause: unknown,
   match: (node: ErrorNode) => Option.Option<A>,
   depth: number,
-  seen: Set<unknown>,
+  seen: WeakSet<object>,
 ): Option.Option<A> => {
   if (!isSearchable(cause, depth, seen)) return Option.none();
   seen.add(cause);
@@ -201,11 +205,7 @@ const searchErrorGraph = <A>(
  */
 // oxlint-disable-next-line effect/no-unknown-parameters -- public entry over an opaque failure graph (any caught value); narrowing it would break callers
 export const findPgError = (error: unknown): Option.Option<PgErrorFacts> =>
-  // The cycle guard needs *reference* identity across an arbitrary error graph:
-  // `HashSet`'s structural equality would mis-merge distinct-but-equal nodes and
-  // would hash (i.e. walk) cyclic values it is meant to stop us walking.
-  // oxlint-disable-next-line effect/avoid-native-object-helpers -- reference identity is the point
-  searchErrorGraph(error, pgErrorFactsOf, 0, new Set());
+  searchErrorGraph(error, pgErrorFactsOf, 0, new WeakSet());
 
 // ── The tagged classification ──────────────────────────────────────
 
@@ -401,8 +401,7 @@ const uniqueViolationNode = (node: ErrorNode): Option.Option<true> => {
  */
 // oxlint-disable-next-line effect/no-unknown-parameters -- public predicate over an opaque failure graph (any caught value); narrowing it would break callers
 export const isUniqueViolation = (error: unknown): boolean =>
-  // oxlint-disable-next-line effect/avoid-native-object-helpers -- reference identity is the point
-  Option.isSome(searchErrorGraph(error, uniqueViolationNode, 0, new Set()));
+  Option.isSome(searchErrorGraph(error, uniqueViolationNode, 0, new WeakSet()));
 
 /**
  * True when `error` is (or wraps) an integrity-constraint violation — one of

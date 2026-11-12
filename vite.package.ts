@@ -10,6 +10,7 @@
 
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
+import * as R from "effect/Record";
 import type { ViteUserConfig } from "vite-plus";
 import type { PackUserConfig } from "vite-plus/pack";
 
@@ -106,12 +107,8 @@ const tsgoPath = (): string => {
  * (`tests/dist-consumer`) asserts the bundled output.
  */
 const packageBuild = (manifest: PackageManifest): PackUserConfig => ({
-  // The root `package.json` lists `effect` as a dev dependency, and fallow
-  // counts a value import from this file as production use of it.
-  // oxlint-disable-next-line effect/avoid-native-object-helpers -- build config: effect/Record here is a fallow dev-dependency-in-production finding
-  entry: Object.fromEntries(
-    // oxlint-disable-next-line effect/avoid-native-object-helpers -- build config: effect/Record here is a fallow dev-dependency-in-production finding
-    Object.entries(manifest.publishConfig.exports).map(([subpath, target]) => [
+  entry: R.fromEntries(
+    R.toEntries(manifest.publishConfig.exports).map(([subpath, target]) => [
       target.default.replace(/^\.\/dist\//, "").replace(/\.js$/, ""),
       manifest.exports[subpath],
     ]),
