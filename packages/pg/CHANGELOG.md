@@ -1,5 +1,46 @@
 # @thomasfosterau/effect-drizzle-ext-pg
 
+## 0.3.0
+
+### Minor Changes
+
+- [#175](https://github.com/thomasfosterau/effect-drizzle-ext/pull/175) [`7709bde`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/7709bdeb2a4972eac54cdc81db4be46d94be7d2c) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - Options bags the library reads itself now spell optional members `readonly x?: T` instead of `?: T | undefined` (effect-drizzle-ext#105):
+  
+  - core: `SortableColumnsOptions`, `ResolveSortOrderOptions`, `ChronologicalOrderOptions`, `NumericBounds`, `DiscriminatorNames` and `typeConstraints`' `refinable`, and `defineTree`'s `LevelSpec`.
+  - -pg: `DatabaseSourceOptions.probe`, `ProvisionOptions.applyMigrations`, and `MigrationDriftOptions.base` (now `base?: Option.Option<GitBase>`).
+  
+  `ResolutionEnvironment` and `BaseRefEnvironment` are now `Readonly<NodeJS.ProcessEnv>`, so `process.env` passes as before.
+  
+  Config handed to Drizzle (`DbColumn`, `DeriveOptions`, `./versioned-chain`'s builder config) and to `PgPoolConfig` (`pgClientFromUrl` / `pgClientFromPool` / `testDatabaseLayer`) keeps `?: T | undefined`.
+  
+  **Migration:** under `exactOptionalPropertyTypes`, omit an absent member instead of passing `undefined`. For example, `resolveSortOrder({ view, sort: query.sort })` with a possibly-undefined `query.sort` becomes `resolveSortOrder(query.sort === undefined ? { view } : { view, sort: query.sort })`. Where a caller holds a whole options object, forward it with a rest spread (`const { direction, ...rest } = options`), which keeps an absent key absent.
+
+- [#189](https://github.com/thomasfosterau/effect-drizzle-ext/pull/189) [`7993e67`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/7993e67ecd487a5d84a4cea9bdc4a20eecd7784e) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - Per-level stable-table columns and constraints (effect-drizzle-ext#188). They hold an external key that must be unique across a leaf's nodes, which a version table can't constrain because every version repeats it.
+  
+  - `makeTreeTables`: a level's `stableColumns` hook appends columns to its stable table after `id` / `type`, and `stableConstraints` appends constraints after the discriminator's. `root.identityConstraints` does the same for the identity table, after `UNIQUE (id, type)`. `makeSubtypeTables` takes `stableColumns` / `stableConstraints` too, and `SubtypeTables` gains a defaulted `TStable` parameter. A `stableColumns` key the stable table (`id`, `type`) or the level's version table already has throws `DerivationError` at module load.
+  - `makeTreeViews`: every view whose path reaches the level projects its stable columns, before its version columns, INNER JOINed on `id`. They're typed through `TreeLeafSelection` / `TreeBranchSelection` and handed to a branch's `project`. A key another of the view's sources shares throws `DerivationError`.
+  - `./chain`: `create` takes `stable` (`ChainStableExtras`), keyed by field across the leaf's path. No other write touches a stable row.
+  
+  The change is additive: a tree without these hooks emits the same DDL and view SQL as before.
+
+- [#173](https://github.com/thomasfosterau/effect-drizzle-ext/pull/173) [`472337a`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/472337afa3fb5bf4d954ac8f966607020d35c3ff) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - `./testing`'s runner states its contract in its types:
+  
+  - `runInTestTransaction` / `withTestTransaction` take a `ManagedRuntime<R | Key, SqlError>`, so a runtime that doesn't provide the `Database` key is a type error instead of a runtime failure.
+  - `makeTestTransaction` accepts any `DatabaseServices` (a `PgDatabase` as before, or core's `makeDatabaseServices` output).
+  - `testDatabaseLayer` reads only the `layer` member.
+  
+  **Migration:** none for a runtime built from `testDatabaseLayer`, which already provides the key.
+
+### Patch Changes
+
+- [#176](https://github.com/thomasfosterau/effect-drizzle-ext/pull/176) [`1ea0789`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/1ea07899dccdea4f850d5240a76a373bfdef5bc9) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - `findPgError`, `classifyError`, `isUniqueViolation`, `isConstraintViolation`, `isRetryableTransactionFailure` (`./errors`) and `isRetryableConnectFailure` (`-pg/testing`) name their parameter `cause`: any caught failure value, walked as an error graph. The type (`unknown`) and behaviour are unchanged.
+
+- [#170](https://github.com/thomasfosterau/effect-drizzle-ext/pull/170) [`c14dd55`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/c14dd554d9421f411853d2768dccc45dbf1d2774) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - `./chain` now treats an id that isn't a UUID as an unknown node, without querying. `head` returns `Option.none()`. `update`, `restore`, `delete` and `history` fail `NodeNotFound`, and `getVersion` and `restoreVersion` fail `VersionNotFound`. Previously PostgreSQL rejected the id (`22P02`), which surfaced as a `SqlError` (a 500) and aborted the caller's transaction. Any spelling PostgreSQL's `uuid` input accepts (upper case, braces, no hyphens) still finds the node.
+
+- [#171](https://github.com/thomasfosterau/effect-drizzle-ext/pull/171) [`bb5fb9d`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/bb5fb9d00d59610be823118a3a5a6c2d108996ae) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - `./tooling` exports `SchemaModule`, the schema-module type drizzle-kit's `generateDrizzleJson` takes. `MigrationDriftOptions.schema` and `checkViewDependencies`' `schema` are now typed with it, which is the same `Record<string, unknown>` as before.
+- Updated dependencies [[`ccb81e7`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/ccb81e74e2bdc32c32fa0050db69c948eea3df2c), [`1ea0789`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/1ea07899dccdea4f850d5240a76a373bfdef5bc9), [`95c24f8`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/95c24f8eaea88dd2239f33f0823f98a1d9afed2e), [`472337a`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/472337afa3fb5bf4d954ac8f966607020d35c3ff), [`7709bde`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/7709bdeb2a4972eac54cdc81db4be46d94be7d2c), [`763b059`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/763b0592321e77afa9149ed718e5077837744689), [`87f1085`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/87f1085f9bbfa5f9f32875d020ab99a0972d9d9e), [`f004f7e`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/f004f7e379a37bc4f76b07b70df3d8c5df10c223), [`7993e67`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/7993e67ecd487a5d84a4cea9bdc4a20eecd7784e), [`db03da2`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/db03da202fa7cccd1d708ae57fbf205baa880783), [`2a050ae`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/2a050ae87d12bd41b7cc83efd4b9e6b55d4a14d6)]:
+  - @thomasfosterau/effect-drizzle-ext@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
