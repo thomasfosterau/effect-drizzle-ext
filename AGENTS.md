@@ -86,7 +86,7 @@ Read the installed package before writing Effect code: `node_modules/effect/AGEN
 
 ## Documentation surfaces
 
-`README.md` at the root is the landing page; each package `README.md` is the API reference consumers read on npm (cross-package links are absolute GitHub URLs, so they work there); each package `CLAUDE.md` carries its boundary, invariants and terms (it is not published); `CONTRIBUTING.md` carries human setup, hooks, CI expectations and single-check commands; `PUBLISHING.md` the release flow and its one-time owner setup; `SECURITY.md` the reporting channel and supply-chain posture. No committed `docs/` tree (docgen's output is gitignored); decisions go in issue comments.
+`README.md` at the root is the landing page; each package `README.md` is the short npm landing page (what it is, install, one minimal example, a table of its entries, links), and the API reference is each export's doc comment; the per-entry and design guides live in `docs/<package>/*.md` (every link to them, and every cross-package link, is an absolute GitHub URL, so it works on npm); each package `CLAUDE.md` carries its boundary, invariants and terms (it is not published); `CONTRIBUTING.md` carries human setup, hooks, CI expectations and single-check commands; `PUBLISHING.md` the release flow and its one-time owner setup; `SECURITY.md` the reporting channel and supply-chain posture. The committed `docs/` tree holds those guides only; docgen's output (`packages/*/docs/`) stays gitignored, and decisions go in issue comments.
 
 ---
 

@@ -48,7 +48,7 @@ export const { Database, CurrentTransaction, transact, readHandle } = database;
 
 ## Documentation
 
-[`packages/core/README.md`](packages/core/README.md) and [`packages/pg/README.md`](packages/pg/README.md) are the two packages' API references. Extracted from the `thomasfosterau/website`, `thomasfosterau/gardeneria` and `thomasfosterau/preferenceflow` applications.
+Each package README ([core](packages/core/README.md), [pg](packages/pg/README.md)) lists its entries and links one guide per entry in [`docs/`](docs/); the API reference is each export's doc comment. Extracted from the `thomasfosterau/website`, `thomasfosterau/gardeneria` and `thomasfosterau/preferenceflow` applications.
 
 ## Development
 

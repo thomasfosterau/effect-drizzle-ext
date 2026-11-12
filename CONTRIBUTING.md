@@ -25,7 +25,7 @@ There is none. `fallow dead-code`, health and duplication report no findings on 
 ## Pre-PR checklist
 
 1. The gates in [AGENTS.md → Verification](AGENTS.md#verification), in order, and the changeset and rebase rules in [AGENTS.md → Branches and pull requests](AGENTS.md#branches-and-pull-requests).
-2. Docs: the package `README.md` for any exported change; the package `CLAUDE.md` for a new term or invariant.
+2. Docs: the export's doc comment and its entry's guide in `docs/<package>/` for any exported change, plus the README's entries table for a new subpath; the package `CLAUDE.md` for a new term or invariant.
 
 ## Running individual checks
 
