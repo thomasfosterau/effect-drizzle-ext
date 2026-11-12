@@ -219,3 +219,59 @@ describe("makeTreeTables: fact-scoped levels, resource leaves and hooks", () => 
     expect(derivedDdlOf(frbrTree)).toEqual(derivedDdlOf(frbrTree));
   });
 });
+
+describe("makeTreeTables: a column key two sources share (effect-drizzle-ext#169)", () => {
+  it("throws for a level hook column shadowing a tree column", () => {
+    expect(() =>
+      makeTreeTables(frbrTree, {
+        schema,
+        builders,
+        levels: { book: { columns: { pages: text("page_count") } } },
+      }),
+    ).toThrow(
+      /table "book" gets "pages" from both level "book"'s tree columns and levels\.book\.columns/,
+    );
+  });
+
+  it("throws for a level hook column shadowing the chain's id or version", () => {
+    expect(() =>
+      makeTreeTables(frbrTree, {
+        schema,
+        builders,
+        levels: { work: { columns: { version: text("v") } } },
+      }),
+    ).toThrow(/gets "version" from both level "work"'s tree columns and levels\.work\.columns/);
+  });
+
+  it("throws for an identity or version extra shadowing a fixed root column", () => {
+    expect(() =>
+      makeTreeTables(frbrTree, {
+        schema,
+        builders,
+        root: { identityColumns: { type: text("t") } },
+      }),
+    ).toThrow(
+      /table "node" gets "type" from both the identity table's own columns and root\.identityColumns/,
+    );
+    expect(() =>
+      makeTreeTables(frbrTree, {
+        schema,
+        builders,
+        root: { versionColumns: { timestamp: text("ts") } },
+      }),
+    ).toThrow(
+      /gets "timestamp" from both the root version table's own columns and root\.versionColumns/,
+    );
+  });
+
+  it("passes for extras under fresh keys", () => {
+    const { root, levels } = makeTreeTables(frbrTree, {
+      schema,
+      builders,
+      root: { identityColumns: { slug: text("slug") } },
+      levels: { book: { columns: { publisherId: uuid("publisher_id") } } },
+    });
+    expect(columnNamesOf(root.identity)).toEqual(["id", "type", "slug"]);
+    expect(columnNamesOf(levels.book.version)).toEqual(["id", "version", "pages", "publisher_id"]);
+  });
+});
