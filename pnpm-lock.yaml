@@ -40,8 +40,8 @@ catalogs:
       specifier: ^0.2.0 || ^0.3.0
       version: 0.3.0
     '@thomasfosterau/effect-jsonapi':
-      specifier: ^0.21.0
-      version: 0.21.0
+      specifier: ^0.22.1
+      version: 0.22.1
     '@types/node':
       specifier: ^26.6.6
       version: 26.6.6
@@ -154,7 +154,7 @@ importers:
         version: 4.1.4(effect@4.1.4)(vitest@5.1.0)
       '@thomasfosterau/effect-jsonapi':
         specifier: 'catalog:'
-        version: 0.21.0(@effect/platform-node@4.1.4(effect@4.1.4)(redis@6.2.1))(effect@4.1.4)
+        version: 0.22.1(@effect/platform-node@4.1.4(effect@4.1.4)(redis@6.2.1))(effect@4.1.4)
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.6
@@ -215,7 +215,7 @@ importers:
         version: 4.1.4(effect@4.1.4)
       '@thomasfosterau/effect-jsonapi':
         specifier: 'catalog:'
-        version: 0.21.0(@effect/platform-node@4.1.4(effect@4.1.4)(redis@6.2.1))(effect@4.1.4)
+        version: 0.22.1(@effect/platform-node@4.1.4(effect@4.1.4)(redis@6.2.1))(effect@4.1.4)
       drizzle-kit:
         specifier: 'catalog:'
         version: 1.0.0-rc.5(drizzle-orm@1.0.0-rc.5(@effect/sql-pg@4.1.4(effect@4.1.4))(@types/pg@8.23.1)(effect@4.1.4)(pg@8.23.0))
@@ -1187,26 +1187,6 @@ packages:
     peerDependencies:
       '@testing-library/dom': '>=7.21.4'
 
-  '@thomasfosterau/effect-ext@0.1.0':
-    resolution: {integrity: sha512-gCewDQmefBF48NeR/3iVdPSxilNbPel6P/AYU5j1iykcBCmXNv3ZwAkkLOls2c5j7iscquXLlTov2IGsAvhgzw==}
-    engines: {node: '>=22.18'}
-    hasBin: true
-    peerDependencies:
-      '@effect/platform-browser': ^4.0.0
-      '@effect/platform-node': ^4.0.0
-      '@thomasfosterau/effect-jsonapi': '>=0.16.1'
-      '@thomasfosterau/effect-parse': ^0.4.1
-      effect: 4.1.4
-    peerDependenciesMeta:
-      '@effect/platform-browser':
-        optional: true
-      '@effect/platform-node':
-        optional: true
-      '@thomasfosterau/effect-jsonapi':
-        optional: true
-      '@thomasfosterau/effect-parse':
-        optional: true
-
   '@thomasfosterau/effect-ext@0.3.0':
     resolution: {integrity: sha512-3MB+WhHsJ9RwSitjFFU7RyfnIMnqtiJ4LtLZG9BUa7CBlIpX63qIueNbcJd/SFRvDApx/aKfAs64stNs7ExcZA==}
     engines: {node: '>=22'}
@@ -1224,8 +1204,8 @@ packages:
       '@thomasfosterau/effect-parse':
         optional: true
 
-  '@thomasfosterau/effect-jsonapi@0.21.0':
-    resolution: {integrity: sha512-EoQJH+1r2tVOF+IRK9haOYMkvC8UpYqfOoxi+BHXkH7I4qbmQAjRuLTCdGh7cDsJJlLM4BdbG5UUz4I/uuytAw==}
+  '@thomasfosterau/effect-jsonapi@0.22.1':
+    resolution: {integrity: sha512-9Jaua/w1tYcSsslhim03VHGSRkzDz3qU0SrEd4e2m1KUXc2SL+xzeBBeldRXNRDW1dPYuV6czD3gdKjTSWjocQ==}
     engines: {node: '>=22', pnpm: '>=11'}
     peerDependencies:
       effect: 4.1.4
@@ -3784,22 +3764,15 @@ snapshots:
     dependencies:
       '@testing-library/dom': 10.4.2
 
-  '@thomasfosterau/effect-ext@0.1.0(@effect/platform-node@4.1.4(effect@4.1.4)(redis@6.2.1))(@thomasfosterau/effect-jsonapi@0.21.0(@effect/platform-node@4.1.4(effect@4.1.4)(redis@6.2.1))(effect@4.1.4))(effect@4.1.4)':
-    dependencies:
-      effect: 4.1.4
-    optionalDependencies:
-      '@effect/platform-node': 4.1.4(effect@4.1.4)(redis@6.2.1)
-      '@thomasfosterau/effect-jsonapi': 0.21.0(@effect/platform-node@4.1.4(effect@4.1.4)(redis@6.2.1))(effect@4.1.4)
-
   '@thomasfosterau/effect-ext@0.3.0(@effect/platform-node@4.1.4(effect@4.1.4)(redis@6.2.1))(effect@4.1.4)':
     dependencies:
       effect: 4.1.4
     optionalDependencies:
       '@effect/platform-node': 4.1.4(effect@4.1.4)(redis@6.2.1)
 
-  '@thomasfosterau/effect-jsonapi@0.21.0(@effect/platform-node@4.1.4(effect@4.1.4)(redis@6.2.1))(effect@4.1.4)':
+  '@thomasfosterau/effect-jsonapi@0.22.1(@effect/platform-node@4.1.4(effect@4.1.4)(redis@6.2.1))(effect@4.1.4)':
     dependencies:
-      '@thomasfosterau/effect-ext': 0.1.0(@effect/platform-node@4.1.4(effect@4.1.4)(redis@6.2.1))(@thomasfosterau/effect-jsonapi@0.21.0(@effect/platform-node@4.1.4(effect@4.1.4)(redis@6.2.1))(effect@4.1.4))(effect@4.1.4)
+      '@thomasfosterau/effect-ext': 0.3.0(@effect/platform-node@4.1.4(effect@4.1.4)(redis@6.2.1))(effect@4.1.4)
       effect: 4.1.4
     transitivePeerDependencies:
       - '@effect/platform-browser'
