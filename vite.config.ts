@@ -85,6 +85,12 @@ export default defineConfig({
       "typescript/ban-ts-comment": "off",
       "unicorn/no-empty-file": "off",
       "vite-plus/prefer-vite-plus-imports": "error",
+      // `@effect/vitest`'s Effect-running test blocks, so `expect` inside one
+      // is inside a test.
+      "vitest/no-standalone-expect": [
+        "error",
+        { additionalTestBlockFunctions: ["it.effect", "it.live", "it.layer"] },
+      ],
 
       // ---- type-aware rules (oxlint-tsgolint) -------------------------------
       // At `error` everywhere but the type-erasure seams (the first override
