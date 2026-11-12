@@ -23,7 +23,6 @@ describe("updateSetMap", () => {
   });
 
   it("clears a clearable column on a present null", () => {
-    // oxlint-disable-next-line effect/prefer-option-over-null -- update tri-state: `summary: null` IS the "clear it" arm this case pins
     expect(updateSetMap({ id: "x", summary: null, birthPlaceId: null }, writable)).toEqual({
       summary: null,
       birthPlaceId: null,
@@ -56,21 +55,18 @@ describe("updateSetMap", () => {
 
   it("accepts any iterable of writable keys", () => {
     expect(updateSetMap({ id: "x", name: "N" }, ["name"])).toEqual({ name: "N" });
-    // oxlint-disable-next-line effect/avoid-native-object-helpers -- pins the native `Set` a consumer passes; `writable` already covers `HashSet`
-    expect(updateSetMap({ id: "x", name: "N" }, new Set(["name"]))).toEqual({ name: "N" });
+    // An iterator that is neither an array nor a `HashSet`.
+    expect(updateSetMap({ id: "x", name: "N" }, ["name"].values())).toEqual({ name: "N" });
   });
 
   it("types the map as the writable keys, optional, without `undefined`", () => {
-    /* oxlint-disable effect/prefer-option-over-null -- the tri-state input shape under test */
     type Input = {
       readonly id: string;
       readonly name?: string | undefined;
       readonly summary?: string | null | undefined;
     };
-    /* oxlint-enable effect/prefer-option-over-null */
     const input: Input = { id: "x" };
     const set = updateSetMap(input, ["name", "summary"] as const);
-    // oxlint-disable-next-line effect/prefer-option-over-null -- the tri-state output shape under test
     expectTypeOf(set).toEqualTypeOf<{ readonly name?: string; readonly summary?: string | null }>();
     expectTypeOf(set).toEqualTypeOf<UpdateSet<Input, "name" | "summary">>();
   });

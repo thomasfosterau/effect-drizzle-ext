@@ -55,12 +55,9 @@ describe("makeDiscriminatorConstraints", () => {
   const toolkit = makeDiscriminatorConstraints<Level>({ leaves });
 
   /**
-   * Materialise a level's constraints onto a real stable table. `refinable` is
-   * `?: boolean | undefined` for the same reason the source spells it that way:
-   * it is config handed to a Drizzle-emitting factory.
+   * Materialise a level's constraints onto a real stable table.
    */
-  /* oxlint-disable-next-line effect/prefer-option-over-null -- mirrors the config type under test */
-  const tableFor = (level: Level, options?: { readonly refinable?: boolean | undefined }) =>
+  const tableFor = (level: Level, options?: { readonly refinable?: boolean }) =>
     getTableConfig(
       pgTable("child", { id: uuid("id").primaryKey(), type: text("type").notNull() }, (t) =>
         toolkit.typeConstraints(level, t, parent, options),

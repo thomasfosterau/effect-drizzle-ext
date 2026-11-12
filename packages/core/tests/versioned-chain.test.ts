@@ -177,7 +177,6 @@ describe("makeSubtypeTables", () => {
      * would not be a modelling improvement — it would simply stop matching and
      * destroy the website #1579 regression guard these exist to be.
      */
-    /* oxlint-disable effect/prefer-option-over-null -- exact-identity assertions against Drizzle's own inferred row types */
     // `id` NOT NULL (never `string | null` — the exact degradation website #1579 found),
     // `type` nullable without a discriminator.
     exact<{ id: string; type: string | null }>()(stable.$inferSelect);
@@ -192,7 +191,6 @@ describe("makeSubtypeTables", () => {
     exact<{ id: string; version: bigint; size: bigint; label?: string | null | undefined }>()(
       version.$inferInsert,
     );
-    /* oxlint-enable effect/prefer-option-over-null */
 
     expect(getTableConfig(version).name).toBe("sprocket_version");
   });
@@ -319,7 +317,6 @@ describe("dist-consumer-style type checks", () => {
     expect(check).toBe(true);
     expectTypeOf<Action>().toEqualTypeOf<string>();
     // the injected `merge` column (`slug`, nullable on `node`) rides along too.
-    /* oxlint-disable-next-line effect/prefer-option-over-null -- exact-identity assertion against Drizzle's own inferred row type */
     expectTypeOf<(typeof view.$inferSelect)["slug"]>().toEqualTypeOf<string | null>();
   });
 });
@@ -332,7 +329,6 @@ describe("version-chain read shapes", () => {
 
   it("carries a hierarchy's extra snapshot facts without knowing them", () => {
     type Snapshot = VersionSnapshot<"create" | "update", { readonly draft?: boolean }>;
-    // oxlint-disable-next-line effect/prefer-option-over-null -- asserts the optional key's read type
     expectTypeOf<Snapshot["draft"]>().toEqualTypeOf<boolean | undefined>();
     // oxlint-disable-next-line effect/no-unsafe-dictionary-type -- asserts the public `VersionSnapshot["columns"]` type, which is this open dictionary
     expectTypeOf<Snapshot["columns"]>().toEqualTypeOf<Readonly<Record<string, unknown>>>();
@@ -358,7 +354,6 @@ describe("versionTimestamps", () => {
       createdAt: edited,
       updatedAt: edited,
     });
-    // oxlint-disable-next-line effect/prefer-option-over-null -- Drizzle's nullable row shape
     expect(versionTimestamps({ timestamp: edited, createdAt: null }).createdAt).toBe(edited);
   });
 });

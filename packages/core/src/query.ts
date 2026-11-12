@@ -113,10 +113,8 @@ export const pageWithTotal = <TResource>(
  * `undefined` — the caller omits `.where(...)` entirely rather than
  * applying a vacuous `WHERE true`.
  */
-/* oxlint-disable effect/prefer-option-over-null -- Drizzle-facing: mirrors drizzle-orm's own `and()` signature, which callers pass straight into `.where(...)` */
 export const combineFilters = (...filters: ReadonlyArray<SQL | undefined>): SQL | undefined =>
   and(...filters);
-/* oxlint-enable effect/prefer-option-over-null */
 
 /**
  * Builds a `limit` / `offset` input schema bounded by `options`, plus the

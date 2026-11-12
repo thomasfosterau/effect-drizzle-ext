@@ -176,7 +176,6 @@ export const roundTrip: Uint8Array = hexToBytea(byteaToHex(new Uint8Array([1, 2]
 
 // ── query ─────────────────────────────────────────────────────────────────
 
-// oxlint-disable-next-line effect/prefer-option-over-null -- `combineFilters` yields the `SQL | undefined` Drizzle's `.where()` reads
 export const where: SQL | undefined = combineFilters(sql`1 = 1`, undefined);
 // A type-level fixture: only the `Page` type `pageOf` infers from a `BookRow`
 // is asserted, so the row is declared, never built.
@@ -325,13 +324,11 @@ export const sortRejected = Effect.fail(new UnsupportedSortError({ field: "x", a
 
 // ── update ────────────────────────────────────────────────────────────────
 
-/* oxlint-disable effect/prefer-option-over-null -- the update tri-state input shape */
 declare const bookUpdate: {
   readonly id: string;
   readonly title?: string;
   readonly pages?: number | null | undefined;
 };
-/* oxlint-enable effect/prefer-option-over-null */
 export const bookSet = updateSetMap(bookUpdate, ["title", "pages"] as const);
 export const bookValues = insertValues(bookUpdate, ["title"] as const);
 
@@ -400,49 +397,21 @@ export const drift = PgTooling.checkMigrationDrift({
   migrationsDir: "/app/migrations",
 });
 
-/* oxlint-disable effect/prefer-option-over-null -- the caller-side optional shape under test */
 /**
- * A caller forwarding its own optionals under `exactOptionalPropertyTypes`:
- * `forwardOptionals` compiles only while each options member is spelled
- * `?: T | undefined` (effect-drizzle-ext#29, #57), since a bare `?: T` rejects
- * an `undefined` value.
+ * A caller forwarding its own optional into Drizzle-facing config under
+ * `exactOptionalPropertyTypes`: compiles only while that member is spelled
+ * `?: T | undefined` (effect-drizzle-ext#29, #57). Options bags the library
+ * reads itself take a bare `?: T` (effect-drizzle-ext#105), so a caller omits
+ * an absent member there instead.
  */
-export interface ForwardedOptionals {
-  readonly probe?: PgTesting.ServerProbe | undefined;
-  readonly applyMigrations?: PgTesting.MigrationRunner<never, never> | undefined;
-  readonly base?: Option.Option<PgTooling.GitBase> | undefined;
-  readonly versionDefault?: bigint | undefined;
-}
-/* oxlint-enable effect/prefer-option-over-null */
-export const forwardOptionals = (forwarded: ForwardedOptionals) =>
-  [
-    PgTesting.resolveDatabaseSource({
-      env: {},
-      migrationsDir: "/app/migrations",
-      dbNamePrefix: "app",
-      image: "postgres:17",
-      probe: forwarded.probe,
-    }),
-    PgTesting.provisionTestDatabase({
-      env: {},
-      migrationsDir: "/app/migrations",
-      dbNamePrefix: "app",
-      image: "postgres:17",
-      applyMigrations: forwarded.applyMigrations,
-    }),
-    PgTooling.checkMigrationDrift({
-      schema: {},
-      migrationsDir: "/app/migrations",
-      base: forwarded.base,
-    }),
-    defineSubtypeTables(core, {
-      name: "short",
-      parentId: node.id,
-      parentVersion: nodeVersion,
-      columns: {},
-      versionDefault: forwarded.versionDefault,
-    }),
-  ] as const;
+export const forwardOptionals = (forwarded: { readonly versionDefault?: bigint }) =>
+  defineSubtypeTables(core, {
+    name: "short",
+    parentId: node.id,
+    parentVersion: nodeVersion,
+    columns: {},
+    versionDefault: forwarded.versionDefault,
+  });
 
 export const views = PgTooling.checkViewDependencies({ schema: {} });
 export const dagIssues: ReadonlyArray<string> = PgTooling.checkDagIntegrity([]);
@@ -455,7 +424,6 @@ export type Checks = [
   /** _titleMetaIsPrecise */ Assert<Equals<TitleMeta["pg"], "text">>,
   /** _titleNotNull */ Assert<Equals<TitleMeta["notNull"], true>>,
   /** _bookTitleIsString */ Assert<Equals<BookRow["title"], string>>,
-  // oxlint-disable-next-line effect/prefer-option-over-null -- asserts Drizzle's own nullable row shape
   /** _bookPagesIsNullable */ Assert<Equals<BookRow["pages"], number | null>>,
   /** _bookCreatedAt */ Assert<Equals<BookRow["createdAt"], Date>>,
   /** _derivationErrorIsTagged */ Assert<Equals<DerivationError["_tag"], "DerivationError">>,
@@ -472,7 +440,6 @@ export type Checks = [
   /** _filmId */ Assert<Equals<FilmVersionRow["id"], string>>,
   /** _filmVersion */ Assert<Equals<FilmVersionRow["version"], bigint>>,
   /** _filmTitle */ Assert<Equals<FilmVersionRow["title"], string>>,
-  // oxlint-disable-next-line effect/prefer-option-over-null -- asserts Drizzle's own nullable row shape
   /** _filmRuntime */ Assert<Equals<FilmVersionRow["runtime"], number | null>>,
   /** _viewId */ Assert<Equals<FilmViewRow["id"], string>>,
   /** _viewType */ Assert<Equals<FilmViewRow["type"], string>>,
@@ -482,7 +449,6 @@ export type Checks = [
   /** _novelViewCreatedAt */ Assert<Equals<NovelViewRow["createdAt"], Date>>,
   /** _workViewType */ Assert<Equals<WorkViewRow["type"], string>>,
   /** _workViewTitle */ Assert<Equals<WorkViewRow["title"], string>>,
-  /* oxlint-disable effect/prefer-option-over-null -- the derived row types under test: a LEFT JOINed keyed column, a cleared pointer and a nullable chain column are `T | null` in Drizzle's own row inference */
   /** _novelLocale */ Assert<Equals<NovelLocaleRow["locale"], string | null>>,
   /** _novelLocaleBlurb */ Assert<Equals<NovelLocaleRow["blurb"], string | null>>,
   /** _novelLiveAt */ Assert<Equals<NovelLiveRow["liveAt"], Date>>,
@@ -492,7 +458,6 @@ export type Checks = [
   /** _pointerVersion */ Assert<Equals<LivePointerRow["version"], bigint | null>>,
   /** _chainStateTitle */ Assert<Equals<NovelState["title"], string>>,
   /** _chainStateWords */ Assert<Equals<NovelState["words"], number | null>>,
-  /* oxlint-enable effect/prefer-option-over-null */
   /** _chainCreateRequiresTx */ Assert<
     Equals<Effect.Services<typeof novelCreated>, "ChainDb/CurrentTransaction">
   >,
@@ -526,14 +491,12 @@ export type Checks = [
     Equals<Effect.Error<typeof sortRejected>["_tag"], "UnsupportedSortError">
   >,
   /** _sortErrorCode */ Assert<Equals<UnsupportedSortError["code"], "unsupported.sort-field">>,
-  /* oxlint-disable effect/prefer-option-over-null -- the tri-state output (a present null clears) and an optional key's read type */
   /** _bookSet */ Assert<
     Equals<typeof bookSet, { readonly title?: string; readonly pages?: number | null }>
   >,
   /** _bookValues */ Assert<Equals<typeof bookValues, { readonly title?: string }>>,
   /** _entryAction */ Assert<Equals<VersionChainEntry["action"], "create" | "update" | "delete">>,
   /** _snapshotDraft */ Assert<Equals<Snapshot["draft"], boolean | undefined>>,
-  /* oxlint-enable effect/prefer-option-over-null */
   /** _snapshotVersion */ Assert<Equals<Snapshot["version"], bigint>>,
   /** _migrated */ Assert<
     Equals<

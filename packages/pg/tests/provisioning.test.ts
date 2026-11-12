@@ -12,6 +12,7 @@
  * @module packages/pg/tests/provisioning
  */
 
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
@@ -24,6 +25,7 @@ import {
   type DatabaseSourceOptions,
   DatabaseUnreachable,
   InvalidDatabasePrefix,
+  provisionTestDatabase,
   resolveDatabaseSource,
   type ServerProbe,
   ServerUnreachable,
@@ -75,6 +77,34 @@ const resolve = (
     dbNamePrefix: "app",
     image: IMAGE,
   });
+
+/** The platform services `provisionTestDatabase` requires (its migration runner reads files). */
+const nodeRuntime = ManagedRuntime.make(NodeServices.layer);
+afterAll(() => nodeRuntime.dispose());
+
+describe("provisionTestDatabase", () => {
+  it("hands an explicit URL back as-is, without probing, provisioning or migrating", async () => {
+    const { probe, asked } = probeAnswering(false);
+    const migrated: string[] = [];
+    const provisioned = await nodeRuntime.runPromise(
+      Effect.scoped(
+        provisionTestDatabase({
+          env: { DATABASE_URL_TEST: "postgresql://explicit@db.example/test" },
+          probe,
+          migrationsDir: MIGRATIONS_DIR,
+          dbNamePrefix: "app",
+          image: IMAGE,
+          applyMigrations: (url) =>
+            Effect.sync(() => migrated.push(Redacted.value(url))).pipe(Effect.as(0)),
+        }),
+      ),
+    );
+    expect(Redacted.value(provisioned.url)).toBe("postgresql://explicit@db.example/test");
+    expect(provisioned.source._tag).toBe("Explicit");
+    expect(asked).toEqual([]);
+    expect(migrated).toEqual([]);
+  });
+});
 
 describe("resolveDatabaseSource", () => {
   it("uses an explicit DATABASE_URL_TEST as-is and never probes", async () => {

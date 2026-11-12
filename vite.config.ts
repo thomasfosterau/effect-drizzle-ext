@@ -149,6 +149,40 @@ export default defineConfig({
           "effect/casting-awareness": "off",
         },
       },
+      // The Drizzle and driver boundary for `prefer-option-over-null`
+      // (effect-drizzle-ext#105): `Option` is the library's own absence
+      // everywhere else, and options bags it reads itself spell an optional
+      // member `readonly x?: T`. Here the shapes are someone else's:
+      // - config handed to Drizzle (core index.ts's `DbColumn`, derive.ts's
+      //   `DeriveOptions`, versioned-chain.ts's table and view builder
+      //   config) or to `@effect/sql-pg`'s `PgPoolConfig` (pg index.ts,
+      //   testing.ts's `testDatabaseLayer`) stays `?: T | undefined`: both
+      //   read `undefined` as "not supplied" and would emit an `Option` as a
+      //   value (wrong DDL, wrong pool config);
+      // - Drizzle's own row types are `T | null` (a nullable column, a LEFT
+      //   JOINed fact or keyed row, a cleared pointer), in versioned-chain.ts
+      //   and pg chain.ts, and `combineFilters` (query.ts) mirrors drizzle's
+      //   `and()` for `.where()`;
+      // - the update tri-state (`null` clears, `undefined` carries forward)
+      //   is Drizzle's SET semantics, in pg chain.ts;
+      // - the tests and the dist-consumer fixture assert exactly those shapes.
+      {
+        files: [
+          "packages/core/src/index.ts",
+          "packages/core/src/derive.ts",
+          "packages/core/src/query.ts",
+          "packages/core/src/versioned-chain.ts",
+          "packages/pg/src/index.ts",
+          "packages/pg/src/testing.ts",
+          "packages/pg/src/chain.ts",
+          "packages/core/tests/versioned-chain.test.ts",
+          "packages/core/tests/update.test.ts",
+          "tests/dist-consumer/src/consumer.ts",
+        ],
+        rules: {
+          "effect/prefer-option-over-null": "off",
+        },
+      },
       // Build/test configs and the integration global setup are evaluated by
       // Vite and Vitest in bare Node, before any Effect runtime exists — there
       // is no `Config` provider to read from and no `FileSystem` service to

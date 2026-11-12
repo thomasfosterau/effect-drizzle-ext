@@ -192,7 +192,6 @@ type LeafOf<S> = {
 }[keyof S] &
   string;
 
-/* oxlint-disable effect/prefer-option-over-null -- Drizzle row types: a nullable column reads and writes `T | null`, a fact's absence at a version is its `NULL`, and the tri-state patch's `undefined` arm is "carry forward" (core's `./update`) */
 /** One level's state: its version columns past `(id, version)`, then its facts. */
 type LevelState<T extends ChainTables, L> = Omit<
   RowOf<MemberOf<MemberOf<T["levels"], L>, "version">>,
@@ -336,7 +335,6 @@ export interface ChainUpdateInput<Patch, VE, KP = never> extends ChainActor<VE>,
 
 /** The options {@link LeafChain.delete} and {@link LeafChain.restoreVersion} take. */
 export interface ChainWriteOptions<VE> extends ChainActor<VE>, ChainPrecondition {}
-/* oxlint-enable effect/prefer-option-over-null */
 
 /** What a chain write returns: the node and the version it landed at. */
 export interface ChainWrite {
@@ -449,7 +447,7 @@ type Row = Readonly<Record<string, unknown>>;
 // oxlint-disable-next-line effect/no-unsafe-dictionary-type -- the runtime form of `ChainKeyedLevel`: each key's `Row`, typed per leaf on the surface
 type KeyedRows = Readonly<Record<string, Row>>;
 
-// oxlint-disable-next-line effect/prefer-option-over-null, effect/no-unsafe-dictionary-type -- the runtime form of `ChainKeyedPatch`: `null` drops a key, `undefined` carries it, each key's `Row` typed per leaf on the surface
+// oxlint-disable-next-line effect/no-unsafe-dictionary-type -- the runtime form of `ChainKeyedPatch`: `null` drops a key, `undefined` carries it, each key's `Row` typed per leaf on the surface
 type KeyedPatchRows = Readonly<Record<string, Row | null | undefined>>;
 
 /** What one version stores: the shared state and the keyed level. */

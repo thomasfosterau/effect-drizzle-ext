@@ -46,7 +46,10 @@ import { generateDrizzleJson, generateMigration, reconstruct } from "drizzle-kit
 import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
+import * as HashMap from "effect/HashMap";
 import * as HashSet from "effect/HashSet";
+import * as MutableHashMap from "effect/MutableHashMap";
+import * as MutableHashSet from "effect/MutableHashSet";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as Path from "effect/Path";
@@ -175,7 +178,7 @@ const findDanglingParents = (
 
 /** What {@link traverse} found: every id reached, and the first cycle (as directory labels). */
 interface Traversal {
-  readonly reachable: ReadonlySet<string>;
+  readonly reachable: MutableHashSet.MutableHashSet<string>;
   readonly cycle: Option.Option<ReadonlyArray<string>>;
 }
 
@@ -188,26 +191,33 @@ const traverse = (
   starts: ReadonlyArray<SnapshotEntry>,
   entries: ReadonlyArray<SnapshotEntry>,
 ): Traversal => {
-  // oxlint-disable-next-line effect/avoid-native-object-helpers -- an id → entry index built once for the walk; never escapes
-  const byId = new Map(entries.map((entry) => [entry.snapshot.id, entry]));
-  // oxlint-disable-next-line effect/avoid-native-object-helpers -- the DFS colouring, shared across successive starts so a node left `done` stays done
-  const state = new Map<string, "visiting" | "done">();
-  // oxlint-disable-next-line effect/avoid-native-object-helpers -- accumulated across the walk and returned partially filled when a cycle stops it
-  const reachable = new Set<string>();
-  const label = (id: string): string => byId.get(id)?.dir ?? id;
+  const byId = HashMap.fromIterable(
+    Arr.map(entries, (entry) => [entry.snapshot.id, entry] as const),
+  );
+  // The DFS colouring, shared across successive starts so a node left `done` stays done.
+  const state = MutableHashMap.empty<string, "visiting" | "done">();
+  // Accumulated across the walk, and returned partly filled when a cycle stops it.
+  const reachable = MutableHashSet.empty<string>();
+  const entryOf = (id: string) => HashMap.get(byId, id);
+  const label = (id: string): string =>
+    Option.match(entryOf(id), { onNone: () => id, onSome: (entry) => entry.dir });
 
   const visit = (id: string, path: ReadonlyArray<string>): Option.Option<ReadonlyArray<string>> => {
-    if (state.get(id) === "visiting") return Option.some([...path, label(id)]);
-    if (state.get(id) === "done") return Option.none();
-    state.set(id, "visiting");
-    reachable.add(id);
+    const colour = MutableHashMap.get(state, id);
+    if (Option.contains(colour, "visiting")) return Option.some([...path, label(id)]);
+    if (Option.contains(colour, "done")) return Option.none();
+    MutableHashMap.set(state, id, "visiting");
+    MutableHashSet.add(reachable, id);
     const next = [...path, label(id)];
     // oxlint-disable-next-line effect/imperative-loops -- stops the whole recursive walk at the first cycle, leaving this node `visiting`; a fold can neither short-circuit nor leave that state behind
-    for (const prevId of byId.get(id)?.snapshot.prevIds ?? []) {
+    for (const prevId of Option.match(entryOf(id), {
+      onNone: (): ReadonlyArray<string> => [],
+      onSome: (entry) => entry.snapshot.prevIds,
+    })) {
       const cycle = visit(prevId, next);
       if (Option.isSome(cycle)) return cycle;
     }
-    state.set(id, "done");
+    MutableHashMap.set(state, id, "done");
     return Option.none();
   };
 
@@ -274,7 +284,7 @@ export const checkDagIntegrity = (entries: ReadonlyArray<SnapshotEntry>): Readon
     );
   }
 
-  const orphaned = entries.filter((entry) => !reachable.has(entry.snapshot.id));
+  const orphaned = entries.filter((entry) => !MutableHashSet.has(reachable, entry.snapshot.id));
   if (Arr.isReadonlyArrayNonEmpty(orphaned)) {
     issues.push(
       `${orphaned.length} migration snapshot(s) are not reachable from the DAG head(s) via ` +
@@ -324,10 +334,7 @@ export const checkBaseAncestry = (
 };
 
 /** The environment {@link resolveBaseRef} reads — the shape of `process.env`. */
-export interface BaseRefEnvironment {
-  // oxlint-disable-next-line effect/prefer-option-over-null -- `process.env`'s shape (unset variables are missing keys), passed straight in
-  readonly [name: string]: string | undefined;
-}
+export type BaseRefEnvironment = Readonly<NodeJS.ProcessEnv>;
 
 /**
  * The base ref for the ancestry check, when one is knowable: an explicit
@@ -579,12 +586,11 @@ export interface MigrationDriftOptions {
   /** The committed drizzle-kit migrations directory. */
   readonly migrationsDir: string;
   /**
-   * The base branch to check ancestry against — `Option.none()` (or absent,
-   * or `undefined`) on pushes and local runs, which is what mapping
+   * The base branch to check ancestry against — `Option.none()` (or absent)
+   * on pushes and local runs, which is what mapping
    * {@link resolveBaseRef} gives outside a pull request.
    */
-  // oxlint-disable-next-line effect/prefer-option-over-null -- the `?: T | undefined` spelling (AGENTS.md → Conventions) lets a caller under `exactOptionalPropertyTypes` forward its own optional; read through `??`, so `undefined` means absent
-  readonly base?: Option.Option<GitBase> | undefined;
+  readonly base?: Option.Option<GitBase>;
 }
 
 /** What a passing run checked. */

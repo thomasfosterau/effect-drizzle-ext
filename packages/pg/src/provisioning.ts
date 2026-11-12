@@ -57,10 +57,7 @@ import { applyMigrations, type MigrationError } from "./migrations.ts";
  * The environment the resolution reads — the shape of `process.env`, taken
  * as a parameter so the order is testable against a fake.
  */
-export interface ResolutionEnvironment {
-  // oxlint-disable-next-line effect/prefer-option-over-null -- this IS `process.env`'s shape (an index signature whose unset variables are missing keys); the real environment is passed straight in
-  readonly [name: string]: string | undefined;
-}
+export type ResolutionEnvironment = Readonly<NodeJS.ProcessEnv>;
 
 /** The variables that count as "explicitly pointed at a server". */
 const SERVER_VARIABLES = ["PGHOST", "PGPORT", "PGUSER", "PGPASSWORD"] as const;
@@ -198,9 +195,8 @@ export interface DatabaseSourceOptions {
   readonly dbNamePrefix: string;
   /** The container image the Testcontainers fallback starts (`pgvector/pgvector:pg17`, `postgres:17`, …). */
   readonly image: string;
-  /** The server probe: {@link probeServer} when absent or `undefined`. A test substitutes its own. */
-  // oxlint-disable-next-line effect/prefer-option-over-null -- the `?: T | undefined` spelling (AGENTS.md → Conventions) lets a caller under `exactOptionalPropertyTypes` forward its own optional; read through `??`, so `undefined` means absent
-  readonly probe?: ServerProbe | undefined;
+  /** The server probe: {@link probeServer} when absent. A test substitutes its own. */
+  readonly probe?: ServerProbe;
 }
 
 /**
@@ -280,10 +276,9 @@ export type MigrationRunner<E, R> = (url: Redacted.Redacted<string>) => Effect.E
 export interface ProvisionOptions<E = never, R = never> extends DatabaseSourceOptions {
   /**
    * Replaces the default runner (for a harness whose migrations are not a
-   * drizzle-kit directory); absent or `undefined` keeps the default.
+   * drizzle-kit directory); absent keeps the default.
    */
-  // oxlint-disable-next-line effect/prefer-option-over-null -- the `?: T | undefined` spelling (AGENTS.md → Conventions) lets a caller under `exactOptionalPropertyTypes` forward its own optional; read through `??`, so `undefined` means absent
-  readonly applyMigrations?: MigrationRunner<E, R> | undefined;
+  readonly applyMigrations?: MigrationRunner<E, R>;
 }
 
 /** The default {@link MigrationRunner}: `./migrations` over a one-connection client. */

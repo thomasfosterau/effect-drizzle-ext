@@ -37,7 +37,6 @@ import type { DbColumn } from "./index.ts";
  */
 export type LevelKind = "plain" | "fact-scoped";
 
-/* oxlint-disable effect/prefer-option-over-null -- a declaration literal threaded into the table derivation, like DbColumn: every member is read once at module load and converted to `Option` on the derived TreeLevel */
 /**
  * A leaf's **keyed fact level**: columns held once per `(id, version, key)`
  * rather than once per version, such as a localised leaf's translated
@@ -54,26 +53,24 @@ export interface KeyedSpec {
 
 /**
  * One level's declaration, generic in the names its `parent` may take and in
- * the leaf payload. Optional members are `?: T | undefined` so a caller can
- * forward its own optional.
+ * the leaf payload.
  */
 export interface LevelSpec<Parent extends string = string, Leaf = unknown> {
   /** The parent level. Absent: a child of the root (a branch root). */
-  readonly parent?: Parent | undefined;
+  readonly parent?: Parent;
   /** How the level stores its columns; `"plain"` when absent. */
-  readonly kind?: LevelKind | undefined;
+  readonly kind?: LevelKind;
   /**
    * Level columns: `dbColumn`-annotated fields on this level's version table,
    * contributed to every descendant's view. Every field must carry a
    * `dbColumn` annotation.
    */
-  readonly columns?: Schema.Struct.Fields | undefined;
+  readonly columns?: Schema.Struct.Fields;
   /** The leaf payload. Present: a concrete leaf; absent: a marker level. */
-  readonly leaf?: Leaf | undefined;
+  readonly leaf?: Leaf;
   /** A leaf's keyed fact level (see {@link KeyedSpec}); a marker can't carry one. */
-  readonly keyed?: KeyedSpec | undefined;
+  readonly keyed?: KeyedSpec;
 }
-/* oxlint-enable effect/prefer-option-over-null */
 
 /**
  * The constraint a tree declaration `S` is checked against: every entry is a
