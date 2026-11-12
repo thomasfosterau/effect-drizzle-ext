@@ -18,7 +18,7 @@
 import type { ExtraConfigColumn, PgTableExtraConfigValue } from "drizzle-orm/pg-core";
 import {
   deriveCheckConstraintsFrom,
-  makeDeriveColumns,
+  deriveColumnsWith,
   type ColumnBuilders,
   type DerivedColumns,
   type DeriveOptions,
@@ -45,11 +45,11 @@ export type DerivedResourceColumns<
  * `dbColumn` annotations into the Drizzle column builders a table factory's
  * `columns` expects.
  */
-export const makeDeriveResourceColumns = <B extends ColumnBuilders>(
+export const deriveResourceColumnsWith = <B extends ColumnBuilders>(
   builders: B,
   options: DeriveOptions = {},
 ): (<R extends AnyResource>(resource: R) => DerivedResourceColumns<R, B>) => {
-  const derive = makeDeriveColumns(builders, options);
+  const derive = deriveColumnsWith(builders, options);
   return <R extends AnyResource>(resource: R): DerivedResourceColumns<R, B> =>
     // SAFETY: `resourceColumns` projects exactly the annotated attributes
     // `ResourceColumnsMetaOf` keys, so the derived map is the one it describes.
