@@ -26,6 +26,11 @@
  *   `restoreVersion` write over one.
  * - **No partial restore.** `restoreVersion` reads the whole snapshot (every
  *   level) first and fails {@link VersionNotFound} before writing anything.
+ * - **An id that isn't a UUID is an unknown node.** `head` returns
+ *   `Option.none()`, and `update` / `restore` / `delete` / `history` fail
+ *   {@link NodeNotFound} (`getVersion` / `restoreVersion` fail
+ *   {@link VersionNotFound}), all without a query. A malformed id from a URL
+ *   is then the wire's 404, not a `22P02` that aborts the transaction.
  * - **Every chain read is bounded** (`PERF-DB-001`): `history` caps its
  *   `limit` at {@link MAX_HISTORY_LIMIT}.
  * - **An expected version is a precondition on the append.** A moved head
@@ -522,6 +527,20 @@ const atVersion = (table: PgTable, idColumn: AnyPgColumn, versionColumn: SQL | A
   and(eq(columnOf(table, "id"), idColumn), eq(columnOf(table, "version"), versionColumn));
 
 /** Drop the `undefined` (carry-forward) arm of a patch. */
+/**
+ * PostgreSQL's `uuid` input grammar (`uuid_in`): 32 hex digits, a hyphen
+ * allowed after any group of four, the whole optionally in braces, any case.
+ * Not a version / variant check: the column takes any 128-bit value.
+ */
+const PG_UUID = /^(?:\{[0-9a-f]{4}(?:-?[0-9a-f]{4}){7}\}|[0-9a-f]{4}(?:-?[0-9a-f]{4}){7})$/i;
+
+/**
+ * Whether `id` can name a node at all. A string PostgreSQL's `uuid` column
+ * rejects (`22P02`) is an unknown node, never a query: sending it would fail
+ * the statement and abort the caller's transaction.
+ */
+const isNodeId = (id: string): boolean => PG_UUID.test(id);
+
 const present = (patch: Row): Row => R.filter(patch, (value) => value !== undefined);
 
 /** Whether a (deep) Drizzle failure is the unique violation of constraint `name`. */
@@ -665,6 +684,7 @@ export const makeVersionChain = <
     ]);
 
     const head = Effect.fn(`${leaf}.head`)(function* (id: string) {
+      if (!isNodeId(id)) return Option.none();
       const tx = yield* CurrentTransaction;
       const rows = yield* tx
         .select({ version: root.version, action: root.action, timestamp: root.timestamp })
@@ -679,6 +699,7 @@ export const makeVersionChain = <
     });
 
     const snapshot = Effect.fn(`${leaf}.snapshot`)(function* (id: string, version: bigint) {
+      if (!isNodeId(id)) return Option.none();
       const tx = yield* CurrentTransaction;
       const query = Arr.reduce(
         levels,
@@ -936,6 +957,7 @@ export const makeVersionChain = <
       id: string,
       limit: number = MAX_HISTORY_LIMIT,
     ) {
+      if (!isNodeId(id)) return yield* new NodeNotFound({ type: leaf, id });
       const tx = yield* CurrentTransaction;
       const bounded = Math.max(1, Math.min(Math.trunc(limit), MAX_HISTORY_LIMIT));
       const rows = yield* tx
