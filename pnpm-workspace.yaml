@@ -85,7 +85,7 @@ catalog:
   # Dependabot proposes it on its own, outside the `toolchain` group. It depends
   # on `effect` 4.1.0 exactly, but the `effect: "catalog:"` override below
   # resolves it to this workspace's singleton, which it lints fine against.
-  "@enfect/oxlint": 0.9.0
+  "@enfect/oxlint": 0.10.0
   effect: 4.1.4
   fallow: 3.42.0
   # Exists only for `@effect/docgen`, which requires it as a peer and spawns
