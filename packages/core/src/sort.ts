@@ -60,9 +60,9 @@
  * @module sort
  */
 
-import { asc, desc, getColumns, SQL } from "drizzle-orm";
+import { asc, desc, getColumns, is, SQL } from "drizzle-orm";
 import type { Table, View } from "drizzle-orm";
-import type { PgColumn } from "drizzle-orm/pg-core";
+import { PgColumn } from "drizzle-orm/pg-core";
 import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as HashSet from "effect/HashSet";
@@ -211,11 +211,14 @@ const admits = (names: ResolvedNames, key: string, term: OrderTerm): boolean => 
   return isSortableColumn(term);
 };
 
+/** Whether a column-map entry is a term `ORDER BY` can take. */
+const isOrderTerm = (value: unknown): value is OrderTerm =>
+  is(value, PgColumn) || is(value, SQL) || is(value, SQL.Aliased);
+
 const deriveSortable = (relation: Table | View, names: ResolvedNames): SortableColumns => {
-  // SAFETY: `getColumns` returns the relation's column / selected-field map;
-  // its conditional return type does not resolve for the `Table | View`
-  // union, but every value is a column or a SQL expression.
-  const columns = getColumns(relation) as Record<string, OrderTerm>;
+  // `getColumns`' conditional return type doesn't resolve for the
+  // `Table | View` union, so each entry is narrowed by the guard instead.
+  const columns: SortableColumns = R.filter(getColumns(relation), isOrderTerm);
   const published = Arr.filter(R.toEntries(columns), ([key, term]) => admits(names, key, term));
   const renamed = Arr.flatMap(R.toEntries(names.renamed), ([name, key]) => {
     const term = columns[key];

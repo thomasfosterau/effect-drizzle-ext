@@ -29,6 +29,7 @@ import { executeRows } from "@thomasfosterau/effect-drizzle-ext/query";
 import { sql } from "drizzle-orm";
 import { integer, pgTable } from "drizzle-orm/pg-core";
 import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Redacted from "effect/Redacted";
 import { describe, expect, it } from "vite-plus/test";
@@ -63,9 +64,10 @@ const createProbeTable = Effect.fn("probe.create")(function* () {
 /** Rows written so far, in insertion order, read through the client. */
 const probeRows = Effect.fn("probe.rows")(function* () {
   const db = yield* Database;
-  const rows = yield* executeRows<{ n: number }>(
+  const rows = yield* executeRows(
     db,
     sql`SELECT n FROM current_transaction_probe ORDER BY n`,
+    Schema.Struct({ n: Schema.Finite }),
   );
   return rows.map((row) => Number(row.n));
 });
@@ -83,7 +85,9 @@ class ProbeRollback {
 describe("makePgDatabase against a live database", () => {
   it("answers a query through the Database service", async () => {
     const rows = await runtime.runPromise(
-      Effect.flatMap(Database, (db) => executeRows<{ one: number }>(db, sql`SELECT 1::int AS one`)),
+      Effect.flatMap(Database, (db) =>
+        executeRows(db, sql`SELECT 1::int AS one`, Schema.Struct({ one: Schema.Finite })),
+      ),
     );
     expect(rows.map((row) => Number(row.one))).toEqual([1]);
   });

@@ -55,7 +55,11 @@ const dropRollbackProbe = Effect.flatMap(Database, (db) =>
 
 const rollbackProbeRows = Effect.fn("rollbackProbe.rows")(function* () {
   const db = yield* Database;
-  const rows = yield* executeRows<{ n: number }>(db, sql`SELECT n FROM rollback_probe ORDER BY n`);
+  const rows = yield* executeRows(
+    db,
+    sql`SELECT n FROM rollback_probe ORDER BY n`,
+    Schema.Struct({ n: Schema.Finite }),
+  );
   return rows.map((row) => Number(row.n));
 });
 
@@ -140,9 +144,10 @@ describe("attemptInSavepoint against a live database", () => {
         // The savepoint absorbed the abort: without it, every statement below
         // would fail with "current transaction is aborted".
         const db = yield* Database;
-        const rows = yield* executeRows<{ n: number; label: string }>(
+        const rows = yield* executeRows(
           db,
           sql`SELECT n, label FROM savepoint_probe ORDER BY n`,
+          Schema.Struct({ n: Schema.Finite, label: Schema.String }),
         );
         yield* tx.execute(sql`INSERT INTO savepoint_probe (n, label) VALUES (2, 'after')`);
 
@@ -166,7 +171,11 @@ describe("attemptInSavepoint against a live database", () => {
             ),
           );
           const db = yield* Database;
-          const rows = yield* executeRows<{ n: number }>(db, sql`SELECT n FROM savepoint_ok`);
+          const rows = yield* executeRows(
+            db,
+            sql`SELECT n FROM savepoint_ok`,
+            Schema.Struct({ n: Schema.Finite }),
+          );
           return { attempt: Exit.isSuccess(attempt), rows: rows.map((row) => Number(row.n)) };
         }),
       ),

@@ -220,11 +220,9 @@ describe("numericBounds", () => {
           });
         },
       }),
-      // SAFETY: a filter whose compiler yields no fragment at all. Cast because
-      // effect's own `ToJsonSchema.Check` promises an object; the walker
-      // guards against `null` because an annotation is foreign data, not
-      // because the type admits it.
-      Schema.isLessThanOrEqualTo(20, { toJsonSchema: (() => null) as never }),
+      // A filter whose compiler yields only the approximate `[fragment, true]`
+      // form: no plain fragment, so no bound.
+      Schema.isLessThanOrEqualTo(20, { toJsonSchema: () => [{ maximum: 20 }, true] as const }),
     );
     expect(numericBounds(hostile)).toEqual(Option.some({ minimum: 0 }));
   });
