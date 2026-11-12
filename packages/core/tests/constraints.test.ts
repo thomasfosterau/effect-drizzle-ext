@@ -1,6 +1,6 @@
 /**
  * Canary for the table-level constraint helpers: `enumCheck` renders a literal
- * `IN (...)` CHECK, and `makeDiscriminatorConstraints` emits the three
+ * `IN (...)` CHECK, and `discriminatorConstraintsFor` emits the three
  * constraints that thread a `type` discriminator up a hierarchy — including
  * `CHECK (false)` for a childless level, `ON UPDATE CASCADE` for a refinable
  * branch, and the custom name templates.
@@ -13,7 +13,7 @@
 
 import { describe, expect, it } from "vite-plus/test";
 import { getTableConfig, PgDialect, pgTable, text, uuid } from "drizzle-orm/pg-core";
-import { enumCheck, makeDiscriminatorConstraints } from "../src/constraints.ts";
+import { enumCheck, discriminatorConstraintsFor } from "../src/constraints.ts";
 
 const dialect = new PgDialect();
 
@@ -51,8 +51,8 @@ describe("enumCheck", () => {
   });
 });
 
-describe("makeDiscriminatorConstraints", () => {
-  const toolkit = makeDiscriminatorConstraints<Level>({ leaves });
+describe("discriminatorConstraintsFor", () => {
+  const toolkit = discriminatorConstraintsFor<Level>({ leaves });
 
   /**
    * Materialise a level's constraints onto a real stable table.
@@ -124,7 +124,7 @@ describe("makeDiscriminatorConstraints", () => {
   });
 
   it("honours custom name templates", () => {
-    const custom = makeDiscriminatorConstraints<Level>({
+    const custom = discriminatorConstraintsFor<Level>({
       leaves,
       names: {
         unique: (level) => `uq_${level}`,
@@ -143,7 +143,7 @@ describe("makeDiscriminatorConstraints", () => {
   });
 
   it("falls back to the default template for a name the options omit", () => {
-    const partial = makeDiscriminatorConstraints<Level>({
+    const partial = discriminatorConstraintsFor<Level>({
       leaves,
       names: { check: (level) => `ck_${level}` },
     });

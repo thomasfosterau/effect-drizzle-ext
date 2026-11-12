@@ -11,7 +11,7 @@ import { describe, expect, it } from "vite-plus/test";
 import * as Schema from "effect/Schema";
 import { getTableConfig, pgTable, text, uuid } from "drizzle-orm/pg-core";
 import { dbColumn } from "../src/index.ts";
-import { DerivationError, makeDeriveColumns, type ColumnBuilders } from "../src/derive.ts";
+import { DerivationError, deriveColumnsWith, type ColumnBuilders } from "../src/derive.ts";
 import { makeReferenceRegistry } from "../src/references.ts";
 
 const builders = {
@@ -69,7 +69,7 @@ describe("makeReferenceRegistry", () => {
   it("wires into the derivation as resolveReference and materialises the FK", () => {
     const registry = makeReferenceRegistry();
     registry.register(owner);
-    const derive = makeDeriveColumns(builders, { resolveReference: registry.resolve });
+    const derive = deriveColumnsWith(builders, { resolveReference: registry.resolve });
     const columns = derive.fromFields({
       ownerId: dbColumn(Schema.String, {
         column: "owner_id",

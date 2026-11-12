@@ -11,12 +11,12 @@
  *
  * **Extensible column kinds.** The kind → builder mapping is *injected*, not
  * baked in: a consumer passes a builder registry (a record from its own kind
- * union to a Drizzle column builder) to {@link makeDeriveColumns}, and the
+ * union to a Drizzle column builder) to {@link deriveColumnsWith}, and the
  * derivation preserves each column's precise builder type — so the derived
  * column map keeps `$inferSelect` typed — by reading the type-level phantom
  * `dbColumn` stamps alongside the runtime annotation.
  *
- * **Two entry shapes, one interpreter.** {@link makeDeriveColumns} returns both
+ * **Two entry shapes, one interpreter.** {@link deriveColumnsWith} returns both
  * `fromFields` (a `Schema.Struct`'s fields, the generic source) and `fromMeta`
  * (an already-projected metadata map, the seam the `./jsonapi/derive` entry and
  * any other projection build on). They share one builder loop.
@@ -118,7 +118,7 @@ export type BuilderFor<M, B extends ColumnBuilders> = M extends {
 /**
  * The Drizzle column builders a db-column metadata map produces against
  * registry `B`, keyed and typed per entry — the type-level counterpart of the
- * builder loop {@link makeDeriveColumns} returns.
+ * builder loop {@link deriveColumnsWith} returns.
  */
 export type DerivedColumns<Meta, B extends ColumnBuilders> = {
   readonly [K in keyof Meta]: BuilderFor<Meta[K], B>;
@@ -139,7 +139,7 @@ export type DerivedColumns<Meta, B extends ColumnBuilders> = {
  */
 
 /**
- * Optional hooks for {@link makeDeriveColumns}. `resolveReference` turns a
+ * Optional hooks for {@link deriveColumnsWith}. `resolveReference` turns a
  * column's {@link DbColumnReference} name pair into the Drizzle column thunk
  * `.references()` needs — the seam that lets FK-backed attributes derive their
  * column instead of being hand-authored. Without it, a `references` annotation
@@ -166,7 +166,7 @@ interface FluentColumn extends ColumnBuilderBase {
 }
 
 /**
- * The derivation pair {@link makeDeriveColumns} returns for builder registry
+ * The derivation pair {@link deriveColumnsWith} returns for builder registry
  * `B`: `fromMeta` over an already-projected metadata map, `fromFields` over a
  * `Schema.Struct`'s fields. Both throw {@link DerivationError} at module load
  * on a misdeclared column.
@@ -192,7 +192,7 @@ export interface DeriveColumns<B extends ColumnBuilders> {
  * - `fromMeta` takes an already-projected metadata map, for a projection this
  *   entry knows nothing about (the `./jsonapi/derive` entry is one).
  */
-export const makeDeriveColumns = <B extends ColumnBuilders>(
+export const deriveColumnsWith = <B extends ColumnBuilders>(
   builders: B,
   options: DeriveOptions = {},
 ): DeriveColumns<B> => {
