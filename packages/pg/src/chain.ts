@@ -679,19 +679,28 @@ export const makeVersionChain = <
       ),
     ]);
 
-    const head = Effect.fn(`${leaf}.head`)(function* (id: string) {
-      if (!isNodeId(id)) return Option.none();
+    /** This leaf's root version entries for `id`, decoded, in `order`, at most `limit`. */
+    const entriesOf = Effect.fn(`${leaf}.entriesOf`)(function* (
+      id: string,
+      order: SQL,
+      limit: number,
+    ) {
       const tx = yield* CurrentTransaction;
       const rows = yield* tx
         .select({ version: root.version, action: root.action, timestamp: root.timestamp })
         .from(rootVersion)
         .innerJoin(identity, eq(identityId, root.id))
         .where(and(eq(root.id, id), eq(identityType, leaf)))
-        .orderBy(desc(root.version))
-        .limit(1);
+        .orderBy(order)
+        .limit(limit);
       return yield* Effect.orDie(
-        Effect.transposeOption(Option.map(Arr.head(rows), (row) => decodeEntry(row))),
+        Effect.forEach(rows, (row) => decodeEntry(row), { concurrency: 1 }),
       );
+    });
+
+    const head = Effect.fn(`${leaf}.head`)(function* (id: string) {
+      if (!isNodeId(id)) return Option.none();
+      return Arr.head(yield* entriesOf(id, desc(root.version), 1));
     });
 
     const snapshot = Effect.fn(`${leaf}.snapshot`)(function* (id: string, version: bigint) {
@@ -954,18 +963,8 @@ export const makeVersionChain = <
       limit: number = MAX_HISTORY_LIMIT,
     ) {
       if (!isNodeId(id)) return yield* new NodeNotFound({ type: leaf, id });
-      const tx = yield* CurrentTransaction;
       const bounded = Math.max(1, Math.min(Math.trunc(limit), MAX_HISTORY_LIMIT));
-      const rows = yield* tx
-        .select({ version: root.version, action: root.action, timestamp: root.timestamp })
-        .from(rootVersion)
-        .innerJoin(identity, eq(identityId, root.id))
-        .where(and(eq(root.id, id), eq(identityType, leaf)))
-        .orderBy(asc(root.version))
-        .limit(bounded);
-      const entries = yield* Effect.orDie(
-        Effect.forEach(rows, (row) => decodeEntry(row), { concurrency: 1 }),
-      );
+      const entries = yield* entriesOf(id, asc(root.version), bounded);
       return yield* Arr.match(entries, {
         onEmpty: () => Effect.fail(new NodeNotFound({ type: leaf, id })),
         onNonEmpty: (nonEmpty) => Effect.succeed(nonEmpty),
