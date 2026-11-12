@@ -34,6 +34,7 @@
  */
 
 import {
+  aliasedTableColumn,
   and,
   Column,
   desc,
@@ -49,12 +50,12 @@ import {
   notExists,
   SQL,
   sql,
+  Subquery,
   StringChunk,
   Table,
   type SQLChunk,
   type SQLWrapper,
   type DriverValueDecoder,
-  type Subquery,
 } from "drizzle-orm";
 import type { ColumnBuilderBase, GetColumnData } from "drizzle-orm";
 import {
@@ -1520,6 +1521,19 @@ export interface TreeViewsConfig<BR, PV = Record<never, never>> {
    * throws `DerivationError` at module load.
    */
   readonly branches?: { readonly [K in keyof BR]: true | TreeBranchViewConfig<BR[K]> } | undefined;
+  /**
+   * Marker levels with columns that a leaf, keyed, pointer or as-of view joins
+   * in its fenced tail rather than as a plain join (effect-drizzle-ext#207). A
+   * level with no columns of its own is always fenced; one with columns stays
+   * a plain join, so an index on them can drive a filter or a sort. Each plain
+   * level adds a relation to the planner's join search, which grows steeply:
+   * 3.6 ms with none, 11, 41 and 75 ms with one, two and three at three
+   * marker levels. Name a level here when its columns are never filtered or
+   * sorted on: they are then read once per row, never through an index (a
+   * sort on one runs the tail for every row, 0.8 s at 50,000 rows). A name
+   * that is not a marker level throws `DerivationError`. Absent: none.
+   */
+  readonly fenced?: ReadonlyArray<string> | undefined;
 }
 
 /**
@@ -1615,6 +1629,35 @@ interface ArmPlan {
   readonly head: { readonly id: AnyPgColumn; readonly version: AnyPgColumn };
   readonly bound: Option.Option<(table: PgTable) => SQL>;
 }
+
+/**
+ * The alias of a leaf arm's fenced tail (effect-drizzle-ext#207): the levels
+ * past the driver, their stable rows and facts, in one `CROSS JOIN LATERAL
+ * (… OFFSET 0)` the planner can't pull up into its join search.
+ *
+ * Measured on PostgreSQL 16, a leaf under three pure markers, 50,000 nodes at
+ * two versions, plan/exec ms: a page by an indexed leaf column 83.6/2.3 with
+ * every level a plain join vs 3.4/2.0 fenced; `ORDER BY created_at DESC`
+ * 84.9/3.1 vs 5.3/5.0; an identity-column filter 63.4/32 (sequential scan) vs
+ * 3.0/12; a join from 20 parent rows on `id` 22.2/426 (sequential scan) vs
+ * 3.1/0.8. The trade-off is `count(*)`, which runs the tail per row: 1.4–2.2×
+ * slower across runs (341 vs 740 ms).
+ */
+const fencedTail = "tail";
+
+/**
+ * A tail column as the outer query reads it, `"tail"."<name>"`: a column keeps
+ * its type (so `./sort` still lists it), an aliased expression its decoder.
+ */
+const throughTail = (value: AnyPgColumn | SQL | SQL.Aliased): AnyPgColumn | SQL.Aliased => {
+  if (is(value, Column)) return aliasedTableColumn(value, fencedTail);
+  const name = projectedName("the fenced tail", fencedTail, value);
+  const read = sql`${sql.identifier(fencedTail)}.${sql.identifier(name)}`;
+  return Option.match(decoderOf(value), {
+    onNone: () => read,
+    onSome: (decoder) => read.mapWith(decoder),
+  }).as(name);
+};
 
 /** A head arm, unbounded: the current version of every node. */
 const atHead = ArmDriver.Head({ bound: Option.none() });
@@ -1849,11 +1892,17 @@ const caseOverLeaves = (
  * row, where a grouped `MAX(version)` head would aggregate the whole root
  * version table before a filter or `LIMIT` could apply
  * (effect-drizzle-ext#199). It then INNER JOINs the root version row, the
- * identity row and **every other level's version table** from the branch
- * root down to the leaf at that `(id, version)`, INNER JOINs on `id` the
- * stable table of every level
- * that has `stableColumns`, LEFT JOINs each fact table, and INNER JOINs the
- * version-0 root row for `createdAt`. A node whose head advanced past any
+ * identity row and the version-0 root row (for `createdAt`); a leaf view
+ * INNER JOINs **every other level's version table** from the branch root
+ * down to the leaf at that `(id, version)`, and on `id` the stable table of
+ * every level that has `stableColumns`, and LEFT JOINs each fact table. A
+ * level with columns of its own is a plain join; a level with none (or one
+ * `fenced` names), every stable row and every fact table sit inside one
+ * fenced `CROSS JOIN LATERAL (… OFFSET 0) "tail"` keyed on the driver
+ * (effect-drizzle-ext#207), out of the planner's join search. A filter or
+ * sort on a plain join's column still reaches its index; one on a column
+ * from the tail is checked row by row and can't drive an index or a sort.
+ * A node whose head advanced past any
  * level yields **no row**, never a stale older one; a tombstone yields its row
  * with `action = 'delete'`. Columns follow declaration order: `id`,
  * `version`, `action` (and a branch view's `type`), the identity extras, each
@@ -1882,8 +1931,8 @@ const caseOverLeaves = (
  *
  * Every view reads base tables only, never another view, so drizzle-kit's
  * view-on-view DROP ordering can't bite (website #1228). Throws
- * `DerivationError` at module load for a `branches` entry naming a leaf or no
- * level, a `project` whose keys differ between leaves (or whose values for a
+ * `DerivationError` at module load for a root table named `tail` (the fenced
+ * tail's alias), a `branches` entry naming a leaf or no level, a `project` whose keys differ between leaves (or whose values for a
  * key name columns of different SQL types, or are unaliased expressions), or
  * a column key two of
  * a view's sources share (a level or `stableColumns` column named like a
@@ -1951,6 +2000,40 @@ export const makeTreeViews = <
       treeError(`level "${name}" has no tables; were they built from this tree?`),
     );
   const factsOf = (name: string) => Option.getOrElse(R.get(tables.facts, name), () => ({}));
+  /** Whether `name` is a marker (non-leaf) level of this tree. */
+  const isMarker = (name: string): boolean =>
+    Option.exists(
+      Arr.findFirst(tree.levels, (level) => level.name === name),
+      (level) => !level.isLeaf,
+    );
+  const fencedNames: ReadonlyArray<string> = config.fenced ?? [];
+  Arr.forEach(fencedNames, (name) => {
+    if (!isMarker(name)) {
+      treeError(`fenced names "${name}", which is not a marker level of this tree`);
+    }
+  });
+  /**
+   * Whether a leaf view joins level `name` in its fenced tail: a level with no
+   * version columns of its own (only its row's existence matters), or one
+   * `fenced` names (effect-drizzle-ext#207).
+   */
+  const isFenced = (name: string): boolean =>
+    Arr.contains(fencedNames, name) ||
+    R.isEmptyRecord(
+      R.filter(
+        getTableColumns(tablesOf(name).version),
+        (_, key) => key !== "id" && key !== "version",
+      ),
+    );
+  // The root tables join outside every leaf view's fenced tail, so one named
+  // like its alias would appear twice in the FROM (effect-drizzle-ext#207).
+  Arr.forEach([tables.root.identity, tables.root.version], (table) => {
+    if (getTableName(table) === fencedTail) {
+      treeError(
+        `the root table "${fencedTail}" shares its name with the leaf views' fenced tail; rename it`,
+      );
+    }
+  });
 
   /** One level's stable-table extras (its `stableColumns` hook), past `id` and `type`. */
   const stableSelection = (name: string): RuntimeSelection =>
@@ -2049,7 +2132,8 @@ export const makeTreeViews = <
    * within the as-of bound); a pointer arm drives it from the pointer's
    * effective fact. The root version row, the identity row and every other
    * level on `leaf`'s path join at the driver's `(id, version)`, so the view
-   * fails closed.
+   * fails closed; the levels past the driver, their stable rows and facts in
+   * the fenced tail (effect-drizzle-ext#207).
    */
   const armOf = (
     qb: QueryBuilder,
@@ -2134,28 +2218,68 @@ export const makeTreeViews = <
       { source: "the pointer", selection: extras.tail },
     ]);
     const atKey = plan.on;
-    const joined = Arr.reduce(
-      plan.levels,
+    const facts = Arr.flatMap(path, (name) => R.values(factsOf(name)));
+    // The tail's required rows: the version table, at its `(id, version)`, of
+    // every fenced level past the driver, then the stable row (on `id`, one
+    // per node, written at create) of every level with `stableColumns`.
+    const required: ReadonlyArray<readonly [PgTable, SQL | undefined]> = [
+      ...Arr.map(Arr.filter(plan.levels, isFenced), (name) => {
+        const version = tablesOf(name).version;
+        return [version, atKey(version)] as const;
+      }),
+      ...Arr.map(stableLevels(path), (name) => {
+        const stable = tablesOf(name).stable;
+        return [stable, eq(plan.id, columnOf(getTableColumns(stable), "id"))] as const;
+      }),
+    ];
+    const root = (outer: RuntimeSelection) =>
       qb
-        .select(selection)
+        .select(outer)
         .from(plan.from)
         .$dynamic()
         .innerJoin(tables.root.version, atKey(tables.root.version))
-        .innerJoin(tables.root.identity, eq(plan.id, columnOf(identity, "id"))),
-      (q, name) => q.innerJoin(tablesOf(name).version, atKey(tablesOf(name).version)),
-    );
-    // A level with stable columns joins its stable row on `id` (one per node,
-    // written at create). A level without any joins nothing here, so a tree
-    // with no `stableColumns` emits exactly the SQL it did before them.
-    const withStable = Arr.reduce(stableLevels(path), joined, (q, name) => {
-      const stable = tablesOf(name).stable;
-      return q.innerJoin(stable, eq(plan.id, columnOf(getTableColumns(stable), "id")));
+        .innerJoin(tables.root.identity, eq(plan.id, columnOf(identity, "id")))
+        .$dynamic();
+    // A level with columns of its own stays a plain join, so its indexes can
+    // drive a filter or a sort.
+    const core = (outer: RuntimeSelection) =>
+      Arr.reduce(
+        Arr.filter(plan.levels, (name) => !isFenced(name)),
+        root(outer),
+        (q, name) => q.innerJoin(tablesOf(name).version, atKey(tablesOf(name).version)),
+      );
+    const withFacts = Arr.match(required, {
+      // Nothing past the driver to fence: the facts join the core directly.
+      onEmpty: () => Arr.reduce(facts, core(selection), (q, fact) => q.leftJoin(fact, atKey(fact))),
+      // The fenced tail (effect-drizzle-ext#207): the required rows and the
+      // facts, in one `CROSS JOIN LATERAL (… OFFSET 0)` keyed on the driver.
+      // An inner join, so a missing level row drops the view row (it fails
+      // closed); the facts stay LEFT JOINs inside it.
+      onNonEmpty: ([[first, firstOn], ...rest]) => {
+        // The tail selects every column read from a table inside it; the
+        // driver's own columns stay outside.
+        const inside = [...Arr.map(required, ([table]) => table), ...facts];
+        const readsInside = (value: AnyPgColumn | SQL | SQL.Aliased) =>
+          Arr.some(tablesRead(value), (table) => Arr.contains(inside, table));
+        const tailSelection = R.filter(selection, readsInside);
+        const tailKeys = R.keys(tailSelection);
+        const tailQuery = Arr.reduce(
+          facts,
+          Arr.reduce(rest, qb.select(tailSelection).from(first).$dynamic(), (q, [table, on]) =>
+            q.innerJoin(table, on),
+          ),
+          (q, fact) => q.leftJoin(fact, atKey(fact)),
+        ).where(firstOn);
+        const outer = R.map(selection, (value, key) =>
+          Arr.contains(tailKeys, key) ? throughTail(value) : value,
+        );
+        // The join source is the same query ending `OFFSET 0`, which keeps
+        // PostgreSQL from pulling it up into the outer join search. Drizzle
+        // never emits `OFFSET 0`, so the subquery is built from its SQL.
+        const fenced = new Subquery(sql`${tailQuery.getSQL()} offset 0`, tailSelection, fencedTail);
+        return core(outer).crossJoinLateral(fenced);
+      },
     });
-    const withFacts = Arr.reduce(
-      Arr.flatMap(path, (name) => R.values(factsOf(name))),
-      withStable,
-      (q, fact) => q.leftJoin(fact, atKey(fact)),
-    );
     const withKeyed = Option.match(extras.keyed, {
       onNone: () => withFacts,
       onSome: (table) => withFacts.leftJoin(table, atKey(table)),
@@ -2186,12 +2310,7 @@ export const makeTreeViews = <
   const branchConfigs: ReadonlyArray<readonly [string, RuntimeBranchConfig]> = Arr.map(
     R.toEntries(branchEntries),
     ([name, entry]): readonly [string, RuntimeBranchConfig] => {
-      if (
-        !Option.exists(
-          Arr.findFirst(tree.levels, (level) => level.name === name),
-          (level) => !level.isLeaf,
-        )
-      ) {
+      if (!isMarker(name)) {
         treeError(`branches names "${name}", which is not a marker level of this tree`);
       }
       return [name, entry === true || entry === undefined ? {} : entry];

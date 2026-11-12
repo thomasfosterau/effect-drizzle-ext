@@ -50,6 +50,7 @@ export const viewsBefore = async (migration: string): Promise<Readonly<Record<st
 export interface PlanNode {
   readonly "Node Type": string;
   readonly "Relation Name"?: string;
+  readonly Alias?: string;
   readonly "Index Name"?: string;
   readonly "Parent Relationship"?: string;
   readonly Plans?: ReadonlyArray<PlanNode>;
@@ -58,6 +59,7 @@ export interface PlanNode {
 const PlanNode: Schema.Codec<PlanNode> = Schema.Struct({
   "Node Type": Schema.String,
   "Relation Name": Schema.optionalKey(Schema.String),
+  Alias: Schema.optionalKey(Schema.String),
   "Index Name": Schema.optionalKey(Schema.String),
   "Parent Relationship": Schema.optionalKey(Schema.String),
   Plans: Schema.optionalKey(Schema.Array(Schema.suspend((): Schema.Codec<PlanNode> => PlanNode))),
@@ -78,7 +80,7 @@ const planNodes = (plan: PlanNode): ReadonlyArray<PlanNode> => [
  * Every node of a plan tree outside its subplans, depth first: the relations
  * the query joins, not those a correlated `EXISTS` probes per row.
  */
-const joinedNodes = (plan: PlanNode): ReadonlyArray<PlanNode> => [
+export const joinedNodes = (plan: PlanNode): ReadonlyArray<PlanNode> => [
   plan,
   ...Arr.flatMap(
     Arr.filter(
@@ -146,5 +148,10 @@ export const viewOracle = <Relations extends AnyRelations>(
     return yield* planOf(query, joinedNodes);
   });
 
-  return { exec, execAll, difference, explain, explainJoined };
+  /** The plan PostgreSQL picks for `query`, as its root node. */
+  const explainRoot = Effect.fn("viewOracle.explainRoot")(function* (query: string) {
+    return yield* planOf(query, (plan) => [plan]);
+  });
+
+  return { exec, execAll, difference, explain, explainJoined, explainRoot };
 };
