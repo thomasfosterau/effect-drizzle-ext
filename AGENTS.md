@@ -50,7 +50,7 @@ Before you report work as done, run the gates below in order and quote each comm
 8. `pnpm audit --audit-level high` (network)
 9. `vp run test:coverage`, then `vp exec fallow audit --format json --quiet --explain --gate-marker agent --base origin/trunk` (the fallow gate below; not a CI step). The PreToolUse gate reads the coverage map on disk and never refreshes it, so run `test:coverage` first.
 
-Steps 2–8 are CI's job, in CI's order ([ci.yml](.github/workflows/ci.yml)). CI holds a read-only token and no secrets or OIDC, so Dependabot PRs run it safely; every action is pinned to a commit SHA, checkout never persists credentials outside the Release job, and only the Release job holds `id-token: write` (never for Dependabot). `uvx zizmor .github` audits the workflows (config in `.github/zizmor.yml`). `CONTRIBUTING.md` and the PR template link here rather than restating the list.
+Steps 2–8 are CI's job, in CI's order ([ci.yml](.github/workflows/ci.yml)). CI holds a read-only token and no secrets or OIDC, so Dependabot PRs run it safely; every action is pinned (to a commit SHA, or, for an action added since effect-drizzle-ext#159, an exact release tag that the workflow lockfile pins), checkout never persists credentials outside the Release job, and only the Release job holds `id-token: write` (never for Dependabot). `uvx zizmor .github` audits the workflows (config in `.github/zizmor.yml`). `CONTRIBUTING.md` and the PR template link here rather than restating the list.
 
 ## Branches and pull requests
 

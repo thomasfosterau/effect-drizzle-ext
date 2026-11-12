@@ -1,5 +1,5 @@
 # zizmor (GitHub Actions static analysis) configuration. Run it with
-# `uvx zizmor .github`; every workflow and the setup action should report no
+# `uvx zizmor .github`; every workflow should report no
 # findings beyond what is configured away here, each with its reason.
 rules:
   dependabot-cooldown:
@@ -9,7 +9,11 @@ rules:
       # cooldown, which counts whole days, waits 1 — longer than pnpm, so a
       # Dependabot PR never proposes a version pnpm would refuse.
       days: 1
-  self-repository:
-    # `./.github/actions/setup` is the documented local-action path; the
-    # `$/` spelling buys nothing for a single-repo composite action.
-    disable: true
+  unpinned-uses:
+    config:
+      policies:
+        # The owner's actions policy (effect-drizzle-ext#159): a new action is
+        # written at an exact release tag (`@vX.Y.Z`), never a new SHA pin;
+        # the GitHub Actions workflow lockfile (#161) takes over pinning.
+        # Every other action keeps zizmor's default (a hash pin).
+        "voidzero-dev/setup-vp": ref-pin

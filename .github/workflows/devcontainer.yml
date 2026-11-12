@@ -47,7 +47,7 @@ jobs:
     permissions:
       contents: read
     env:
-      # The devcontainers CLI, pinned. `pnpm dlx` honours the workspace's
+      # The devcontainers CLI, pinned. `vp dlx` (pnpm's) honours the workspace's
       # `minimumReleaseAge`, so keep this at a release at least 8 hours old.
       DEVCONTAINER_CLI: "@devcontainers/cli@0.89.0"
     steps:
@@ -55,18 +55,16 @@ jobs:
         with:
           persist-credentials: false
       # Only to run the CLI on the runner; the container installs its own.
-      - name: Setup pnpm
-        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
-      - name: Setup Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1.22.0
         with:
-          node-version: "*"
-          check-latest: true
+          cache: true
+          run-install: false
       # `up` fails when the image, a feature or `postCreateCommand` fails.
       - name: Build and start the container
         run: |
           set -o pipefail
-          pnpm dlx "$DEVCONTAINER_CLI" up --workspace-folder . --log-level info 2>&1 | tee "$RUNNER_TEMP/up.log"
+          vp dlx "$DEVCONTAINER_CLI" up --workspace-folder . --log-level info 2>&1 | tee "$RUNNER_TEMP/up.log"
       # The hook logs and continues on every failure; any such line fails here.
       - name: Assert the hook reported no failure
         run: |
@@ -80,7 +78,7 @@ jobs:
         run: |
           pin="$(sed -nE 's/^  vite-plus: "?([0-9]+\.[0-9]+\.[0-9]+)"?$/\1/p' pnpm-workspace.yaml | head -1)"
           echo "catalog vite-plus pin: $pin"
-          run() { pnpm dlx "$DEVCONTAINER_CLI" exec --workspace-folder . bash -lc "$1"; }
+          run() { vp dlx "$DEVCONTAINER_CLI" exec --workspace-folder . bash -lc "$1"; }
           set -x
           run 'id; echo "HOME=$HOME"; pwd; echo "PATH=$PATH"; env | grep -E "^(VP_|VITE_PLUS|PNPM|COREPACK)" || true; type -a vp node pnpm; ls -l "$HOME/.local/bin"'
           # The hook links the global CLI, not its node_modules fallback shim.
