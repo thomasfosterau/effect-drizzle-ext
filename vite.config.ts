@@ -274,6 +274,24 @@ export default defineConfig({
   },
   run: {
     tasks: {
+      // The whole CI pipeline as ONE task, so local and CI are the same thing:
+      // `.github/workflows/ci.yml` runs only `vp run ci`, once per Node
+      // version in its matrix. The gates run in this order and stop at the
+      // first failure (AGENTS.md → Verification lists them). Integration
+      // needs a reachable PostgreSQL or Docker (see `test:integration`), and
+      // the audit needs the network. cache: false — it is the verdict.
+      ci: {
+        command: [
+          "vp check",
+          "vp run --concurrency-limit 2 check",
+          "vp run -r test:unit",
+          "vp run test:integration",
+          "vp run -r build",
+          "vp run docgen",
+          "pnpm audit --audit-level high",
+        ].join(" && "),
+        cache: false,
+      },
       // The CI typecheck gate, as one task: every package's `check`, plus the
       // dist-consumer check that type-checks a consumer fixture against the
       // EMITTED declarations (the declaration-emit hazard versioned-chain.ts
