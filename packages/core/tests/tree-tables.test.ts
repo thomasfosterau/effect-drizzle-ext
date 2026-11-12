@@ -9,6 +9,7 @@ import {
   uuid,
   type ExtraConfigColumn,
   type PgTable,
+  unique,
 } from "drizzle-orm/pg-core";
 import * as Arr from "effect/Array";
 import * as Option from "effect/Option";
@@ -273,5 +274,117 @@ describe("makeTreeTables: a column key two sources share (effect-drizzle-ext#169
     });
     expect(columnNamesOf(root.identity)).toEqual(["id", "type", "slug"]);
     expect(columnNamesOf(levels.book.version)).toEqual(["id", "version", "pages", "publisher_id"]);
+  });
+});
+
+const uniqueNamesOf = (table: PgTable) =>
+  Arr.map(getTableConfig(table).uniqueConstraints, (u) => u.getName());
+
+/** A stable table's DDL: its columns, unique constraints, FK names and CHECKs. */
+const stableDdlOf = (table: PgTable) => [
+  columnNamesOf(table),
+  uniqueNamesOf(table),
+  fkNamesOf(table),
+  checksOf(table),
+];
+
+describe("makeTreeTables: stable-table columns and constraints (effect-drizzle-ext#188)", () => {
+  const tables = makeTreeTables(frbrTree, {
+    schema,
+    builders,
+    root: {
+      identityColumns: { slug: text("slug") },
+      identityConstraints: (table: Record<string, ExtraConfigColumn>) =>
+        Arr.map(Arr.filter([table.slug], P.isNotUndefined), (column) =>
+          unique("node_slug_unique").on(column),
+        ),
+    },
+    levels: {
+      person: {
+        stableColumns: { wikidataId: text("wikidata_id") },
+        stableConstraints: (table: Record<string, ExtraConfigColumn>) =>
+          Arr.map(Arr.filter([table.wikidataId], P.isNotUndefined), (column) =>
+            unique("person_wikidata_id_unique").on(column),
+          ),
+      },
+    },
+  });
+
+  it("appends a level's stable columns after id / type, and its constraints after the discriminator's", () => {
+    const stable = getTableConfig(tables.levels.person.stable);
+    expect(columnNamesOf(tables.levels.person.stable)).toEqual(["id", "type", "wikidata_id"]);
+    expect(uniqueNamesOf(tables.levels.person.stable)).toEqual([
+      "person_id_type_unique",
+      "person_wikidata_id_unique",
+    ]);
+    expect(Arr.map(stable.foreignKeys, (fk) => fk.getName())).toEqual([
+      "person_id_agent_id_fk",
+      "person_id_type_fk",
+    ]);
+    expect(Arr.map(stable.checks, (c) => c.name)).toEqual(["person_type_valid"]);
+    // The version table is untouched.
+    expect(columnNamesOf(tables.levels.person.version)).toEqual(["id", "version", "born"]);
+  });
+
+  it("appends root.identityConstraints after the identity table's UNIQUE (id, type)", () => {
+    expect(uniqueNamesOf(tables.root.identity)).toEqual([
+      "node_id_type_unique",
+      "node_slug_unique",
+    ]);
+  });
+
+  it("leaves every other level's stable table as it was", () => {
+    const plain = makeTreeTables(frbrTree, { schema, builders });
+    Arr.forEach(frbrTree.names, (name) => {
+      if (name === "person") return;
+      expect(stableDdlOf(tables.levels[name].stable)).toEqual(
+        stableDdlOf(plain.levels[name].stable),
+      );
+    });
+    expect(columnNamesOf(plain.levels.person.stable)).toEqual(["id", "type"]);
+  });
+
+  it("types the stable table from the hook", () => {
+    type Person = typeof tables.levels.person.stable.$inferSelect;
+    expectTypeOf<keyof Person>().toEqualTypeOf<"id" | "type" | "wikidataId">();
+    expectTypeOf<Person["wikidataId"]>().toBeNullable();
+    expectTypeOf<NonNullable<Person["wikidataId"]>>().toEqualTypeOf<string>();
+    type Agent = typeof tables.levels.agent.stable.$inferSelect;
+    expectTypeOf<keyof Agent>().toEqualTypeOf<"id" | "type">();
+  });
+
+  it("throws for a stable column shadowing the stable table's id or type", () => {
+    expect(() =>
+      makeTreeTables(frbrTree, {
+        schema,
+        builders,
+        levels: { person: { stableColumns: { type: text("kind") } } },
+      }),
+    ).toThrow(
+      /table "person" gets "type" from both the stable table's own columns and levels\.person\.stableColumns/,
+    );
+  });
+
+  it("throws for a stable column sharing a key with the level's version columns", () => {
+    expect(() =>
+      makeTreeTables(frbrTree, {
+        schema,
+        builders,
+        levels: { person: { stableColumns: { born: integer("born_year") } } },
+      }),
+    ).toThrow(
+      /level "person" gets "born" from both level "person"'s version columns and levels\.person\.stableColumns/,
+    );
+    expect(() =>
+      makeTreeTables(frbrTree, {
+        schema,
+        builders,
+        levels: {
+          book: { columns: { isbn: text("isbn") }, stableColumns: { isbn: text("stable_isbn") } },
+        },
+      }),
+    ).toThrow(
+      /gets "isbn" from both level "book"'s version columns and levels\.book\.stableColumns/,
+    );
   });
 });
