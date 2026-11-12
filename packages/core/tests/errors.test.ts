@@ -13,7 +13,7 @@ import { describe, expect, it } from "vite-plus/test";
 import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
-import * as Predicate from "effect/Predicate";
+import * as P from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import { SqlError, UniqueViolation as SqlUniqueViolation } from "effect/sql/SqlError";
 import {
@@ -48,7 +48,7 @@ const classifiedAs = <T extends ClassifiedError["_tag"]>(
   expect(Option.map(classified, (violation) => violation._tag)).toStrictEqual(Option.some(tag));
   const isRequested = (
     violation: ClassifiedError,
-  ): violation is ClassifiedError & { readonly _tag: T } => Predicate.isTagged(violation, tag);
+  ): violation is ClassifiedError & { readonly _tag: T } => P.isTagged(violation, tag);
   return Option.getOrElse(Option.filter(classified, isRequested), () =>
     expect.unreachable(`classifyError did not return a ${tag}`),
   );

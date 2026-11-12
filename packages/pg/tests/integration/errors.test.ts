@@ -25,7 +25,7 @@ import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
-import * as Predicate from "effect/Predicate";
+import * as P from "effect/Predicate";
 import * as Redacted from "effect/Redacted";
 import { assert, describe, expect, it } from "vite-plus/test";
 import { makePgDatabase } from "../../src/index.ts";
@@ -96,7 +96,7 @@ describe("classifyError against the live driver", () => {
         );
         expect(violation._tag).toBe("UniqueViolation");
         expect(violation).toMatchObject({ _tag: "UniqueViolation" });
-        if (!Predicate.isTagged(violation, "UniqueViolation")) return;
+        if (!P.isTagged(violation, "UniqueViolation")) return;
         expect(violation.constraint).toEqual(Option.some("edx_child_slug_key"));
         expect(violation.table).toEqual(Option.some("edx_child"));
         expect(Option.isSome(violation.detail)).toBe(true);
@@ -115,7 +115,7 @@ describe("classifyError against the live driver", () => {
           ),
         );
         expect(violation._tag).toBe("ForeignKeyViolation");
-        if (!Predicate.isTagged(violation, "ForeignKeyViolation")) return;
+        if (!P.isTagged(violation, "ForeignKeyViolation")) return;
         expect(violation.constraint).toEqual(Option.some("edx_child_parent_fkey"));
         expect(violation.table).toEqual(Option.some("edx_child"));
         expect(Option.isSome(violation.detail)).toBe(true);
@@ -134,7 +134,7 @@ describe("classifyError against the live driver", () => {
           ),
         );
         expect(violation._tag).toBe("NotNullViolation");
-        if (!Predicate.isTagged(violation, "NotNullViolation")) return;
+        if (!P.isTagged(violation, "NotNullViolation")) return;
         expect(violation.column).toEqual(Option.some("slug"));
         expect(violation.table).toEqual(Option.some("edx_child"));
       }),
@@ -152,7 +152,7 @@ describe("classifyError against the live driver", () => {
           ),
         );
         expect(violation._tag).toBe("CheckViolation");
-        if (!Predicate.isTagged(violation, "CheckViolation")) return;
+        if (!P.isTagged(violation, "CheckViolation")) return;
         expect(violation.constraint).toEqual(Option.some("edx_child_score_positive"));
         expect(violation.table).toEqual(Option.some("edx_child"));
       }),

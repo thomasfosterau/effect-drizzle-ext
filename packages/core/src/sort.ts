@@ -66,7 +66,7 @@ import type { PgColumn } from "drizzle-orm/pg-core";
 import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as HashSet from "effect/HashSet";
-import * as Predicate from "effect/Predicate";
+import * as P from "effect/Predicate";
 import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
 
@@ -172,7 +172,7 @@ const SORTABLE_BASE_TYPES: HashSet.HashSet<string> = HashSet.make(
 );
 
 const isSortableColumn = (term: OrderTerm): boolean => {
-  if (!Predicate.hasProperty(term, "dataType") || !Predicate.isString(term.dataType)) return false;
+  if (!P.hasProperty(term, "dataType") || !P.isString(term.dataType)) return false;
   if (term.dataType === "object date") return true;
   return HashSet.has(SORTABLE_BASE_TYPES, term.dataType.split(" ")[0] ?? "");
 };

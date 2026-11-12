@@ -26,7 +26,7 @@ import {
   type ExtraConfigColumn,
   type PgTableExtraConfigValue,
 } from "drizzle-orm/pg-core";
-import * as Array from "effect/Array";
+import * as Arr from "effect/Array";
 
 // ── Enum-valued text columns ──────────────────────────────────────────
 
@@ -197,7 +197,7 @@ export const makeDiscriminatorConstraints = <Level extends string>(options: {
 
   const typeCheck = (level: Level, stable: TypedStable): PgTableExtraConfigValue => {
     const leaves = options.leaves(level);
-    if (Array.isReadonlyArrayEmpty(leaves)) return check(checkName(level), sql`false`);
+    if (Arr.isReadonlyArrayEmpty(leaves)) return check(checkName(level), sql`false`);
     const list = sql.join(
       leaves.map((leaf) => sql`${leaf}`),
       sql`, `,

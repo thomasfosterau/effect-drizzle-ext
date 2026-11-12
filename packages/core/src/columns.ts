@@ -10,7 +10,7 @@
  * @module columns
  */
 import * as Option from "effect/Option";
-import * as Predicate from "effect/Predicate";
+import * as P from "effect/Predicate";
 import * as Schema from "effect/Schema";
 import { customType, timestamp } from "drizzle-orm/pg-core";
 import type {
@@ -69,7 +69,7 @@ export const jsonbSchema =
         return encodeJsonText(encode(value));
       },
       fromDriver(value) {
-        if (!Predicate.isString(value)) return decode(value);
+        if (!P.isString(value)) return decode(value);
         return Option.match(decodeJsonText(value), {
           onNone: () => decode(value),
           onSome: (parsed) => decode(parsed),

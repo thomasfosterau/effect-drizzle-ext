@@ -12,7 +12,7 @@ import {
 } from "drizzle-orm/pg-core";
 import * as Arr from "effect/Array";
 import * as Option from "effect/Option";
-import * as Predicate from "effect/Predicate";
+import * as P from "effect/Predicate";
 import { describe, expect, expectTypeOf, it } from "vite-plus/test";
 import type { ColumnBuilders } from "../src/derive.ts";
 import { makeTreeTables } from "../src/versioned-chain.ts";
@@ -184,7 +184,7 @@ describe("makeTreeTables: fact-scoped levels, resource leaves and hooks", () => 
         book: {
           columns: { publisherId: uuid("publisher_id") },
           extraConstraints: (table: Record<string, ExtraConfigColumn>) =>
-            Arr.map(Arr.filter([table.publisherId], Predicate.isNotUndefined), (column) =>
+            Arr.map(Arr.filter([table.publisherId], P.isNotUndefined), (column) =>
               index("book_version_publisher_idx").on(column),
             ),
         },

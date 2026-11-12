@@ -77,7 +77,7 @@ import * as LiteralExact from "@thomasfosterau/effect-ext/LiteralExact";
 import * as Arr from "effect/Array";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
-import * as Predicate from "effect/Predicate";
+import * as P from "effect/Predicate";
 import * as R from "effect/Record";
 import {
   enumCheck,
@@ -483,7 +483,7 @@ export interface CurrentVersionViewDeps<
 /** Whether a `merge` is the function form, which receives the birth-row alias. */
 const isMergeFunction = <TRoot, TMerge>(
   merge: TMerge | ((versionZero: TRoot) => TMerge),
-): merge is (versionZero: TRoot) => TMerge => Predicate.isFunction(merge);
+): merge is (versionZero: TRoot) => TMerge => P.isFunction(merge);
 
 /**
  * Build a `currentVersionView` bound to a root version table + identity row.

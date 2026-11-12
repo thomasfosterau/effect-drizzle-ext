@@ -51,7 +51,7 @@ import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
-import * as Predicate from "effect/Predicate";
+import * as P from "effect/Predicate";
 import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
 import { ChildProcess } from "effect/process";
@@ -493,7 +493,7 @@ export const readBaseMigrations = (
  * every other failure is broken input and stays a defect.
  */
 const isAmbiguousDiff = (cause: unknown): boolean =>
-  Predicate.isError(cause) && cause.message.includes("was called without a HintsHandler");
+  P.isError(cause) && cause.message.includes("was called without a HintsHandler");
 
 const checkZeroDrift = (
   schema: MigrationDriftOptions["schema"],
@@ -565,11 +565,17 @@ const checkZeroDrift = (
 
 // ── The gate ────────────────────────────────────────────────────────────
 
+/**
+ * A Drizzle schema module (`import * as schema from "./schema.ts"`): drizzle-kit's
+ * own `generateDrizzleJson` parameter, a namespace of arbitrary exports that
+ * drizzle-kit sorts into tables, views, enums and the rest itself.
+ */
+export type SchemaModule = Parameters<typeof generateDrizzleJson>[0];
+
 /** The inputs {@link checkMigrationDrift} takes. */
 export interface MigrationDriftOptions {
-  /** The schema module (`import * as schema from "./schema.ts"`), as drizzle-kit's `generateDrizzleJson` takes it. */
-  // oxlint-disable-next-line effect/no-unsafe-dictionary-type -- drizzle-kit's boundary: `generateDrizzleJson(imports: Record<string, unknown>)` takes a module namespace of arbitrary exports, which it sorts itself; this is that parameter, forwarded unchanged
-  readonly schema: Record<string, unknown>;
+  /** The schema module, as drizzle-kit's `generateDrizzleJson` takes it. */
+  readonly schema: SchemaModule;
   /** The committed drizzle-kit migrations directory. */
   readonly migrationsDir: string;
   /**

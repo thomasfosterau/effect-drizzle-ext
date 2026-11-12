@@ -46,7 +46,7 @@
 import * as Arr from "effect/Array";
 import type * as JsonSchema from "effect/JsonSchema";
 import * as Option from "effect/Option";
-import * as Predicate from "effect/Predicate";
+import * as P from "effect/Predicate";
 import * as R from "effect/Record";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
@@ -376,7 +376,7 @@ const NEUTRAL_CHECK_INPUT: SchemaRepresentation.ToJsonSchema.CheckInput = {
  */
 const isFragment = (
   output: SchemaRepresentation.ToJsonSchema.CheckOutput,
-): output is JsonSchema.JsonSchema => Predicate.isObject(output);
+): output is JsonSchema.JsonSchema => P.isObject(output);
 
 /** The `representation.id` effect gives the `Schema.isInt()` filter. */
 const IS_INT_REPRESENTATION_ID = "effect/schema/isInt";
@@ -390,7 +390,7 @@ const IS_INT_REPRESENTATION_ID = "effect/schema/isInt";
  * declared safe-integer bound still counts.
  */
 const isIntTypeCheck = (check: SchemaAST.Check<never>): boolean =>
-  Predicate.isObject(check.annotations?.representation) &&
+  P.isObject(check.annotations?.representation) &&
   check.annotations.representation.id === IS_INT_REPRESENTATION_ID;
 
 /** The JSON-Schema fragment a check's `toJsonSchema` annotation exposes, if any. */
@@ -412,7 +412,7 @@ const checkFragment = (check: SchemaAST.Check<never>): Option.Option<JsonSchema.
 const mergeBounds = (fragment: JsonSchema.JsonSchema, bounds: NumericBounds): NumericBounds =>
   Arr.reduce(BOUND_KEYS, bounds, (acc, key) => {
     const value = fragment[key];
-    return Predicate.isNumber(value) ? { ...acc, [key]: value } : acc;
+    return P.isNumber(value) ? { ...acc, [key]: value } : acc;
   });
 
 /**
@@ -431,7 +431,7 @@ const collectCheckBounds = (
     bounds,
     (acc, check) => {
       // A FilterGroup nests its members under `checks`; recurse into them.
-      const nested = Predicate.isTagged(check, "FilterGroup")
+      const nested = P.isTagged(check, "FilterGroup")
         ? collectCheckBounds(Option.some(check.checks), acc)
         : acc;
       return Option.match(checkFragment(check), {

@@ -46,7 +46,7 @@ import * as Effect from "effect/Effect";
 import type * as FileSystem from "effect/FileSystem";
 import type * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
-import * as Predicate from "effect/Predicate";
+import * as P from "effect/Predicate";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import type * as Scope from "effect/Scope";
@@ -388,9 +388,9 @@ export const provisionTestDatabase = <
 > =>
   Effect.gen(function* () {
     const source = yield* resolveDatabaseSource(options);
-    if (Predicate.isTagged(source, "Explicit")) return { url: source.url, source };
+    if (P.isTagged(source, "Explicit")) return { url: source.url, source };
 
-    const url = Predicate.isTagged(source, "LocalServer")
+    const url = P.isTagged(source, "LocalServer")
       ? yield* recreateDatabase(source).pipe(Effect.as(source.url))
       : yield* startContainer(source.image, serverLabel(options.env));
 
@@ -398,9 +398,7 @@ export const provisionTestDatabase = <
     const applied = yield* migrate(url);
     yield* Effect.logInfo(
       `provisioned ${
-        Predicate.isTagged(source, "LocalServer")
-          ? `'${source.database}'`
-          : `a ${source.image} container`
+        P.isTagged(source, "LocalServer") ? `'${source.database}'` : `a ${source.image} container`
       } (${applied} migrations)`,
     );
     return { url, source };

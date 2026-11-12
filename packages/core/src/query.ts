@@ -13,7 +13,7 @@ import { and, sql } from "drizzle-orm";
 import type { SQL, SQLWrapper } from "drizzle-orm";
 import type { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import * as Effect from "effect/Effect";
-import * as Predicate from "effect/Predicate";
+import * as P from "effect/Predicate";
 import * as Schema from "effect/Schema";
 
 /**
@@ -74,7 +74,7 @@ export interface Page<TResource> {
  */
 const totalFrom = (rows: readonly unknown[]): number => {
   const first = rows[0];
-  return Predicate.isObjectOrArray(first) && TOTAL_COUNT_ALIAS in first
+  return P.isObjectOrArray(first) && TOTAL_COUNT_ALIAS in first
     ? Number(first[TOTAL_COUNT_ALIAS])
     : 0;
 };

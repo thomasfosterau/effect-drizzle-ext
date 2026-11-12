@@ -32,9 +32,9 @@
  * @module update
  */
 
-import * as Array from "effect/Array";
+import * as Arr from "effect/Array";
 import * as HashSet from "effect/HashSet";
-import * as Record from "effect/Record";
+import * as R from "effect/Record";
 
 /**
  * The `SET` (or `VALUES`) map {@link updateSetMap} produces from input `I`
@@ -67,9 +67,9 @@ export const updateSetMap = <I extends Readonly<Record<string, unknown>>, K exte
   const columns: HashSet.HashSet<string> = toHashSet(writable);
   // SAFETY: the entries kept are exactly the writable keys of `input` whose
   // value is not `undefined`, which is what `UpdateSet<I, K>` describes.
-  return Record.fromEntries(
-    Array.filter(
-      Record.toEntries(input),
+  return R.fromEntries(
+    Arr.filter(
+      R.toEntries(input),
       ([key, value]) => value !== undefined && HashSet.has(columns, key),
     ),
   ) as UpdateSet<I, K>;
