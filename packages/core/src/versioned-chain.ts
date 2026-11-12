@@ -1493,9 +1493,43 @@ interface ArmExtras {
   readonly tail: RuntimeSelection;
 }
 
-/** Merge selections left to right, a later key winning, into one selection. */
-const mergeSelections = (parts: ReadonlyArray<RuntimeSelection>): RuntimeSelection =>
-  Arr.reduce(parts, noProjection(), (merged, part) => ({ ...merged, ...part }));
+/** A part of a view's selection, named by the source it comes from. */
+interface SourcedSelection {
+  readonly source: string;
+  readonly selection: RuntimeSelection;
+}
+
+/** A selection under construction, with the source each of its keys came from. */
+interface MergedSelection {
+  readonly selection: RuntimeSelection;
+  readonly sources: Readonly<Record<string, string>>;
+}
+
+/**
+ * Merge a view's selection parts in order into one selection. Throws
+ * `DerivationError` at module load when two sources share a key, naming the
+ * key and both sources: a plain spread would keep the later column and
+ * silently drop the earlier one.
+ */
+const mergeSelections = (
+  view: string,
+  parts: ReadonlyArray<SourcedSelection>,
+): RuntimeSelection => {
+  const empty: MergedSelection = { selection: noProjection(), sources: {} };
+  return Arr.reduce(parts, empty, (merged, { source, selection }) => {
+    Arr.forEach(R.keys(selection), (key) =>
+      Option.map(R.get(merged.sources, key), (earlier) =>
+        treeError(
+          `${view} selects "${key}" from both ${earlier} and ${source}; rename one, or project it under another key`,
+        ),
+      ),
+    );
+    return {
+      selection: { ...merged.selection, ...selection },
+      sources: { ...merged.sources, ...R.map(selection, () => source) },
+    };
+  }).selection;
+};
 
 /** Views keyed by name, the key widened to `string` for the type-erasure seam. */
 const byName = (
@@ -1537,7 +1571,10 @@ const noProjection = (): RuntimeSelection => ({});
  * Every view reads base tables only, never another view, so drizzle-kit's
  * view-on-view DROP ordering can't bite (website #1228). Throws
  * `DerivationError` at module load for a `branches` entry naming a leaf or no
- * level, or a `project` whose keys differ between leaves.
+ * level, a `project` whose keys differ between leaves, or a column key two of
+ * a view's sources share (a level column named like a `root.identityColumns`
+ * extra or `createdAt`, or a `project` key the view already selects), naming
+ * the key and both sources: rename one, or project it under another key.
  *
  * @example
  * ```ts
@@ -1620,6 +1657,7 @@ export const makeTreeViews = <
    */
   const armOf = (
     qb: QueryBuilder,
+    view: string,
     head: HeadSubquery,
     leaf: string,
     cut: string,
@@ -1651,21 +1689,35 @@ export const makeTreeViews = <
           (column) => sql`${column}`.mapWith(column).as(column.name),
         ),
     });
-    const selection = mergeSelections([
-      lead,
-      Option.match(headRow, {
-        onNone: noProjection,
-        onSome: (row) => ({ action: columnOf(getTableColumns(row), "action") }),
-      }),
-      identityExtras,
-      ...Arr.map(projected, levelSelection),
-      keyedColumns,
+    const selection = mergeSelections(view, [
+      // A pointer arm's `action` is the head row's, not the pointed version's;
+      // `action` stays third either way, so the emitted SQL is unchanged.
       {
-        timestamp: columnOf(rootVersion, "timestamp"),
-        createdAt: sql<Date>`${zeroTimestamp}`.mapWith(zeroTimestamp).as("created_at"),
+        source: "the chain's head",
+        selection: Option.isSome(headRow) ? R.remove(lead, "action") : lead,
       },
-      extras.tail,
-      projection,
+      {
+        source: "the head row",
+        selection: Option.match(headRow, {
+          onNone: noProjection,
+          onSome: (row) => ({ action: columnOf(getTableColumns(row), "action") }),
+        }),
+      },
+      { source: "root.identityColumns", selection: identityExtras },
+      ...Arr.map(projected, (name) => ({
+        source: `level "${name}"`,
+        selection: levelSelection(name),
+      })),
+      { source: "the keyed table", selection: keyedColumns },
+      {
+        source: "the chain's timestamps",
+        selection: {
+          timestamp: columnOf(rootVersion, "timestamp"),
+          createdAt: sql<Date>`${zeroTimestamp}`.mapWith(zeroTimestamp).as("created_at"),
+        },
+      },
+      { source: "the pointer", selection: extras.tail },
+      { source: "project", selection: projection },
     ]);
     const atHead = (table: PgTable) => {
       const columns = getTableColumns(table);
@@ -1742,7 +1794,7 @@ export const makeTreeViews = <
   const leafView = (leaf: string): PgView =>
     schema.view(`${leaf}_view`).as((qb) => {
       const head = headOf(qb, Option.none(), "head");
-      return armOf(qb, head, leaf, leaf, leafLead, noProjection).query;
+      return armOf(qb, `view "${leaf}_view"`, head, leaf, leaf, leafLead, noProjection).query;
     });
 
   const branchEntries: Readonly<Record<string, RuntimeBranchConfig | true>> = config.branches ?? {};
@@ -1772,6 +1824,7 @@ export const makeTreeViews = <
       const arms = Arr.map(leaves, (leaf) =>
         armOf(
           qb,
+          `view "${name}_view" (arm "${leaf}")`,
           head,
           leaf,
           name,
@@ -1798,7 +1851,9 @@ export const makeTreeViews = <
         ? lte(rootVersionNumber, point.version)
         : lte(columnOf(rootVersion, "timestamp"), point.at);
     const head = headOf(qb, Option.some(bound), "head");
-    return armOf(qb, head, leaf, leaf, leafLead, noProjection).query.as(`${leaf}_as_of`);
+    return armOf(qb, `asOf("${leaf}")`, head, leaf, leaf, leafLead, noProjection).query.as(
+      `${leaf}_as_of`,
+    );
   };
 
   /** A keyed leaf's key name and table; none for a leaf with no keyed level. */
@@ -1817,10 +1872,19 @@ export const makeTreeViews = <
   ): PgView =>
     schema.view(`${leaf}_${keyed.name}_view`).as((qb) => {
       const head = headOf(qb, Option.none(), "head");
-      return armOf(qb, head, leaf, leaf, leafLead, noProjection, {
-        ...noExtras,
-        keyed: Option.some(keyed.table),
-      }).query;
+      return armOf(
+        qb,
+        `view "${leaf}_${keyed.name}_view"`,
+        head,
+        leaf,
+        leaf,
+        leafLead,
+        noProjection,
+        {
+          ...noExtras,
+          keyed: Option.some(keyed.table),
+        },
+      ).query;
     });
 
   /**
@@ -1849,27 +1913,25 @@ export const makeTreeViews = <
     pointer: string,
     leaf: string,
     keyed: Option.Option<{ readonly name: string; readonly table: PgTable }>,
-  ): PgView =>
-    schema
-      .view(
-        Option.match(keyed, {
-          onNone: () => `${leaf}_${pointer}_view`,
-          onSome: ({ name }) => `${leaf}_${name}_${pointer}_view`,
-        }),
-      )
-      .as((qb) => {
-        const point = pointerOf(qb, pointer);
-        const head = headOf(qb, Option.none(), "head");
-        return armOf(qb, point, leaf, leaf, leafLead, noProjection, {
-          actionHead: Option.some(head),
-          keyed: Option.map(keyed, ({ table }) => table),
-          tail: {
-            [`${pointer}At`]: sql<Date>`${point.at}`
-              .mapWith(columnOf(getTableColumns(tables.root.version), "timestamp"))
-              .as(`${pointer}_at`),
-          },
-        }).query;
-      });
+  ): PgView => {
+    const view = Option.match(keyed, {
+      onNone: () => `${leaf}_${pointer}_view`,
+      onSome: ({ name }) => `${leaf}_${name}_${pointer}_view`,
+    });
+    return schema.view(view).as((qb) => {
+      const point = pointerOf(qb, pointer);
+      const head = headOf(qb, Option.none(), "head");
+      return armOf(qb, `view "${view}"`, point, leaf, leaf, leafLead, noProjection, {
+        actionHead: Option.some(head),
+        keyed: Option.map(keyed, ({ table }) => table),
+        tail: {
+          [`${pointer}At`]: sql<Date>`${point.at}`
+            .mapWith(columnOf(getTableColumns(tables.root.version), "timestamp"))
+            .as(`${pointer}_at`),
+        },
+      }).query;
+    });
+  };
 
   const pointerEntries: Readonly<Record<string, ReadonlyArray<string>>> = config.pointers ?? {};
   const pointerViews = R.map(pointerEntries, (leaves, pointer) => {
