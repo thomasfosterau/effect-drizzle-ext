@@ -59,6 +59,7 @@ describe("readMigrations", () => {
       "20261112160706_view-head-antijoin",
       "20261112163910_collection-branch",
       "20261112164138_branch-view-single-driver",
+      "20261112193408_branch-view-case-check",
     ]);
     expect(migrations[0]?.statements[0]).toBe('CREATE SCHEMA "fixture";');
     expect(migrations[0]?.statements).toHaveLength(5);

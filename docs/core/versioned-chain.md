@@ -62,25 +62,36 @@ The set of rows is the same as the `max` head's: a row exists when every joined 
 
 #### Branch views
 
-A branch view is one SELECT driven from the branch level's own version table (effect-drizzle-ext#200), not a `UNION ALL` of one arm per subtree leaf:
+A branch view is one SELECT driven from the branch level's own version table (effect-drizzle-ext#200), not a `UNION ALL` of one arm per subtree leaf, and it joins nothing below the branch that it doesn't project (effect-drizzle-ext#204):
 
 ```sql
 FROM <branch>_version
 JOIN <root>_version, <root> (identity), version_zero, every level above the branch  -- INNER, at (id, version)
-LEFT JOIN <marker>_version  -- each marker between the branch and a leaf, once
-LEFT JOIN <leaf>_version    -- each subtree leaf, in declaration order
+LEFT JOIN <level below the branch>  -- only a marker, leaf, stable or fact table `project` reads
 WHERE NOT EXISTS (a newer <root>_version of the node)
-  AND (   (<root>.type = '<leaf 1>' AND <its markers>.id IS NOT NULL AND <leaf 1>_version.id IS NOT NULL)
-       OR (<root>.type = '<leaf 2>' AND ...))
+  AND CASE <root>.type
+        WHEN '<leaf 1>' THEN EXISTS (<its marker>_version at (id, version) OFFSET 0)
+                         AND EXISTS (<leaf 1>_version at (id, version) OFFSET 0)
+        WHEN '<leaf 2>' THEN ...
+        ELSE false
+      END
 ```
 
-The predicate keeps the view fail-closed: a row needs every level on the path to the leaf its `type` names, at the head, so a head that skipped the leaf or a marker below the branch yields no row, as a leaf view's would. A node whose `type` names a leaf with no row at the head, while another leaf's row is there (old leaf rows kept past a move), yields no row either; the `UNION ALL` form showed that other leaf's row under the stale `type`. Stable and fact tables below the branch LEFT JOIN too, and a level with `stableColumns` adds its stable row to the predicate. Columns, their order and the row type are unchanged. A `project` key becomes `CASE <root>.type WHEN '<leaf>' THEN <that leaf's value> … END`, named and decoded as the first leaf's value (a column every leaf returns as itself is selected bare). Leaves whose values name columns of different SQL types are a thrown `DerivationError`; a computed value that names no column is left to PostgreSQL's `CASE` type resolution.
+The `CASE` keeps the view fail-closed: a row needs every level on the path to the leaf its `type` names, at the head, so a head that skipped the leaf or a marker below the branch yields no row, as a leaf view's would. A `type` that names no subtree leaf, or is `NULL`, reaches `ELSE false` and yields no row. A node whose `type` names a leaf with no row at the head, while another leaf's row is there (old leaf rows kept past a move), yields no row either; the `UNION ALL` form showed that other leaf's row under the stale `type`. A level below the branch with `stableColumns` adds an `EXISTS` on its stable row to its leaves' arms. Each probe ends `OFFSET 0` so PostgreSQL keeps it a per-row index probe: without it the planner may hash the subquery, which seq-scans every leaf table to serve one page. Columns, their order and the row type are unchanged. A `project` key becomes `CASE <root>.type WHEN '<leaf>' THEN <that leaf's value> … END`, named and decoded as the first leaf's value (a column every leaf returns as itself is selected bare); the tables it reads are LEFT JOINed, in declaration order, and nothing else below the branch is.
+
+**Projected types.** Leaves whose values name columns of different SQL types are a thrown `DerivationError` at module load; a computed value that names no column is left to PostgreSQL's `CASE` type resolution. That includes pairs a `UNION ALL` used to unify (`varchar` and `text`, `integer` and `bigint`): cast or alias in `project` so every leaf names the same type, for example ``sql`${columns.key}::text`.as("key")``.
 
 **Indexing.** Index the branch-level column a branch view is sorted by, through `levels.<branch>.extraConstraints` (`index("work_version_title_idx").on(table.title, table.id)`). Then `work_view ORDER BY title, id LIMIT 20` walks that index and stops after a page: the union sorted every branch row, since PostgreSQL plans each `UNION ALL` arm with joins as its own subquery. Sorting a branch view by a leaf-only (or `project`ed) column can't be served by an index: the value comes through a LEFT JOIN or a `CASE`, so it sorts.
 
-On the fixture chain (PostgreSQL 16, 100,000 works at two versions, half books and half essays, a `work_version (title, id)` index, `EXPLAIN (ANALYZE, BUFFERS)`, second run), `work_view ORDER BY title, id LIMIT 20` went from 391 ms (a Sort over every row) to about 2.3 ms (the index, roughly 500 buffers). On a synthetic branch of 20 leaves the page went from 2,385 ms to 4.9 ms. Past `join_collapse_limit` the planner keeps the written join order, which is already the good one.
+Each `EXISTS` probe ends `OFFSET 0`, which keeps it a per-row subplan. Without that fence PostgreSQL picks a hashed subplan that seq-scans every leaf table to serve one page: on a 200,000-node synthetic branch, a page took 104 ms at 20 leaves and 49–60 ms at 40, against 1.9 ms and 2.4–2.6 ms with it. The cost is `count(*)`, which visits every row and is slower with the fence (1,601 ms against 1,218 ms at 40 leaves, still below the old `UNION ALL` shape's 2,257 ms). On small tables, or a very wide branch with few rows, the planner may still choose a full scan plus a Sort for a paged list, because it costs the `CASE` inside a hash join as nearly free; on large tables it walks the branch index.
 
-**Upgrading.** Only branch views' SQL changed: a consumer's next `drizzle-kit generate` emits a `DROP VIEW` and a `CREATE VIEW` for each branch view, with no table or data change, and leaves every other view alone. The [head-resolution upgrade note](#head-resolution) on dependent application views applies the same way.
+On the fixture chain (PostgreSQL 16.15, two leaves, 50,000 books and 50,000 essays at two versions each, a `work_version (title, id)` index, `EXPLAIN (ANALYZE, BUFFERS)`), `work_view ORDER BY title, id LIMIT 20` executes in 0.37 ms (2.1 ms planning), walking the index with no Sort; the `UNION ALL` form took 391 ms, a Sort over every row. The planner can still prefer a full scan and a Sort for a wide branch over few rows: it costs the `CASE` in a hash join as near free (seen with 30 leaves and 40,000 nodes). The plan spec pins the index walk for twelve leaves at 40,000 nodes; the synthetic numbers in the changelog are 200,000 nodes.
+
+**Planning.** Each nullable LEFT JOIN multiplies the planner's join search, so the effect-drizzle-ext#200 form, which LEFT JOINed every marker and leaf, planned a 40-leaf page in about 1.5 s; the `CASE` form plans it in a few milliseconds, since it joins only the spine. That matters because a paged list re-plans: with `@effect/sql-pg`'s default named prepared statements and `plan_cache_mode = auto`, a `LIMIT $n` read stays on custom plans (PostgreSQL re-plans every call), while a by-id read switches to a generic plan after five executions.
+
+**Page, then fetch.** A list that needs leaf columns is two reads: page the branch view's ids (`SELECT id FROM work_view ORDER BY title, id LIMIT 20`), then read each leaf's view by those ids (`book_view WHERE id = ANY($1)`). The page walks the branch index and the fetch probes primary keys, where projecting every leaf's columns through the branch view LEFT JOINs each of those leaves.
+
+**Upgrading.** Only branch views' SQL changed (in effect-drizzle-ext#200 and again in effect-drizzle-ext#204): a consumer's next `drizzle-kit generate` emits a `DROP VIEW` and a `CREATE VIEW` for each branch view, with no table or data change, and leaves every other view alone. The [head-resolution upgrade note](#head-resolution) on dependent application views applies the same way.
 
 ### Per-leaf builders
 

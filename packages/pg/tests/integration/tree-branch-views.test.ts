@@ -1,35 +1,46 @@
 /**
  * The branch views `makeTreeViews` derives, as one SELECT driven from the
  * branch level's own version table instead of a `UNION ALL` of per-leaf arms
- * (effect-drizzle-ext#200), proven against PostgreSQL.
+ * (effect-drizzle-ext#200), failing closed with a `CASE` on `type` over
+ * `EXISTS` probes instead of a LEFT JOIN per leaf (effect-drizzle-ext#204),
+ * proven against PostgreSQL.
  *
  * - **Equivalence.** Over mixed histories (multi-version nodes, deleted
  *   heads, a head that skipped its leaf, a head that skipped the marker
- *   between the branch and its leaf), every fixture branch view (`work`,
- *   `collection`, `series`) returns exactly the rows, columns and column types
- *   its previous definition did. The oracle is that definition: each view's
- *   last `CREATE VIEW` in the fixture chain before the single-driver
- *   migration, read from the committed migrations. Branch views have no
- *   as-of form (`asOf` reads a leaf), so the head is the only point.
+ *   between the branch and its leaf, a stale `type`, a `type` naming no
+ *   subtree leaf), every fixture branch view (`work`, `collection`, `series`)
+ *   returns exactly the rows, columns and column types its `UNION ALL`
+ *   definition did, less the stale- and unknown-type rows that form showed.
+ *   The oracle is each view's last `CREATE VIEW` in the fixture chain before
+ *   the single-driver migration, read from the committed migrations. Two
+ *   generated branches (12 and 30 leaves under two marker levels) are checked
+ *   the same way against a `UNION ALL` of their leaf views. Branch views have
+ *   no as-of form (`asOf` reads a leaf), so the head is the only point.
  * - **Fail closed.** A head with the branch row but no leaf row, a head
- *   whose marker below the branch is missing, and a node whose `type` names a
- *   leaf with no row at the head while another leaf's row is there (a kept old
- *   row) all yield no row.
+ *   whose marker below the branch is missing, a node whose `type` names a
+ *   leaf with no row at the head while another leaf's row is there (a kept
+ *   old row), and a node whose `type` names no subtree leaf (the `CASE`'s
+ *   `ELSE false`) all yield no row.
  * - **Projection.** `collection`'s per-leaf `label` (a `CASE` on `type`)
  *   equals each leaf view's own `label`, row for row.
- * - **Plans.** A generated twelve-leaf branch, its leaves under two marker
- *   levels, pages through an index on the branch level with no Sort and no
- *   aggregate, and reads one node by id without a sequential scan of the root
- *   version table.
+ * - **Plans.** The fixture `work_view` and a generated twelve-leaf branch
+ *   page through an index on the branch level with no Sort, no aggregate and
+ *   no join to any table below the branch (the `EXISTS` probes are subplans),
+ *   and the wide branch reads one node by id without a sequential scan of the
+ *   root version table.
  *
  * @module packages/pg/tests/integration/tree-branch-views
  */
 
 import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext";
-import { makeTreeTables, makeTreeViews } from "@thomasfosterau/effect-drizzle-ext/versioned-chain";
+import {
+  makeTreeTables,
+  makeTreeViews,
+  type AnyTreeTables,
+} from "@thomasfosterau/effect-drizzle-ext/versioned-chain";
 import { generateDrizzleJson, generateMigration } from "drizzle-kit/api-postgres";
 import { getTableName, sql, type SQL } from "drizzle-orm";
-import { pgSchema, text } from "drizzle-orm/pg-core";
+import { pgSchema, text, type PgSchema, type PgTable, type PgView } from "drizzle-orm/pg-core";
 import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as ManagedRuntime from "effect/ManagedRuntime";
@@ -44,7 +55,7 @@ import { makeTestTransaction } from "../../src/testing.ts";
 
 const database = makePgDatabase({ relations: {}, key: "Database" });
 const { CurrentTransaction } = database;
-const { difference, execAll, explain } = viewOracle(database);
+const { difference, execAll, explain, explainJoined } = viewOracle(database);
 
 const runtime = ManagedRuntime.make(integrationDatabaseLayer(database));
 const { runInTestTransaction } = makeTestTransaction(database);
@@ -93,6 +104,7 @@ const C4 = idOf(8); // volume, v1 has its leaf row but no series row (fails clos
 const C5 = idOf(9); // supplement, v1 has the series row but no leaf row (fails closed)
 const C6 = idOf(10); // volume, no label
 const STALE = idOf(11); // type says book; only an essay row at the head
+const UNKNOWN = idOf(12); // type names no work leaf; a full book chain at the head
 
 /** Version `v`'s timestamp: the first of month `v + 1` of 2026. */
 const at = (v: number) => `2026-${String(v + 1).padStart(2, "0")}-01T00:00:00Z`;
@@ -195,7 +207,31 @@ const seedStale = execAll([
   row("essay_version", STALE, 0),
 ]);
 
+/**
+ * A node whose `type` names no leaf of `work` (`'pamphlet'`, a collection
+ * leaf) over a complete book chain. The `(id, type)` arcs forbid the work and
+ * book rows under that type, so they go in unchecked. `node.type` is
+ * `NOT NULL`, so a NULL `type` can't be written; it reaches the same
+ * `ELSE false` (`CASE NULL WHEN …` matches no arm).
+ */
+const seedUnknown = execAll([
+  `INSERT INTO ontology.node (id, type) VALUES ('${UNKNOWN}', 'pamphlet')`,
+  ...unchecked([
+    `INSERT INTO ontology.work (id, type) VALUES ('${UNKNOWN}', 'book')`,
+    `INSERT INTO ontology.book (id, type) VALUES ('${UNKNOWN}', 'book')`,
+  ]),
+  ...workAt(UNKNOWN, "book", 0, "create"),
+]);
+
 const BRANCH_VIEWS = ["work_view", "collection_view", "series_view"] as const;
+
+/** The distinct ids `query` returns, ordered. */
+const idsOf = Effect.fn("branchViews.idsOf")(function* (query: string) {
+  const rows = yield* rowsOf(
+    sql.raw(`select distinct id::text as id from (${query}) q order by id`),
+  );
+  return Arr.map(rows, (r) => String(r["id"]));
+});
 
 /** `view`'s `(version, action, type)` rows for `id`, ordered. */
 const headsOf = Effect.fn("branchViews.headsOf")(function* (from: string, id: string) {
@@ -223,6 +259,8 @@ describe("branch views: one driver returns exactly the UNION ALL form's rows", (
       runtime,
       Effect.gen(function* () {
         yield* seedHistories;
+        yield* seedStale;
+        yield* seedUnknown;
         const results = yield* Effect.forEach(
           BRANCH_VIEWS,
           (view) =>
@@ -246,6 +284,7 @@ describe("branch views: one driver returns exactly the UNION ALL form's rows", (
                   `${view}_oracle`,
                 ),
                 ...(yield* difference(sql.raw(`select * from ontology.${view}`), oracle)),
+                extraIds: yield* idsOf(`(${oracle}) except all select * from ontology.${view}`),
               };
             }),
           { concurrency: 1 },
@@ -255,7 +294,17 @@ describe("branch views: one driver returns exactly the UNION ALL form's rows", (
           // The oracle really is the union of per-leaf arms; the view is not.
           expect(result.oracle, `${view}: the oracle`).toContain(") union all (");
           expect(result.definition, `${view}: the definition`).not.toContain("UNION ALL");
-          expect({ view, missing, extra }).toEqual({ view, missing: 0, extra: 0 });
+          // The single driver's tightening (effect-drizzle-ext#200), kept by
+          // the CASE (effect-drizzle-ext#204): the union showed work's
+          // stale-type and unknown-type rows, the view shows neither; every
+          // other row is equal both ways.
+          const tightened = view === "work_view" ? [STALE, UNKNOWN] : [];
+          expect({ view, missing, extra, ids: result.extraIds }).toEqual({
+            view,
+            missing: 0,
+            extra: tightened.length,
+            ids: tightened,
+          });
           expect(rows, `${view} is non-empty, so the check is not vacuous`).toBeGreaterThan(0);
           expect(result.columns, `${view}: the columns`).toEqual(result.oracleColumns);
         });
@@ -312,6 +361,25 @@ describe("branch views: fail closed", () => {
       }),
     );
   });
+
+  it("yields no row for a node whose type names no subtree leaf: the CASE's ELSE false", async () => {
+    await runInTestTransaction(
+      runtime,
+      Effect.gen(function* () {
+        yield* seedUnknown;
+        expect(yield* headsOf("ontology.work_view", UNKNOWN)).toEqual([]);
+        // The union's book arm showed the book row under the foreign type.
+        expect(yield* headsOf(`(${unionView("work_view")})`, UNKNOWN)).toEqual([
+          [0, "create", "pamphlet"],
+        ]);
+        // The CASE's last arm is `ELSE false`, not a fall-through to NULL.
+        const [definition] = yield* rowsOf(
+          sql.raw(`SELECT pg_get_viewdef('ontology.work_view') AS d`),
+        );
+        expect(String(definition?.["d"])).toContain("ELSE false");
+      }),
+    );
+  });
 });
 
 describe("branch views: per-leaf projection", () => {
@@ -343,19 +411,64 @@ describe("branch views: per-leaf projection", () => {
   });
 });
 
-// ── A wide branch ────────────────────────────────────────────────────────
+// ── Plans on the fixture ─────────────────────────────────────────────────
+
+const WORK_INDEX = "work_title_probe";
+const WORK_NODES = 4000;
+const workId = (g: string) => `('00000000-0000-4000-b000-' || lpad(${g}::text, 12, '0'))::uuid`;
+
+/** 4,000 works at two versions, alternating book and essay, and an index on the branch level. */
+const seedWorks = execAll([
+  `CREATE TEMPORARY TABLE work_ids ON COMMIT DROP AS SELECT g, ${workId("g")} AS id, CASE g % 2 WHEN 0 THEN 'book' ELSE 'essay' END AS leaf FROM generate_series(1, ${WORK_NODES}) g`,
+  `INSERT INTO ontology.node (id, type) SELECT id, leaf FROM work_ids`,
+  `INSERT INTO ontology.work (id, type) SELECT id, leaf FROM work_ids`,
+  `INSERT INTO ontology.book (id, type) SELECT id, leaf FROM work_ids WHERE leaf = 'book'`,
+  `INSERT INTO ontology.essay (id, type) SELECT id, leaf FROM work_ids WHERE leaf = 'essay'`,
+  `INSERT INTO ontology.node_version (id, version, action) SELECT id, v, CASE v WHEN 0 THEN 'create' ELSE 'update' END FROM work_ids, generate_series(0, 1) v`,
+  `INSERT INTO ontology.work_version (id, version, title) SELECT id, v, 'title ' || lpad(g::text, 6, '0') || '-' || v FROM work_ids, generate_series(0, 1) v`,
+  `INSERT INTO ontology.book_version (id, version, pages) SELECT id, v, g FROM work_ids, generate_series(0, 1) v WHERE leaf = 'book'`,
+  `INSERT INTO ontology.essay_version (id, version) SELECT id, v FROM work_ids, generate_series(0, 1) v WHERE leaf = 'essay'`,
+  `CREATE INDEX ${WORK_INDEX} ON ontology.work_version (title, id)`,
+  `ANALYZE`,
+]);
+
+describe("branch views: the fixture page plan", () => {
+  it("pages work_view through the branch level's index, joining no leaf (effect-drizzle-ext#204)", async () => {
+    await runInTestTransaction(
+      runtime,
+      Effect.gen(function* () {
+        yield* seedWorks;
+        expect(yield* countOf(`select * from ontology.work_view`)).toBe(WORK_NODES);
+        const query = "SELECT * FROM ontology.work_view ORDER BY title, id LIMIT 20";
+        const page = yield* explain(query);
+        expect(aggregates(page)).toEqual([]);
+        expect(Arr.some(page, (n) => n["Index Name"] === WORK_INDEX)).toBe(true);
+        expect(Arr.some(page, (n) => n["Node Type"] === "Sort")).toBe(false);
+        // The leaves are probed by the CASE's EXISTS subplans, never joined.
+        const joined = Arr.flatMap(yield* explainJoined(query), (n) =>
+          Arr.fromNullishOr(n["Relation Name"]),
+        );
+        expect(joined).toContain("work_version");
+        expect(Arr.intersection(joined, ["book_version", "essay_version"])).toEqual([]);
+      }),
+    );
+  });
+});
+
+// ── Generated wide branches ──────────────────────────────────────────────
 
 const empty = {};
 const wideBuilders = { text: (column: string) => text(column) };
+const hubColumns = {
+  title: dbColumn(Schema.String, { column: "title", pg: "text", notNull: true }),
+};
 
 /**
  * A twelve-leaf branch: `hub` over markers `ma` (with `maa` under it) and
  * `mb`; four leaves under `maa`, two under `ma`, six under `mb`.
  */
-const wideTree = defineTree({
-  hub: {
-    columns: { title: dbColumn(Schema.String, { column: "title", pg: "text", notNull: true }) },
-  },
+const wide12Tree = defineTree({
+  hub: { columns: hubColumns },
   ma: { parent: "hub" },
   maa: { parent: "ma" },
   mb: { parent: "hub" },
@@ -373,25 +486,110 @@ const wideTree = defineTree({
   b6: { parent: "mb", leaf: empty },
 });
 
-const wide = pgSchema("wide_branch");
-const wideTables = makeTreeTables(wideTree, { schema: wide, builders: wideBuilders });
-const wideViews = makeTreeViews(wideTree, wideTables, { schema: wide, branches: { hub: true } });
+/** A thirty-leaf branch of the same shape: ten leaves under `maa`, five under `ma`, fifteen under `mb`. */
+const wide30Tree = defineTree({
+  hub: { columns: hubColumns },
+  ma: { parent: "hub" },
+  maa: { parent: "ma" },
+  mb: { parent: "hub" },
+  a1: { parent: "maa", leaf: empty },
+  a2: { parent: "maa", leaf: empty },
+  a3: { parent: "maa", leaf: empty },
+  a4: { parent: "maa", leaf: empty },
+  a5: { parent: "maa", leaf: empty },
+  a6: { parent: "maa", leaf: empty },
+  a7: { parent: "maa", leaf: empty },
+  a8: { parent: "maa", leaf: empty },
+  a9: { parent: "maa", leaf: empty },
+  a10: { parent: "maa", leaf: empty },
+  a11: { parent: "ma", leaf: empty },
+  a12: { parent: "ma", leaf: empty },
+  a13: { parent: "ma", leaf: empty },
+  a14: { parent: "ma", leaf: empty },
+  a15: { parent: "ma", leaf: empty },
+  b1: { parent: "mb", leaf: empty },
+  b2: { parent: "mb", leaf: empty },
+  b3: { parent: "mb", leaf: empty },
+  b4: { parent: "mb", leaf: empty },
+  b5: { parent: "mb", leaf: empty },
+  b6: { parent: "mb", leaf: empty },
+  b7: { parent: "mb", leaf: empty },
+  b8: { parent: "mb", leaf: empty },
+  b9: { parent: "mb", leaf: empty },
+  b10: { parent: "mb", leaf: empty },
+  b11: { parent: "mb", leaf: empty },
+  b12: { parent: "mb", leaf: empty },
+  b13: { parent: "mb", leaf: empty },
+  b14: { parent: "mb", leaf: empty },
+  b15: { parent: "mb", leaf: empty },
+});
 
-/** The wide tree's schema, tables and branch view, as a schema module drizzle-kit reads. */
-const wideModule = {
-  wide,
-  identity: wideTables.root.identity,
-  version: wideTables.root.version,
-  ...R.fromEntries(
-    Arr.flatMap(R.toEntries(wideTables.levels), ([name, level]) => [
-      [`${name}Stable`, level.stable] as const,
-      [`${name}Version`, level.version] as const,
-    ]),
+/** One generated wide branch: its schema, its levels, and the module drizzle-kit diffs. */
+interface WideBranch {
+  readonly schema: string;
+  readonly leaves: ReadonlyArray<string>;
+  readonly levels: ReadonlyArray<{
+    readonly name: string;
+    readonly subtreeLeaves: ReadonlyArray<string>;
+  }>;
+  readonly identity: string;
+  readonly rootVersion: string;
+  readonly module: Readonly<Record<string, PgSchema | PgTable | PgView>>;
+}
+
+/** A wide tree's tables, its branch view and every leaf view (the oracle's arms), as a schema module. */
+const wideBranch = (
+  schema: PgSchema,
+  tree: Pick<WideBranch, "leaves" | "levels">,
+  tables: AnyTreeTables,
+  views: {
+    readonly leaves: Readonly<Record<string, PgView>>;
+    readonly branches: { readonly hub: PgView };
+  },
+): WideBranch => ({
+  schema: schema.schemaName,
+  leaves: tree.leaves,
+  levels: tree.levels,
+  identity: getTableName(tables.root.identity),
+  rootVersion: getTableName(tables.root.version),
+  module: {
+    schema,
+    identity: tables.root.identity,
+    version: tables.root.version,
+    ...R.fromEntries(
+      Arr.flatMap(R.toEntries(tables.levels), ([level, pair]) => [
+        [`${level}Stable`, pair.stable] as const,
+        [`${level}Version`, pair.version] as const,
+      ]),
+    ),
+    ...R.fromEntries(
+      Arr.map(R.toEntries(views.leaves), ([leaf, view]) => [`${leaf}View`, view] as const),
+    ),
+    hubView: views.branches.hub,
+  },
+});
+
+const wide12 = pgSchema("wide_branch");
+const wide12Tables = makeTreeTables(wide12Tree, { schema: wide12, builders: wideBuilders });
+const wide30 = pgSchema("wide_branch_30");
+const wide30Tables = makeTreeTables(wide30Tree, { schema: wide30, builders: wideBuilders });
+
+const WIDE_BRANCHES = [
+  wideBranch(
+    wide12,
+    wide12Tree,
+    wide12Tables,
+    makeTreeViews(wide12Tree, wide12Tables, { schema: wide12, branches: { hub: true } }),
   ),
-  hubView: wideViews.branches.hub,
-};
+  wideBranch(
+    wide30,
+    wide30Tree,
+    wide30Tables,
+    makeTreeViews(wide30Tree, wide30Tables, { schema: wide30, branches: { hub: true } }),
+  ),
+] as const;
 
-/** drizzle-kit could not diff the wide tree's schema module. */
+/** drizzle-kit could not diff a wide tree's schema module. */
 class WideSchemaError extends Schema.TaggedError<WideSchemaError>()("WideSchemaError", {
   cause: Schema.Defect(),
 }) {}
@@ -401,67 +599,153 @@ const inList = (names: ReadonlyArray<string>) => names.map((name) => `'${name}'`
 
 const WIDE_INDEX = "wide_hub_title_probe";
 const WIDE_NODES = 6000;
+/**
+ * The plan spec's node count. Below it the planner costs the hash joins'
+ * fail-closed CASE as near free and prefers a full scan and a Sort (seen at
+ * 6,000 nodes for twelve leaves and at 40,000 for thirty).
+ */
+const PLAN_NODES = 40000;
 const wideId = (g: string) => `('00000000-0000-4000-a000-' || lpad(${g}::text, 12, '0'))::uuid`;
 
-/** The wide tree's DDL from drizzle-kit, then 6,000 nodes at two versions over its leaves. */
-const seedWide = Effect.fn("branchViews.seedWide")(function* () {
+/** `n`th of a wide branch's irregular nodes, clear of the generated ones. */
+const oddId = (n: number) => `00000000-0000-4000-a000-1000000000${String(n).padStart(2, "0")}`;
+const WIDE_NO_LEAF = oddId(1); // a1: hub, ma, maa at the head, no a1 row
+const WIDE_NO_MARKER = oddId(2); // a1: hub, ma, a1 at the head, no maa row
+const WIDE_STALE = oddId(3); // type a1; only b1's chain at the head
+const WIDE_UNKNOWN = oddId(4); // type names no level; b1's chain at the head
+
+/**
+ * A wide tree's DDL from drizzle-kit, then `nodes` nodes at two versions over
+ * its leaves, the irregular nodes above (written unchecked, past the
+ * `(id, type)` arcs), and an index on the branch level.
+ */
+const seedWide = Effect.fn("branchViews.seedWide")(function* (branch: WideBranch, nodes: number) {
   const ddl = yield* Effect.tryPromise({
     try: async () =>
-      generateMigration(await generateDrizzleJson({}), await generateDrizzleJson(wideModule)),
+      generateMigration(await generateDrizzleJson({}), await generateDrizzleJson(branch.module)),
     catch: (cause) => new WideSchemaError({ cause }),
   });
-  const leaves = wideTree.leaves;
-  const identity = getTableName(wideTables.root.identity);
-  const rootVersion = getTableName(wideTables.root.version);
+  const { leaves, schema } = branch;
+  const odd = (id: string, type: string, levels: ReadonlyArray<string>) => [
+    `INSERT INTO ${schema}.${branch.identity} (id, type) VALUES ('${id}', '${type}')`,
+    `INSERT INTO ${schema}.${branch.rootVersion} (id, version, action) VALUES ('${id}', 0, 'create')`,
+    ...Arr.map(
+      levels,
+      (level) =>
+        `INSERT INTO ${schema}.${level}_version (id, version${level === "hub" ? ", title" : ""}) VALUES ('${id}', 0${level === "hub" ? ", 'odd'" : ""})`,
+    ),
+  ];
   yield* execAll([
     ...ddl,
-    `CREATE TEMPORARY TABLE wide_ids ON COMMIT DROP AS SELECT g, ${wideId("g")} AS id, (ARRAY[${inList(leaves)}])[1 + g % ${leaves.length}] AS leaf FROM generate_series(1, ${WIDE_NODES}) g`,
-    `INSERT INTO wide_branch.${identity} (id, type) SELECT id, leaf FROM wide_ids`,
-    `INSERT INTO wide_branch.${rootVersion} (id, version, action) SELECT id, v, CASE v WHEN 0 THEN 'create' ELSE 'update' END FROM wide_ids, generate_series(0, 1) v`,
-    ...Arr.flatMap(wideTree.levels, (level) => {
+    `CREATE TEMPORARY TABLE wide_ids ON COMMIT DROP AS SELECT g, ${wideId("g")} AS id, (ARRAY[${inList(leaves)}])[1 + g % ${leaves.length}] AS leaf FROM generate_series(1, ${nodes}) g`,
+    `INSERT INTO ${schema}.${branch.identity} (id, type) SELECT id, leaf FROM wide_ids`,
+    `INSERT INTO ${schema}.${branch.rootVersion} (id, version, action) SELECT id, v, CASE v WHEN 0 THEN 'create' ELSE 'update' END FROM wide_ids, generate_series(0, 1) v`,
+    ...Arr.flatMap(branch.levels, (level) => {
       const where = `WHERE leaf IN (${inList(level.subtreeLeaves)})`;
-      const stable = getTableName(wideTables.levels[level.name].stable);
-      const version = getTableName(wideTables.levels[level.name].version);
       return [
-        `INSERT INTO wide_branch.${stable} (id, type) SELECT id, leaf FROM wide_ids ${where}`,
+        `INSERT INTO ${schema}.${level.name} (id, type) SELECT id, leaf FROM wide_ids ${where}`,
         level.name === "hub"
-          ? `INSERT INTO wide_branch.${version} (id, version, title) SELECT id, v, 'title ' || lpad(g::text, 6, '0') || '-' || v FROM wide_ids, generate_series(0, 1) v ${where}`
-          : `INSERT INTO wide_branch.${version} (id, version) SELECT id, v FROM wide_ids, generate_series(0, 1) v ${where}`,
+          ? `INSERT INTO ${schema}.${level.name}_version (id, version, title) SELECT id, v, 'title ' || lpad(g::text, 6, '0') || '-' || v FROM wide_ids, generate_series(0, 1) v ${where}`
+          : `INSERT INTO ${schema}.${level.name}_version (id, version) SELECT id, v FROM wide_ids, generate_series(0, 1) v ${where}`,
       ];
     }),
-    `CREATE INDEX ${WIDE_INDEX} ON wide_branch.hub_version (title, id)`,
+    ...unchecked([
+      ...odd(WIDE_NO_LEAF, "a1", ["hub", "ma", "maa"]),
+      ...odd(WIDE_NO_MARKER, "a1", ["hub", "ma", "a1"]),
+      ...odd(WIDE_STALE, "a1", ["hub", "mb", "b1"]),
+      ...odd(WIDE_UNKNOWN, "zz", ["hub", "mb", "b1"]),
+    ]),
+    `CREATE INDEX ${WIDE_INDEX} ON ${schema}.hub_version (title, id)`,
     `ANALYZE`,
   ]);
 });
 
-describe("branch views: plans", () => {
-  it("pages a twelve-leaf branch through the branch level's index, with no Sort and no aggregate", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seedWide();
-        // Every node shows once, at its head: the fail-closed predicate
-        // matches each one's own leaf.
-        expect(yield* countOf(`select * from wide_branch.hub_view`)).toBe(WIDE_NODES);
-        const page = yield* explain(
-          "SELECT * FROM wide_branch.hub_view ORDER BY title, id LIMIT 20",
-        );
-        expect(aggregates(page)).toEqual([]);
-        expect(Arr.some(page, (n) => n["Index Name"] === WIDE_INDEX)).toBe(true);
-        expect(Arr.some(page, (n) => n["Node Type"] === "Sort")).toBe(false);
-        const byId = yield* explain(
-          `SELECT * FROM wide_branch.hub_view WHERE id = '00000000-0000-4000-a000-000000000042'`,
-        );
-        expect(aggregates(byId)).toEqual([]);
-        expect(
-          Arr.filter(
-            byId,
-            (n) =>
-              n["Node Type"] === "Seq Scan" &&
-              (n["Relation Name"] === "node_version" || n["Relation Name"] === "hub_version"),
-          ),
-        ).toEqual([]);
-      }),
-    );
-  });
+/**
+ * The `UNION ALL` form of a wide branch view, from its leaf views: per leaf,
+ * the leaf view's branch columns with the identity's `type`, as each
+ * per-leaf arm was (the leaf views are unchanged, and fail closed alike).
+ */
+const wideOracle = Effect.fn("branchViews.wideOracle")(function* (branch: WideBranch) {
+  const columns = Arr.map(yield* columnsOf(branch.schema, "hub_view"), (c) => c.split(" ")[0]);
+  const select = Arr.map(columns, (c) => (c === "type" ? "n.type" : `l.${c}`)).join(", ");
+  const arms = Arr.map(
+    branch.leaves,
+    (leaf) =>
+      `(select ${select} from ${branch.schema}.${leaf}_view l join ${branch.schema}.${branch.identity} n on n.id = l.id)`,
+  );
+  return `select * from (${arms.join(" union all ")}) oracle`;
+});
+
+describe("branch views: generated wide branches", () => {
+  it.each(WIDE_BRANCHES)(
+    "$schema returns the UNION ALL form's rows, less the stale- and unknown-type ones",
+    async (branch) => {
+      await runInTestTransaction(
+        runtime,
+        Effect.gen(function* () {
+          yield* seedWide(branch, WIDE_NODES);
+          const view = `select * from ${branch.schema}.hub_view`;
+          const oracle = yield* wideOracle(branch);
+          expect(yield* countOf(view)).toBe(WIDE_NODES);
+          expect(yield* difference(sql.raw(view), oracle)).toEqual({
+            rows: WIDE_NODES,
+            missing: 0,
+            extra: 2,
+          });
+          // The tightening, explicitly: only the stale- and unknown-type
+          // nodes are the union's alone; the missing leaf and marker show in
+          // neither.
+          expect(yield* idsOf(`${oracle} except all ${view}`)).toEqual([WIDE_STALE, WIDE_UNKNOWN]);
+          expect(
+            yield* countOf(
+              `${view} where id in ('${WIDE_NO_LEAF}', '${WIDE_NO_MARKER}', '${WIDE_STALE}', '${WIDE_UNKNOWN}')`,
+            ),
+          ).toBe(0);
+          expect(
+            yield* countOf(
+              `select * from (${oracle}) o where id in ('${WIDE_NO_LEAF}', '${WIDE_NO_MARKER}')`,
+            ),
+          ).toBe(0);
+        }),
+      );
+    },
+  );
+
+  it.each([WIDE_BRANCHES[0]])(
+    "$schema pages through the branch level's index with no Sort, no aggregate and no leaf join",
+    async (branch) => {
+      await runInTestTransaction(
+        runtime,
+        Effect.gen(function* () {
+          yield* seedWide(branch, PLAN_NODES);
+          const query = `SELECT * FROM ${branch.schema}.hub_view ORDER BY title, id LIMIT 20`;
+          const page = yield* explain(query);
+          expect(aggregates(page)).toEqual([]);
+          expect(Arr.some(page, (n) => n["Index Name"] === WIDE_INDEX)).toBe(true);
+          expect(Arr.some(page, (n) => n["Node Type"] === "Sort")).toBe(false);
+          const joined = Arr.flatMap(yield* explainJoined(query), (n) =>
+            Arr.fromNullishOr(n["Relation Name"]),
+          );
+          const below = Arr.filter(
+            Arr.map(branch.levels, (level) => `${level.name}_version`),
+            (table) => table !== "hub_version",
+          );
+          expect(joined).toContain("hub_version");
+          expect(Arr.intersection(joined, below)).toEqual([]);
+          const byId = yield* explain(
+            `SELECT * FROM ${branch.schema}.hub_view WHERE id = '00000000-0000-4000-a000-000000000042'`,
+          );
+          expect(aggregates(byId)).toEqual([]);
+          expect(
+            Arr.filter(
+              byId,
+              (n) =>
+                n["Node Type"] === "Seq Scan" &&
+                (n["Relation Name"] === branch.rootVersion || n["Relation Name"] === "hub_version"),
+            ),
+          ).toEqual([]);
+        }),
+      );
+    },
+  );
 });
