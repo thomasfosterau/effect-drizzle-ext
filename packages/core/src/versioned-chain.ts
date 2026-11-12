@@ -79,9 +79,9 @@ import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as P from "effect/Predicate";
 import * as R from "effect/Record";
-import { enumCheck, makeDiscriminatorConstraints, type TypedStable } from "./constraints.ts";
+import { enumCheck, discriminatorConstraintsFor, type TypedStable } from "./constraints.ts";
 import {
-  makeDeriveColumns,
+  deriveColumnsWith,
   type ColumnBuilders,
   type DerivedColumns,
   type DeriveOptions,
@@ -910,6 +910,24 @@ export interface TreeTablesConfig<
 const columnsOrEmpty = <T extends ColumnMap>(columns: T | undefined): T => columns ?? ({} as T);
 
 /**
+ * Throws `DerivationError` at module load when an injected column map shares a
+ * key with the columns a table already has, naming the key and both sources:
+ * spread after them, it would silently replace the earlier column.
+ */
+const rejectSharedKeys = (
+  table: string,
+  existing: { readonly source: string; readonly keys: ReadonlyArray<string> },
+  injected: { readonly source: string; readonly columns: ColumnMap | undefined },
+): void =>
+  Arr.forEach(R.keys(injected.columns ?? {}), (key) => {
+    if (Arr.contains(existing.keys, key)) {
+      treeError(
+        `table "${table}" gets "${key}" from both ${existing.source} and ${injected.source}; rename the ${injected.source} key`,
+      );
+    }
+  });
+
+/**
  * The `action` values the root version table admits, in CHECK order; a
  * compile error if they stop naming every {@link VersionAction} exactly.
  */
@@ -938,8 +956,10 @@ const VERSION_ACTIONS = LiteralExact.tuple<VersionAction>()(["create", "update",
  * `${level}_id_type_unique` / `_fk` / `_type_valid`); no version table carries
  * `action`. Column, constraint and CHECK value order follow declaration order,
  * so the same tree always generates the same migration. Throws
- * `DerivationError` at module load for a column kind `builders` lacks or an
- * unresolvable reference.
+ * `DerivationError` at module load for a column kind `builders` lacks, an
+ * unresolvable reference, or an injected column (`root.identityColumns`,
+ * `root.versionColumns`, a level's `columns` hook) whose key the table already
+ * has, naming the key and both sources.
  *
  * Every table is typed from the tree's column phantom. The one type-erasure
  * seam is inside: the level and fact records are assembled from the runtime
@@ -984,10 +1004,10 @@ export const makeTreeTables = <
   config: TreeTablesConfig<B, H, IE, VE, P>,
 ): TreeTables<S, M, B, H, IE, VE, P> => {
   const { schema } = config;
-  const derive = makeDeriveColumns(config.builders, { resolveReference: config.resolveReference });
+  const derive = deriveColumnsWith(config.builders, { resolveReference: config.resolveReference });
   const identityName = config.root?.identity ?? "node";
   const versionName = config.root?.version ?? `${identityName}_version`;
-  const toolkit = makeDiscriminatorConstraints<string>({
+  const toolkit = discriminatorConstraintsFor<string>({
     leaves: (level) =>
       Option.getOrElse(
         Option.map(
@@ -998,6 +1018,19 @@ export const makeTreeTables = <
       ),
   });
 
+  rejectSharedKeys(
+    identityName,
+    { source: "the identity table's own columns", keys: ["id", "type"] },
+    { source: "root.identityColumns", columns: config.root?.identityColumns },
+  );
+  rejectSharedKeys(
+    versionName,
+    {
+      source: "the root version table's own columns",
+      keys: ["id", "version", "action", "timestamp", "actor"],
+    },
+    { source: "root.versionColumns", columns: config.root?.versionColumns },
+  );
   const identity = schema.table<string, RootIdentityColumnBuilders<IE>>(
     identityName,
     {
@@ -1053,6 +1086,11 @@ export const makeTreeTables = <
     const metas = { ...level.levelColumns, ...level.leafColumns };
     const own: ColumnMap = derive.fromMeta(metas);
     const factScoped = level.kind === "fact-scoped";
+    rejectSharedKeys(
+      level.name,
+      { source: `level "${level.name}"'s tree columns`, keys: ["id", "version", ...R.keys(own)] },
+      { source: `levels.${level.name}.columns`, columns: hooks.columns },
+    );
     const tables = subtype(schema, {
       name: level.name,
       parentId: parent.stable.id,

@@ -32,12 +32,12 @@ import {
 import {
   DerivationError,
   deriveFieldCheckConstraints,
-  makeDeriveColumns,
+  deriveColumnsWith,
 } from "@thomasfosterau/effect-drizzle-ext/derive";
 import { makeReferenceRegistry } from "@thomasfosterau/effect-drizzle-ext/references";
 import {
   enumCheck,
-  makeDiscriminatorConstraints,
+  discriminatorConstraintsFor,
 } from "@thomasfosterau/effect-drizzle-ext/constraints";
 import {
   bytea,
@@ -85,7 +85,7 @@ import {
   resourceColumns,
   dbTable,
 } from "@thomasfosterau/effect-drizzle-ext/jsonapi";
-import { makeDeriveResourceColumns } from "@thomasfosterau/effect-drizzle-ext/jsonapi/derive";
+import { deriveResourceColumnsWith } from "@thomasfosterau/effect-drizzle-ext/jsonapi/derive";
 import * as Pg from "@thomasfosterau/effect-drizzle-ext-pg";
 import * as PgChain from "@thomasfosterau/effect-drizzle-ext-pg/chain";
 import * as PgMigrations from "@thomasfosterau/effect-drizzle-ext-pg/migrations";
@@ -139,7 +139,7 @@ const builders = {
   uuid: (name: string) => uuid(name),
 };
 const references = makeReferenceRegistry();
-const derive = makeDeriveColumns(builders, { resolveReference: references.resolve });
+const derive = deriveColumnsWith(builders, { resolveReference: references.resolve });
 
 export const book = pgTable(
   "book",
@@ -152,7 +152,7 @@ type BookRow = typeof book.$inferSelect;
 
 // ── constraints ───────────────────────────────────────────────────────────
 
-const discriminator = makeDiscriminatorConstraints<"work" | "agent">({
+const discriminator = discriminatorConstraintsFor<"work" | "agent">({
   leaves: (level) => (level === "work" ? ["books", "films"] : []),
 });
 export const branch = pgTable(
@@ -350,7 +350,7 @@ export const personColumns = resourceColumns(PersonResource);
 export const personProjections = resourceAttributeProjections(PersonResource);
 export const personTable = table(PersonResource, { name: "person", level: "agent" });
 export const personTableMeta = readDbTable(PersonResource);
-const deriveResource = makeDeriveResourceColumns(builders);
+const deriveResource = deriveResourceColumnsWith(builders);
 export const person = pgTable("person", {
   id: uuid("id").primaryKey(),
   ...deriveResource(PersonResource),

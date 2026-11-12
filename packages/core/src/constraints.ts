@@ -9,7 +9,7 @@
  * - {@link enumCheck} — the `CHECK (col IN (…))` behind an enum-valued `text`
  *   column, so a vocabulary declared once in a model constrains the database
  *   too.
- * - {@link makeDiscriminatorConstraints} — the three constraints that thread a
+ * - {@link discriminatorConstraintsFor} — the three constraints that thread a
  *   `type` discriminator up a hierarchy of stable tables, parameterised over
  *   the hierarchy (the library knows no level ontology; the consumer supplies
  *   the leaf set per level).
@@ -160,7 +160,7 @@ export interface DiscriminatorToolkit<Level extends string> {
  * exist under a parent carrying the SAME `type`), and the CHECK narrows `type`
  * to the level's own subtree.
  */
-export const makeDiscriminatorConstraints = <Level extends string>(options: {
+export const discriminatorConstraintsFor = <Level extends string>(options: {
   readonly leaves: (level: Level) => ReadonlyArray<string>;
   readonly names?: DiscriminatorNames;
 }): DiscriminatorToolkit<Level> => {
