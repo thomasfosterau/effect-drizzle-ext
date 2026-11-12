@@ -1,31 +1,40 @@
 name: CI
 
-# ONE job, ONE required check: the pipeline's task graph lives in
-# vite.config.ts (the root `check` and `test:integration` tasks), not in
-# GitHub Actions `needs:`. Copied in shape from the gardeneria application.
+# ONE pipeline, defined once: the `ci` task in vite.config.ts runs every gate
+# in order (format and lint, type gates, unit, integration, build, docgen,
+# audit), so `vp run ci` locally is what this workflow runs. The `ci` job
+# runs it once per Node version in the matrix; each leg's check,
+# `ci (node <version>)`, is required by name in the ruleset.
 #
 # Integration runs against an EPHEMERAL LOCAL database (fresh per run,
 # provisioned by the suite's own global setup on the job's `postgres` service
 # container) — no stage, no secrets, so every PR class runs it, Dependabot's
-# included: the job holds a read-only token, no secrets and no OIDC, every
-# action is pinned to a commit SHA, and checkout never persists credentials.
+# included: the jobs hold a read-only token, no secrets and no OIDC, every
+# action is pinned, and checkout never persists credentials.
 
 on:
   pull_request:
-    branches: [trunk]
     types: [opened, reopened, synchronize, ready_for_review]
   push:
     branches: [trunk]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/trunk' }}
 
-# No permissions by default; the single job grants only read access.
+# No permissions by default; each job grants only read access.
 permissions: {}
 
 jobs:
   ci:
+    name: ci (node ${{ matrix.node }})
+    # Every supported line: the active LTS and the latest release. Both must
+    # sit inside `engines.node` (>=22.18).
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [lts, latest]
     runs-on: ubuntu-latest
     # The integration suite's database. Fresh per job by construction (the
     # container dies with the job), and the suite's global setup additionally
@@ -45,7 +54,7 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-    timeout-minutes: 20
+    timeout-minutes: 25
     permissions:
       contents: read
     env:
@@ -61,12 +70,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Vite+ at the catalog's `vite-plus` pin (auto-detected), its managed
-      # Node and pnpm, and the dependency cache. The install is the next step,
+      # Vite+ at the catalog's `vite-plus` pin (auto-detected), the matrix's
+      # Node (via `vp env use`), its pnpm, and the dependency cache. The install is the next step,
       # so it can retry.
       - name: Setup Vite+
         uses: voidzero-dev/setup-vp@v1.22.0
         with:
+          node-version: ${{ matrix.node }}
           cache: true
           run-install: false
       # Retried up to three times: pnpm's linker has raced itself transiently
@@ -93,21 +103,11 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules/.vite/task-cache
-          key: vp-task-v1-${{ runner.os }}-${{ github.sha }}
+          key: vp-task-v1-${{ runner.os }}-node-${{ matrix.node }}-${{ github.sha }}
           restore-keys: |
-            vp-task-v1-${{ runner.os }}-
-      - name: Format and lint
-        run: vp check
-      - name: Type gates (packages + emitted declarations)
-        run: vp run --concurrency-limit 2 check
-      - name: Unit tests
-        run: vp run -r test:unit
-      - name: Integration tests
-        run: vp run test:integration
-      - name: Build
-        run: vp run -r build
-      # Type-checks AND runs every JSDoc @example (docgen, runExamples).
-      - name: Verify documentation examples (docgen)
-        run: vp run docgen
-      - name: Audit
-        run: pnpm audit --audit-level high
+            vp-task-v1-${{ runner.os }}-node-${{ matrix.node }}-
+      - name: Node version
+        run: node --version
+      # Every gate, in order: vite.config.ts → `ci`.
+      - name: CI
+        run: vp run ci
