@@ -1,5 +1,79 @@
 # @thomasfosterau/effect-drizzle-ext
 
+## 0.3.0
+
+### Minor Changes
+
+- [#173](https://github.com/thomasfosterau/effect-drizzle-ext/pull/173) [`472337a`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/472337afa3fb5bf4d954ac8f966607020d35c3ff) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - `executeRows` (`./query`) now decodes the rows with a Schema instead of trusting a caller-asserted row type. Its error channel gains `Schema.SchemaError`, which it fails with when a row doesn't match, or when the result is neither a rows array nor a result object (several statements' results, for one).
+  
+  **Migration:** replace the type argument with a schema argument.
+  
+  ```ts
+  // before
+  executeRows<{ n: number }>(db, sql`SELECT n FROM t`);
+  // after
+  executeRows(db, sql`SELECT n FROM t`, Schema.Struct({ n: Schema.Finite }));
+  ```
+  
+  Also new: `isDbColumn`, the guard `readDbColumn` and `resourceColumns` now read an annotation through. A value under the annotation key that isn't db-column metadata reads as no column.
+
+- [#175](https://github.com/thomasfosterau/effect-drizzle-ext/pull/175) [`7709bde`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/7709bdeb2a4972eac54cdc81db4be46d94be7d2c) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - Options bags the library reads itself now spell optional members `readonly x?: T` instead of `?: T | undefined` (effect-drizzle-ext#105):
+  
+  - core: `SortableColumnsOptions`, `ResolveSortOrderOptions`, `ChronologicalOrderOptions`, `NumericBounds`, `DiscriminatorNames` and `typeConstraints`' `refinable`, and `defineTree`'s `LevelSpec`.
+  - -pg: `DatabaseSourceOptions.probe`, `ProvisionOptions.applyMigrations`, and `MigrationDriftOptions.base` (now `base?: Option.Option<GitBase>`).
+  
+  `ResolutionEnvironment` and `BaseRefEnvironment` are now `Readonly<NodeJS.ProcessEnv>`, so `process.env` passes as before.
+  
+  Config handed to Drizzle (`DbColumn`, `DeriveOptions`, `./versioned-chain`'s builder config) and to `PgPoolConfig` (`pgClientFromUrl` / `pgClientFromPool` / `testDatabaseLayer`) keeps `?: T | undefined`.
+  
+  **Migration:** under `exactOptionalPropertyTypes`, omit an absent member instead of passing `undefined`. For example, `resolveSortOrder({ view, sort: query.sort })` with a possibly-undefined `query.sort` becomes `resolveSortOrder(query.sort === undefined ? { view } : { view, sort: query.sort })`. Where a caller holds a whole options object, forward it with a rest spread (`const { direction, ...rest } = options`), which keeps an absent key absent.
+
+- [#186](https://github.com/thomasfosterau/effect-drizzle-ext/pull/186) [`763b059`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/763b0592321e77afa9149ed718e5077837744689) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - Three plain factories drop their `make*` prefix, which in Effect names service constructors; these build no service:
+  
+  | Before                         | After                         | Entry              |
+  | ------------------------------ | ----------------------------- | ------------------ |
+  | `makeDeriveColumns`            | `deriveColumnsWith`           | `./derive`         |
+  | `makeDeriveResourceColumns`    | `deriveResourceColumnsWith`   | `./jsonapi/derive` |
+  | `makeDiscriminatorConstraints` | `discriminatorConstraintsFor` | `./constraints`    |
+  
+  Their signatures and behaviour are unchanged.
+  
+  **Migration:** rename the imports and calls, for example `const { fromFields } = deriveColumnsWith(builders, { resolveReference })`.
+
+- [#193](https://github.com/thomasfosterau/effect-drizzle-ext/pull/193) [`87f1085`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/87f1085f9bbfa5f9f32875d020ab99a0972d9d9e) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - The root entry (`@thomasfosterau/effect-drizzle-ext`) now exports the version-chain read shapes `VersionAction`, `VersionChainEntry` and `VersionSnapshot`, so a client-bundled package can name them without pulling `drizzle-orm` into its module graph (effect-drizzle-ext#191). They are the same types `./versioned-chain` exports, and that import path keeps working: nothing needs migrating. `VersionSnapshot["columns"]` is spelled without Drizzle, as the decoded type of `Schema.Record(Schema.String, Schema.Unknown)`: exactly the type `Readonly<InferSelectModel<PgTable>>` resolved to (and `Readonly<Record<string, unknown>>`), so no caller changes.
+
+- [#189](https://github.com/thomasfosterau/effect-drizzle-ext/pull/189) [`7993e67`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/7993e67ecd487a5d84a4cea9bdc4a20eecd7784e) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - Per-level stable-table columns and constraints (effect-drizzle-ext#188). They hold an external key that must be unique across a leaf's nodes, which a version table can't constrain because every version repeats it.
+  
+  - `makeTreeTables`: a level's `stableColumns` hook appends columns to its stable table after `id` / `type`, and `stableConstraints` appends constraints after the discriminator's. `root.identityConstraints` does the same for the identity table, after `UNIQUE (id, type)`. `makeSubtypeTables` takes `stableColumns` / `stableConstraints` too, and `SubtypeTables` gains a defaulted `TStable` parameter. A `stableColumns` key the stable table (`id`, `type`) or the level's version table already has throws `DerivationError` at module load.
+  - `makeTreeViews`: every view whose path reaches the level projects its stable columns, before its version columns, INNER JOINed on `id`. They're typed through `TreeLeafSelection` / `TreeBranchSelection` and handed to a branch's `project`. A key another of the view's sources shares throws `DerivationError`.
+  - `./chain`: `create` takes `stable` (`ChainStableExtras`), keyed by field across the leaf's path. No other write touches a stable row.
+  
+  The change is additive: a tree without these hooks emits the same DDL and view SQL as before.
+
+- [#183](https://github.com/thomasfosterau/effect-drizzle-ext/pull/183) [`db03da2`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/db03da202fa7cccd1d708ae57fbf205baa880783) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - `makeTreeTables` now throws `DerivationError` at module load when an injected column shares a key with one its table already has, naming the key and both sources. Previously the injected column silently replaced the other. The check covers:
+  
+  - `root.identityColumns` against `id` / `type`;
+  - `root.versionColumns` against `id` / `version` / `action` / `timestamp` / `actor`;
+  - a level's `columns` hook against that level's tree columns and `id` / `version`.
+  
+  Trees without a clash emit the same DDL.
+  
+  **Migration:** rename the injected key.
+
+- [#168](https://github.com/thomasfosterau/effect-drizzle-ext/pull/168) [`2a050ae`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/2a050ae87d12bd41b7cc83efd4b9e6b55d4a14d6) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - `makeTreeViews` now throws `DerivationError` at module load when two of a view's sources share a column key, naming the key and both sources. Previously the later source silently won. This covers a level column named like a `root.identityColumns` extra (the `slug` trap), a level column named `timestamp` or `createdAt`, and a branch `project` key the view already selects. The emitted SQL of every view without a clash is unchanged.
+  
+  **Migration:** if a tree now throws, rename one of the two columns' keys. For a branch view, return the projected column from `project` under a key the view doesn't already select. The view that loaded before was missing one of the two columns.
+
+### Patch Changes
+
+- [#167](https://github.com/thomasfosterau/effect-drizzle-ext/pull/167) [`ccb81e7`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/ccb81e74e2bdc32c32fa0050db69c948eea3df2c) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - `BuilderFor` (and with it `DerivedColumns` / `DerivedResourceColumns`) now applies Drizzle's `HasDefault` when a `dbColumn` annotation declares a `default`, matching the `.default(value)` the derivation applies at runtime. A defaulted column is optional on the table's `$inferInsert`. An app carrying a local `WithDefaults` workaround can drop it.
+
+- [#176](https://github.com/thomasfosterau/effect-drizzle-ext/pull/176) [`1ea0789`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/1ea07899dccdea4f850d5240a76a373bfdef5bc9) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - `findPgError`, `classifyError`, `isUniqueViolation`, `isConstraintViolation`, `isRetryableTransactionFailure` (`./errors`) and `isRetryableConnectFailure` (`-pg/testing`) name their parameter `cause`: any caught failure value, walked as an error graph. The type (`unknown`) and behaviour are unchanged.
+
+- [#166](https://github.com/thomasfosterau/effect-drizzle-ext/pull/166) [`95c24f8`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/95c24f8eaea88dd2239f33f0823f98a1d9afed2e) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - Accept `@thomasfosterau/effect-ext` `^0.1.0 || ^0.2.0`, so an app on effect-ext 0.2 installs one copy instead of a nested 0.1.0. Nothing this package uses (`./Ast`, `./LiteralExact`) changed between the two releases.
+
+- [#192](https://github.com/thomasfosterau/effect-drizzle-ext/pull/192) [`f004f7e`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/f004f7e379a37bc4f76b07b70df3d8c5df10c223) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - `resolveSortOrder` (`./sort`) keeps only the first occurrence of a field repeated in the caller's sort, and the closing `id` tiebreak follows the de-duplicated list (effect-drizzle-ext#190). `[name asc, name desc]` now resolves to `name asc, id asc`, the same order as `[name asc]`, instead of `name asc, name desc, id desc`. `resourceAttributeProjections`' doc comment now says `column` is an `Option` by design.
+
 ## 0.2.0
 
 ### Minor Changes
