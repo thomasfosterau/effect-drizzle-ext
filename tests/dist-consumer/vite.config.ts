@@ -18,7 +18,8 @@ export default defineConfig({
       // root-entry-graph.ts; effect-drizzle-ext#191): the `.` entry is the
       // Drizzle-free one a client bundle imports, so a `drizzle-orm` import in
       // any file its `dist/` JavaScript or declarations reach, a shared chunk
-      // included, fails the check. Node runs the script with its built-in type
+      // included, fails the check, except the `PostGis` namespace's own chunk
+      // (effect-drizzle-ext#222). Node runs the script with its built-in type
       // stripping (engines: node >= 22.18).
       check: {
         command: "tsc -p tsconfig.json && node scripts/root-entry-graph.ts",

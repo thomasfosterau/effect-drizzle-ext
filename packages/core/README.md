@@ -42,7 +42,7 @@ The [overview](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/d
 
 | Subpath | Drizzle? | Contents | Guide |
 | --- | --- | --- | --- |
-| `.` | no | The `dbColumn` / `dbTable` annotation vocabulary, phantoms, `Option` readers, numeric bounds, struct-field projection, `defineTree` (the Drizzle-free ontology declaration), and the `VersionChainEntry` / `VersionSnapshot` read shapes `./versioned-chain` also exports. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/annotations.md) |
+| `.` | no | The `dbColumn` / `dbTable` annotation vocabulary, phantoms, `Option` readers, numeric bounds, struct-field projection, `defineTree` (the Drizzle-free ontology declaration), the `VersionChainEntry` / `VersionSnapshot` read shapes `./versioned-chain` also exports, and the `PostGis` namespace (`./postgis`, the one part that imports Drizzle). | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/annotations.md) |
 | `./derive` | yes | The builder registry, `deriveColumnsWith`, CHECK derivation from bounds, `DerivationError`. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/derive.md) |
 | `./references` | yes | The lazy FK-reference registry a `resolveReference` hook is built from. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/references.md) |
 | `./constraints` | yes | `enumCheck` and the threaded `type`-discriminator toolkit. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/constraints.md) |
@@ -54,6 +54,7 @@ The [overview](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/d
 | `./errors` | no (types only) | Postgres error facts and tagged classification over drizzle / `@effect/sql` error graphs. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/errors.md) |
 | `./database` | types only | The driver-agnostic `makeDatabaseServices` factory (`Database`, `CurrentTransaction`, `transact`, `readHandle`). | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/database.md) |
 | `./versioned-chain` | yes | The whole-tree builders `makeTreeTables` / `makeTreeViews`, the per-leaf `makeSubtypeTables` / `makeCurrentVersionView`, the `VersionChainEntry` / `VersionSnapshot` read shapes, `versionTimestamps`. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/versioned-chain.md) |
+| `./postgis` | yes | Typed PostGIS helpers beside `eq`: `geometryColumn` / `geographyColumn`, spatial predicates, measures, constructors and outputs that keep geometry and geography apart. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/postgis.md) |
 | `./jsonapi` | no | `Resource.*`-shaped readers, including `resourceAttributeProjections`, and `defineResourceTree` (optional peer `@thomasfosterau/effect-jsonapi`). | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/jsonapi.md) |
 | `./jsonapi/derive` | yes | The Drizzle-emitting half of `./jsonapi`. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/jsonapi.md) |
 
