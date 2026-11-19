@@ -19,8 +19,7 @@ updates:
     assignees:
       - "thomasfosterau"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "daily"
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
@@ -81,8 +80,7 @@ updates:
     assignees:
       - "thomasfosterau"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "daily"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
@@ -99,8 +97,7 @@ updates:
     assignees:
       - "thomasfosterau"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "daily"
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
