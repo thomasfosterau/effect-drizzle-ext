@@ -4,7 +4,7 @@
  * the kind rules (no geometry/geography mix, geometry-only functions) are
  * pinned on the operand types.
  *
- * @module tests/postgis
+ * @module tests/PostGis
  */
 
 import { describe, expect, expectTypeOf, it } from "vite-plus/test";
@@ -60,7 +60,7 @@ import {
   type SameKindOperand,
   type SpatialKindOf,
   type SpatialOperand,
-} from "../src/postgis.ts";
+} from "../src/PostGis.ts";
 import * as Arr from "effect/Array";
 import * as R from "effect/Record";
 

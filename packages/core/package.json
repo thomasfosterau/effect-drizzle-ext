@@ -44,7 +44,7 @@
     "./errors": "./src/errors.ts",
     "./database": "./src/database.ts",
     "./versioned-chain": "./src/versioned-chain.ts",
-    "./postgis": "./src/postgis.ts",
+    "./postgis": "./src/PostGis.ts",
     "./jsonapi": "./src/jsonapi/index.ts",
     "./jsonapi/derive": "./src/jsonapi/derive.ts"
   },

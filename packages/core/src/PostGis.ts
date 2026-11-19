@@ -1,50 +1,12 @@
 /**
  * @copyright Thomas Foster
  *
- * **Typed PostGIS helpers** that sit beside Drizzle's `eq` / `and`: spatial
- * predicates (`ST_Intersects`, `ST_DWithin`, …), measures (`ST_Distance`,
- * `ST_Area`, the `<->` KNN distance), constructors (`ST_Point`,
- * `ST_GeomFromGeoJSON`, …) and outputs (`ST_AsGeoJSON`, `ST_X`, …), each
- * returning a typed Drizzle `SQL` value to drop into `where`, `orderBy` or a
- * select map.
+ * Typed PostGIS helpers that sit beside Drizzle's `eq`: spatial predicates,
+ * measures, constructors and outputs, each returning a typed `SQL`. Operands
+ * are geometry or geography only, a binary helper takes two of the same
+ * kind, and geometry-only PostGIS functions accept geometry only.
  *
- * ## What the types enforce
- *
- * A spatial operand is a {@link Geometry} or a {@link Geography}, never a bare
- * `SQL`: a column built by {@link geometryColumn} / {@link geographyColumn},
- * a Drizzle `geometry()` point column (geometry), or an expression one of
- * these helpers returns. A binary helper takes two operands of the **same**
- * kind, so `ST_Distance(geometry, geography)` is a type error rather than a
- * silent implicit cast. Functions PostGIS defines for geometry only
- * (`ST_Contains`, `ST_X`, `ST_Transform`, …) accept geometry only; cross
- * with {@link asGeography} / {@link asGeometry}. An expression the helpers
- * don't cover joins in as `sql<Geometry>` / `sql<Geography>` (Drizzle infers
- * that type argument from the parameter, so a bare `sql` template written in
- * the second operand's position is taken at its word).
- *
- * Predicates are `SQL<boolean>`, measures and coordinates `SQL<number>`
- * (PostGIS returns `float8`, which the driver parses), text outputs
- * `SQL<string>`. Numbers are bound as parameters cast to `double precision`
- * (an SRID to `integer`) so Postgres resolves PostGIS's overloads without
- * guessing; a per-row number can be a numeric column or `sql<number>`.
- *
- * ## Units
- *
- * Geography distances, areas and lengths are metres on the spheroid.
- * Geometry ones are in the units of the operand's SRID (degrees for 4326),
- * which is why a radius search over lon/lat data usually wants geography.
- *
- * ## Values
- *
- * A geometry or geography value read from the driver is PostGIS's hex EWKB
- * text, typed {@link Geometry} / {@link Geography}: opaque, writable back
- * unchanged. Read coordinates or GeoJSON with {@link stX} / {@link stAsGeoJSON}
- * in the select map; write with a constructor in the insert values.
- *
- * The extension is the application's to declare, next to its other extras:
- * `extension("postgis")` from `@thomasfosterau/effect-drizzle-ext-pg/tooling`.
- *
- * @module postgis
+ * @module PostGis
  */
 import { Column, is, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import type { AnyColumn } from "drizzle-orm";

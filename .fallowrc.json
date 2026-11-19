@@ -13,7 +13,7 @@
     "packages/core/src/errors.ts",
     "packages/core/src/database.ts",
     "packages/core/src/versioned-chain.ts",
-    "packages/core/src/postgis.ts",
+    "packages/core/src/PostGis.ts",
     "packages/core/src/jsonapi/index.ts",
     "packages/core/src/jsonapi/derive.ts",
     "packages/pg/src/index.ts",
