@@ -7,8 +7,9 @@ describe("subpaths", () => {
       import("@thomasfosterau/effect-drizzle-ext-pg"),
       import("@thomasfosterau/effect-drizzle-ext-pg/migrations"),
       import("@thomasfosterau/effect-drizzle-ext-pg/testing"),
+      import("@thomasfosterau/effect-drizzle-ext-pg/tin"),
       import("@thomasfosterau/effect-drizzle-ext-pg/tooling"),
     ]);
-    expect(modules).toHaveLength(4);
+    expect(modules).toHaveLength(5);
   });
 });
