@@ -1,16 +1,9 @@
 # effect-drizzle-ext
 
-The Effect ↔ Drizzle bridge, published as three npm packages:
+The Effect ↔ Drizzle bridge: derive Drizzle tables from Effect Schema annotations, version entities on append-only chains, classify Postgres errors, and run Drizzle queries as Effects over `@effect/sql-pg`. It extends drizzle-orm's own Effect integration rather than replacing it.
 
-| Package | What it is |
-| --- | --- |
-| [`@thomasfosterau/effect-drizzle-ext`](packages/core/README.md) | Effect Schema → Drizzle column derivation with an extensible column-kind system, a versioned-chain interpreter, typed Postgres error classification, pagination and transaction combinators. Peers: `effect`, `drizzle-orm`. |
-| [`@thomasfosterau/effect-drizzle-ext-pg`](packages/pg/README.md) | The `@effect/sql-pg` binding: `Database` / `CurrentTransaction` services over `drizzle-orm/effect-postgres`, `PgClient` layer helpers, a sentinel-rollback test transaction runner and test-database provisioning, a fresh-database migration runner, and the migration-drift / view-dependency schema guards. Peers add `@effect/sql-pg`; `drizzle-kit` and `@testcontainers/postgresql` are optional. |
-| [`@thomasfosterau/effect-drizzle-ext-kit`](packages/kit/README.md) | `effect-drizzle-kit`, a command-line companion to drizzle-kit: `generate` migrates the extensions, domains and composite types drizzle-kit doesn't manage, and `check` gates extras and schema drift. Peers add `drizzle-kit` and `@effect/platform-node`. |
-
-The core and pg packages extend drizzle-orm's own Effect integration (`drizzle-orm/effect-postgres`, `effect-core`) rather than replacing it, and both are built against `effect@4.0.0-rc` and `drizzle-orm@1.0.0-rc`.
-
-**Disclaimer:** this repository and its packages have been created using Claude Code. The API is in flux; expect churn and breaking changes.
+> [!CAUTION]
+> Experimental and pre-1.0, largely written with Claude Code. The API may change between releases.
 
 ## Install
 
@@ -18,9 +11,7 @@ The core and pg packages extend drizzle-orm's own Effect integration (`drizzle-o
 pnpm add @thomasfosterau/effect-drizzle-ext @thomasfosterau/effect-drizzle-ext-pg effect drizzle-orm @effect/sql-pg
 ```
 
-The core package alone (`effect`, `drizzle-orm` peers) covers derivation, errors, sorting and the driver-agnostic services; add the pg package for the `@effect/sql-pg` binding. Each package README lists its optional peers.
-
-## Quick start
+## Usage
 
 ```ts
 import { dbColumnFor } from "@thomasfosterau/effect-drizzle-ext";
@@ -28,33 +19,36 @@ import { deriveColumnsWith } from "@thomasfosterau/effect-drizzle-ext/derive";
 import { makePgDatabase } from "@thomasfosterau/effect-drizzle-ext-pg";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import * as Schema from "effect/Schema";
-import { relations } from "./relations.ts"; // your application's drizzle relations graph
+import { relations } from "./relations.ts"; // your drizzle relations graph
 
-// Pin a column-kind union once, and annotate a model field with its column.
-export const dbColumn = dbColumnFor<"text" | "integer">();
+const dbColumn = dbColumnFor<"text" | "integer">();
 const Article = Schema.Struct({
   title: dbColumn(Schema.NonEmptyString, { column: "title", pg: "text", notNull: true }),
 });
 
-// A builder registry turns the annotations into Drizzle columns.
 const { fromFields } = deriveColumnsWith({ text, integer });
 export const articleTable = pgTable("article", fromFields(Article.fields));
 
-// One `@effect/sql-pg` binding call gives the app its services.
-const database = makePgDatabase({ relations, key: "Database" });
-export const { Database, CurrentTransaction, transact, readHandle } = database;
+export const { Database, CurrentTransaction, transact, readHandle } = makePgDatabase({
+  relations,
+  key: "Database",
+});
 ```
 
-`transact` opens the write boundary (always a fresh transaction or SAVEPOINT, never a silent join); `readHandle` reads through whichever is already open.
+## Packages
 
-## Documentation
+| Package | What it is |
+| --- | --- |
+| [`@thomasfosterau/effect-drizzle-ext`](packages/core/README.md) | Schema → column derivation, versioned chains, error classification, sorting, pagination and transaction combinators. Peers: `effect`, `drizzle-orm`. |
+| [`@thomasfosterau/effect-drizzle-ext-pg`](packages/pg/README.md) | The `@effect/sql-pg` binding: `Database` services, test runner and provisioning, migration runner, schema guards. |
+| [`@thomasfosterau/effect-drizzle-ext-kit`](packages/kit/README.md) | `effect-drizzle-kit`, a CLI companion to drizzle-kit for extensions, domains, composite types and drift checks. |
 
-Each package README ([core](packages/core/README.md), [pg](packages/pg/README.md)) lists its entries and links one guide per entry in [`docs/`](docs/); the API reference is each export's doc comment. Extracted from the `thomasfosterau/website`, `thomasfosterau/gardeneria` and `thomasfosterau/preferenceflow` applications.
+Guides are in [`docs/`](docs/); the API reference is each export's doc comment.
 
-## Development
+## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md); agent conventions are in [AGENTS.md](AGENTS.md). Releases: [PUBLISHING.md](PUBLISHING.md). Report vulnerabilities through [SECURITY.md](SECURITY.md).
+[docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) · [AGENTS.md](AGENTS.md) · [docs/PUBLISHING.md](docs/PUBLISHING.md) · [docs/SECURITY.md](docs/SECURITY.md)
 
 ## License
 
-MIT © Thomas Foster. See [LICENSE](LICENSE).
+[MIT](LICENSE.md)

@@ -1,6 +1,6 @@
 # @thomasfosterau/effect-drizzle-ext-kit
 
-`effect-drizzle-kit`, the bin over the pg package's `./tooling`: `generate` (the extras migration) and `check` (extras drift, plus schema drift when the config names its schema module). Owner decision on effect-drizzle-ext#216: the bin lives here, so the pg package's `./tooling` stays bin-less.
+`effect-drizzle-kit`, the bin over the pg package's `./tooling`: `generate` (the extras migration) and `check` (extras drift, plus schema drift when the config names its schema module). The bin lives here so the pg package's `./tooling` stays bin-less.
 
 ## Boundary
 

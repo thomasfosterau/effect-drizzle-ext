@@ -42,7 +42,7 @@ Every derived view reads base tables only, never another view. Each view's row t
 
 #### Head resolution
 
-A view keeps a leaf version row only when it is the node's head: no root version of the same node is newer. That is an anti-join on the root version table's `(id, version)` primary key (effect-drizzle-ext#199):
+A view keeps a leaf version row only when it is the node's head: no root version of the same node is newer. That is an anti-join on the root version table's `(id, version)` primary key:
 
 ```sql
 FROM <leaf>_version
@@ -62,7 +62,7 @@ The set of rows is the same as the `max` head's: a row exists when every joined 
 
 #### Branch views
 
-A branch view is one SELECT driven from the branch level's own version table (effect-drizzle-ext#200), not a `UNION ALL` of one arm per subtree leaf, and it joins nothing below the branch that it doesn't project (effect-drizzle-ext#204):
+A branch view is one SELECT driven from the branch level's own version table, not a `UNION ALL` of one arm per subtree leaf, and it joins nothing below the branch that it doesn't project:
 
 ```sql
 FROM <branch>_version
@@ -87,11 +87,11 @@ Each `EXISTS` probe ends `OFFSET 0`, which keeps it a per-row index probe. Witho
 
 On the fixture chain (PostgreSQL 16.15, two leaves, 50,000 books and 50,000 essays at two versions each, a `work_version (title, id)` index, `EXPLAIN (ANALYZE, BUFFERS)`), `work_view ORDER BY title, id LIMIT 20` executes in 0.37 ms (2.1 ms planning), walking the index with no Sort; the `UNION ALL` form took 391 ms, a Sort over every row. The planner can still prefer a full scan and a Sort for a wide branch over few rows: it costs the `CASE` in a hash join as near free (seen with 30 leaves and 40,000 nodes). The plan spec pins the index walk for twelve leaves at 40,000 nodes; the synthetic numbers in the changelog are 200,000 nodes.
 
-**Planning.** Each nullable LEFT JOIN multiplies the planner's join search, so the effect-drizzle-ext#200 form, which LEFT JOINed every marker and leaf, planned a 40-leaf page in about 1.5 s; the `CASE` form plans it in a few milliseconds, since it joins only the spine. That matters because a paged list re-plans: with `@effect/sql-pg`'s default named prepared statements and `plan_cache_mode = auto`, a `LIMIT $n` read stays on custom plans (PostgreSQL re-plans every call), while a by-id read switches to a generic plan after five executions.
+**Planning.** Each nullable LEFT JOIN multiplies the planner's join search, so a form that LEFT JOINs every marker and leaf planned a 40-leaf page in about 1.5 s; the `CASE` form plans it in a few milliseconds, since it joins only the spine. That matters because a paged list re-plans: with `@effect/sql-pg`'s default named prepared statements and `plan_cache_mode = auto`, a `LIMIT $n` read stays on custom plans (PostgreSQL re-plans every call), while a by-id read switches to a generic plan after five executions.
 
 **Page, then fetch.** A list that needs leaf columns is two reads: page the branch view's ids (`SELECT id FROM work_view ORDER BY title, id LIMIT 20`), then read each leaf's view by those ids (`book_view WHERE id = ANY($1)`). The page walks the branch index and the fetch probes primary keys, where projecting every leaf's columns through the branch view LEFT JOINs each of those leaves.
 
-**Upgrading.** Only branch views' SQL changed (in effect-drizzle-ext#200 and again in effect-drizzle-ext#204): a consumer's next `drizzle-kit generate` emits a `DROP VIEW` and a `CREATE VIEW` for each branch view, with no table or data change, and leaves every other view alone. The [head-resolution upgrade note](#head-resolution) on dependent application views applies the same way.
+**Upgrading.** A change to branch views' SQL means a consumer's next `drizzle-kit generate` emits a `DROP VIEW` and a `CREATE VIEW` for each branch view, with no table or data change, and leaves every other view alone. The [head-resolution upgrade note](#head-resolution) on dependent application views applies the same way.
 
 ### Per-leaf builders
 
@@ -103,7 +103,7 @@ On the fixture chain (PostgreSQL 16.15, two leaves, 50,000 books and 50,000 essa
 
 The read shapes of a chain are structural types, so a history listing and the page that renders it can share them without depending on an operations module. `VersionChainEntry<Action>` is one `{ version, action, timestamp }` row. `VersionSnapshot<Action, Extra>` is one version's reconstructed state: the entry plus `columns` (every leaf-chain domain column at that version) and whatever branch-level facts `Extra` names. `Action` defaults to `"create" | "update" | "delete"`. `versionTimestamps(row)` reads a current-version row's `createdAt` / `updatedAt` pair: `updatedAt` is the current `timestamp`, and `createdAt` comes from the birth-row merge, falling back to `updatedAt` for a view that has none.
 
-The three read-shape types (`VersionAction`, `VersionChainEntry`, `VersionSnapshot`) are also exported from the Drizzle-free root entry, `@thomasfosterau/effect-drizzle-ext`, as the same types: a client-bundled package that only names them imports them from there and keeps `drizzle-orm` out of its module graph (effect-drizzle-ext#191).
+The three read-shape types (`VersionAction`, `VersionChainEntry`, `VersionSnapshot`) are also exported from the Drizzle-free root entry, `@thomasfosterau/effect-drizzle-ext`, as the same types: a client-bundled package that only names them imports them from there and keeps `drizzle-orm` out of its module graph.
 
 ```ts
 export const makeSubtypeTables: <TDiscriminator>(
