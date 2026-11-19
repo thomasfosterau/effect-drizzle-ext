@@ -16,7 +16,7 @@ import * as Schema from "effect/Schema";
 import * as PgClient from "@effect/sql-pg/PgClient";
 import type { SqlError } from "effect/sql/SqlError";
 import { Resource } from "@thomasfosterau/effect-jsonapi";
-import { sql, type InferSelectModel, type SQL } from "drizzle-orm";
+import { defineRelations, sql, type InferSelectModel, type SQL } from "drizzle-orm";
 import type { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import {
   boolean,
@@ -419,6 +419,11 @@ export const appInserted = appDatabase.queries
   .insert(book)
   .values({ id: "b", title: "t", pages: null })
   .returning({ id: book.id });
+const locatingDatabase = Pg.makePgDatabase({
+  relations: defineRelations({ book }),
+  key: "LocatingDb",
+});
+export const located = locatingDatabase.locate({ code: "23505", table: "book" });
 export const pooled: Layer.Layer<PgClient.PgClient, SqlError> = Pg.pgClientFromPool({
   connectionString: Redacted.make("postgresql://postgres@127.0.0.1:5432/app"),
 });
@@ -569,6 +574,8 @@ export type Checks = [
   /** _classifyErrorsWidens */ Assert<
     Equals<Effect.Error<typeof classifiedInChannel>, ProbeError | ClassifiedError>
   >,
+  /** _locatedKey */ Assert<Equals<Option.Option.Value<typeof located>["key"], "book">>,
+  /** _locatedTable */ Assert<Equals<Option.Option.Value<typeof located>["table"], typeof book>>,
   /** _appSelectError */ Assert<
     Equals<Effect.Error<typeof appBooks>, EffectDrizzleQueryError | ClassifiedError>
   >,

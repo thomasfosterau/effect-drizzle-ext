@@ -48,9 +48,13 @@ import type { AnyRelations } from "drizzle-orm/relations";
 import type * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import type * as Option from "effect/Option";
 import type * as Redacted from "effect/Redacted";
 import type { SqlClient } from "effect/sql/SqlClient";
 import type { SqlError } from "effect/sql/SqlError";
+import { errorLocator, type PgErrorLocation } from "./locate.ts";
+
+export type { ColumnOf, PgErrorLocation, PgErrorTableLocation } from "./locate.ts";
 
 /**
  * The Effect-native Drizzle client an application's `Database` service holds,
@@ -185,6 +189,26 @@ export interface PgDatabase<
    * itself; see {@link PgContextQueryEffectHKT}.
    */
   readonly queries: PgQueryFunctions<Relations, Key>;
+
+  /**
+   * Resolves the table and columns a Postgres error names to the Drizzle
+   * table and columns this database's `relations` declare, so a handler can
+   * compare against `users.email` instead of the string `"email"`.
+   *
+   * Takes any failure (a classified `UniqueViolation`, the driver's
+   * `EffectDrizzleQueryError`, a `Cause`) and finds the driver error in it
+   * as core's `findPgError` does. `Option.none()` when there is no driver
+   * error, it names no table (a serialization failure, a deadlock), or the
+   * table isn't one `relations` declares (a temporary table, a table only
+   * raw SQL touches, the same name in another schema). Never fails.
+   *
+   * The result is a union discriminated by the relations `key`, so
+   * `location.key === "users"` narrows `table` and `columns`; see
+   * `PgErrorTableLocation` for how `columns` is found. Column names are
+   * matched as Drizzle declares them, so a client-level `casing` rename isn't
+   * seen.
+   */
+  readonly locate: (cause: unknown) => Option.Option<PgErrorLocation<Relations>>;
 }
 
 /**
@@ -232,6 +256,7 @@ export const makePgDatabase = <Relations extends AnyRelations, const Key extends
     queries: makeQueryFunctions<PgQueryFunctions<Relations, Key>>()(services, {
       mapQuery: classifyErrors,
     }),
+    locate: errorLocator(options.relations),
   };
 };
 

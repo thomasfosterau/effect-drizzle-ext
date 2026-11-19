@@ -127,7 +127,7 @@ export default defineConfig({
       // compute from the runtime value that has it, and no guard can recover
       // that type, because the precision lives only in the type. Narrowing at
       // a guard-able boundary is fixed in code instead, so a new `as` in any
-      // other file is an error. The 18 sites:
+      // other file is an error. The 19 sites:
       // - core derive.ts (3): the `FluentColumn` bridge over the registry's
       //   widened `ColumnBuilderBase`, and `fromMeta` / `fromFields` naming
       //   the per-entry `DerivedColumns` the builder loop computes.
@@ -141,6 +141,8 @@ export default defineConfig({
       //   the type-only phantom (never present at runtime) onto the value.
       // - core update.ts (1): `updateSetMap`'s key-filtered `UpdateSet`.
       // - pg chain.ts (1): `makeVersionChain` naming per-leaf operations.
+      // - pg locate.ts (1): `errorLocator` naming the relations-keyed
+      //   location union from the runtime key it matched.
       // - core query-functions.ts (1): `makeQueryFunctions` naming the
       //   binding's query surface on the recording proxy.
       {
@@ -152,6 +154,7 @@ export default defineConfig({
           "packages/core/src/index.ts",
           "packages/core/src/update.ts",
           "packages/pg/src/chain.ts",
+          "packages/pg/src/locate.ts",
         ],
         rules: {
           "typescript/no-unsafe-type-assertion": "off",
