@@ -1,23 +1,16 @@
 {
   "name": "effect-drizzle-ext",
-  // The Vite+ base image: Node + pnpm + the vp CLI. The tag is the catalog's
-  // `vite-plus` pin in pnpm-workspace.yaml; Dependabot cannot move it, so bump it
-  // by hand on the toolchain PR that moves `vite-plus`.
-  "image": "ghcr.io/voidzero-dev/vite-plus:1.4.0",
+  // Tag follows the catalog's `vite-plus` pin.
+  "image": "ghcr.io/voidzero-dev/vite-plus:1.6.0",
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers-extra/features/ripgrep:1": {},
     "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {},
     "ghcr.io/devcontainer-community/devcontainer-features/jq:1": {},
-    // A Docker daemon for `vp run test:integration`: with no `PG*` variable set and
-    // nothing on 127.0.0.1:5432, the suite starts its `pgvector/pgvector:pg17`
-    // server through Testcontainers (packages/pg/src/provisioning.ts).
+    // Lets `vp run test:integration` start its PostgreSQL via Testcontainers.
     "ghcr.io/devcontainers/features/docker-in-docker:4": {}
   },
-  // Same provisioning as an agent session: .claude/hooks/session-start.sh installs
-  // the pinned Vite+ CLI, links `vp` / `vpx` into ~/.local/bin and runs
-  // `vp install --frozen-lockfile` (see that file's header).
-  "postCreateCommand": "bash .claude/hooks/session-start.sh",
+  "postCreateCommand": "vp install --frozen-lockfile",
   "customizations": {
     "vscode": {
       "extensions": ["Anthropic.claude-code", "oxc.oxc-vscode", "EditorConfig.EditorConfig"]

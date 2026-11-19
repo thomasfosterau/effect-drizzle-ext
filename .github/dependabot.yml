@@ -1,28 +1,14 @@
-# Dependabot version updates.
-#
-# Not bumpable by Dependabot, so moved by hand (AGENTS.md → Commands):
-# - the npm-alias catalog entries: `vite` (`npm:@voidzero-dev/vite-plus-core`,
-#   always the vite-plus version; `vp migrate` re-pins it), `typescript`
-#   (`npm:@typescript/typescript6`) and `@typescript/native`
-#   (`npm:typescript`, a version `@effect/tsgo`'s `components` table lists).
-#   Set them on the `toolchain` group's PR branch;
-# - the `overrides` literals in pnpm-workspace.yaml: the `@grpc/grpc-js`
-#   security pin (a transitive pin of @testcontainers; revisit it whenever
-#   `@testcontainers/postgresql` moves) and the `undici` / `launch-editor` security
-#   floors, each dropped once its comment's condition holds.
-# - the `ghcr.io/voidzero-dev/vite-plus:<tag>` image in .devcontainer/devcontainer.json:
-#   it equals the catalog's `vite-plus` pin, moved on the toolchain PR.
+# Groups cover only sets that must move together. By-hand steps for the
+# toolchain group are in docs/CONTRIBUTING.md.
 version: 2
 updates:
   - package-ecosystem: "npm"
     directory: "/"
-    assignees:
-      - "thomasfosterau"
     schedule:
       interval: "daily"
     open-pull-requests-limit: 10
-    labels:
-      - "dependencies"
+    assignees: [thomasfosterau]
+    labels: [dependencies]
     commit-message:
       prefix: "chore"
     cooldown:
@@ -30,21 +16,14 @@ updates:
       exclude:
         - "@thomasfosterau/*"
     groups:
-      # vite-plus pins vitest / oxlint exactly; @effect/tsgo patches only listed
-      # TS / oxlint versions.
       toolchain:
         applies-to: version-updates
         patterns:
           - "vite-plus"
-          - "vite"
+          - "@voidzero-dev/*"
           - "vitest"
           - "@vitest/*"
           - "@effect/tsgo"
-          - "@typescript/native"
-          - "typescript"
-          - "@typescript/typescript6"
-        update-types: ["major", "minor", "patch"]
-      # One release train (docgen included).
       effect:
         applies-to: version-updates
         patterns:
@@ -52,55 +31,29 @@ updates:
           - "@effect/*"
         exclude-patterns:
           - "@effect/tsgo"
-        update-types: ["major", "minor", "patch"]
-      # drizzle-kit is always the drizzle-orm pin.
       drizzle:
         applies-to: version-updates
         patterns:
           - "drizzle-orm"
           - "drizzle-kit"
-        update-types: ["major", "minor", "patch"]
-    ignore:
-      - dependency-name: "drizzle-orm"
-        update-types:
-          [
-            "version-update:semver-major",
-            "version-update:semver-minor",
-            "version-update:semver-patch",
-          ]
-      - dependency-name: "drizzle-kit"
-        update-types:
-          [
-            "version-update:semver-major",
-            "version-update:semver-minor",
-            "version-update:semver-patch",
-          ]
   - package-ecosystem: "github-actions"
     directory: "/"
-    assignees:
-      - "thomasfosterau"
     schedule:
       interval: "daily"
     open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
+    assignees: [thomasfosterau]
+    labels: [dependencies]
     commit-message:
       prefix: "chore"
     cooldown:
       default-days: 1
-  # `devcontainers` keeps the dev container's features and their lockfile
-  # current (.devcontainer/devcontainer.json). Its base image tag is not a
-  # feature: it equals the catalog's `vite-plus` pin and is moved by hand on the
-  # `toolchain` PR.
   - package-ecosystem: "devcontainers"
     directory: "/"
-    assignees:
-      - "thomasfosterau"
     schedule:
       interval: "daily"
     open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
+    assignees: [thomasfosterau]
+    labels: [dependencies]
     commit-message:
       prefix: "chore"
     cooldown:
