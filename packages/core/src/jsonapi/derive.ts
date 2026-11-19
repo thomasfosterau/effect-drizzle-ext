@@ -1,16 +1,7 @@
 /**
- * @copyright Thomas Foster
- *
- * **The JSON:API resource projection of the derivation entry (Drizzle).**
- *
- * `./jsonapi` reads a `Resource.make` definition's `dbColumn` annotations;
- * `./derive` turns db-column metadata into Drizzle column builders. This entry
- * is the join: the resource-shaped signatures the consuming applications'
- * table factories call, implemented by handing `resourceColumns` /
- * `resourceColumnBounds` to the generic interpreter. No semantics of its own —
- * failure modes, CHECK naming and the `resolveReference` seam are all
- * `./derive`'s, and its {@link DerivationError} is what a misdeclared resource
- * throws at module load.
+ * The derivation entry's JSON:API projection (imports Drizzle): resource-shaped
+ * wrappers over `./derive` for `Resource.make` definitions. See the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/jsonapi.md).
  *
  * @module jsonapi/derive
  */

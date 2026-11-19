@@ -2,12 +2,7 @@ import { defineConfig, type TestUserConfig } from "vite-plus";
 import manifest from "./package.json" with { type: "json" };
 import { packageConfig } from "../../vite.package.ts";
 
-/**
- * Same fingerprint shape and rationale as packages/pg/vite.config.ts: the
- * bare package directory and the sibling packages' `node_modules` are
- * excluded so `check` and `build` hit after a test run, and the lockfile
- * catches a real dependency change.
- */
+/** As in packages/pg/vite.config.ts. */
 const cacheInputs = [
   { auto: true },
   "!node_modules/**",

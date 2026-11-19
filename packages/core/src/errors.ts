@@ -1,34 +1,8 @@
 /**
- * @copyright Thomas Foster
- *
- * Typed Postgres error classification.
- *
- * Effect already classifies SQLSTATE: `@effect/sql-pg` maps a driver error
- * into `SqlError.reason` (`UniqueViolation{constraint}`, `ConstraintError`,
- * `DeadlockError`, `SerializationError`, `ConnectionError`, …). It keeps the
- * violated constraint for `23505` only — every other `23xxx` becomes a bare
- * `ConstraintError` with no constraint / table / column — and drizzle then
- * wraps the whole thing inside `EffectDrizzleQueryError.cause`, which is an
- * Effect `Cause`, not the driver error. So the facts a caller needs to say
- * *which* constraint failed are still in the graph, just not on the failure
- * it is handed.
- *
- * This module recovers them: {@link findPgError} walks the error graph for the
- * driver's Postgres error (the node carrying a SQLSTATE `code`; under
- * `@effect/sql-pg` an `Error` carrying the server's ErrorResponse fields) and
- * reads its `code` / `constraint` / `table` / `column` / `detail` / `schema`,
- * and {@link classifyError} turns those facts into one of seven tagged errors
- * a consumer can `catchTag`.
- *
- * Nothing here is thrown: these are runtime query failures and they travel in
- * the Effect error channel. (Construction-time failures are the thrown
- * `DerivationError` in `./derive`.)
- *
- * The module imports neither `drizzle-orm` nor `@effect/sql-pg`, at runtime or
- * as types: it recognises those shapes structurally, so it works the same on a
- * bare `SqlError`, a bare Postgres error and the drizzle-wrapped shape, and
- * a consumer holding any of them classifies it without pulling a driver into
- * the bundle.
+ * Typed Postgres error classification: recovers the violated constraint, table
+ * and column from a drizzle / `@effect/sql` error graph as tagged errors. See
+ * the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/errors.md).
  *
  * @module errors
  */

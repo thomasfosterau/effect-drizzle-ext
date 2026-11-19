@@ -1,6 +1,4 @@
 /**
- * @copyright Thomas Foster
- *
  * Typed PostGIS helpers that sit beside Drizzle's `eq`: spatial predicates,
  * measures, constructors and outputs, each returning a typed `SQL`. Operands
  * are geometry or geography only, a binary helper takes two of the same

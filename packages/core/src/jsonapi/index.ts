@@ -1,27 +1,8 @@
 /**
- * @copyright Thomas Foster
- *
- * **The JSON:API resource projection of the annotation entry (no Drizzle).**
- *
- * The {@link ../index.ts} entry reads `dbColumn` annotations off a
- * `Schema.Struct`'s fields. A consumer whose models are
- * `@thomasfosterau/effect-jsonapi` `Resource.make` definitions declares the
- * same annotations on its **attributes**, which sit behind an extra layer:
- * `Resource.attribute` descriptors, and the `optionalKey` wrapper a
- * `resource: "optional"` attribute takes. This entry is the reader for that
- * shape — the resource-shaped counterpart of `fieldColumns` /
- * `fieldColumnBounds`.
- *
- * **No Drizzle, and an optional peer.** `@thomasfosterau/effect-jsonapi` is an
- * *optional* peer dependency: only this subpath and `./derive` import it, so a
- * consumer with plain `Schema.Struct` models never installs it. The
- * Drizzle-emitting half is `./jsonapi/derive`.
- *
- * The table-level annotation helpers are re-exported here with an
- * `R extends AnyResource` bound. They are the same functions — the narrower
- * bound exists so a consumer's resource-facing `db-annotation.ts` can import
- * every name it needs from one place, and so a non-resource object cannot be
- * annotated through the resource-shaped API by accident.
+ * The annotation entry's JSON:API projection (no Drizzle): reads `dbColumn`
+ * annotations off `@thomasfosterau/effect-jsonapi` resource attributes, and
+ * `defineResourceTree`. See the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/jsonapi.md).
  *
  * @module jsonapi
  */

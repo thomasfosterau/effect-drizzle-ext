@@ -195,7 +195,7 @@ describe("makeTreeTables against PostgreSQL", () => {
     );
   });
 
-  it("deletes a multi-level leaf's whole chain with its node (effect-drizzle-ext#145)", async () => {
+  it("deletes a multi-level leaf's whole chain with its node", async () => {
     await runInTestTransaction(
       runtime,
       Effect.gen(function* () {

@@ -1,24 +1,7 @@
 /**
- * The interpreter behind `defineTree` (`.`) and `defineResourceTree`
- * (`./jsonapi`): one Drizzle-free declaration of an ontology's level tree, from
- * which every structural fact the database layer needs is derived at module
- * load. Not a published subpath: the two entries re-export its types and wrap
- * {@link buildTree} with their own leaf reader.
- *
- * **Shape.** A tree is an ordered record of levels. Each level names its
- * `parent` (another level; absent means a child of the root, i.e. a branch
- * root), may carry level `columns` (`dbColumn`-annotated fields contributed to
- * every descendant's view, landing on that level's version table) and a level
- * `kind`, and is either a **marker** (no `leaf`) or a **leaf** (a `leaf`
- * payload: a struct's fields in `.`, a `Resource.make` definition in
- * `./jsonapi`). A leaf's name is its discriminator value.
- *
- * **Order.** Declaration order is preserved wherever it becomes SQL order: the
- * level list, every descendant and subtree-leaf list (the discriminator CHECK
- * value sets), and each level's columns.
- *
- * **Failures.** Every check throws {@link DerivationError} at module load:
- * there is no runtime yet, and a misdeclared tree must stop its `import`.
+ * The interpreter behind `defineTree` and `defineResourceTree`: builds and
+ * checks a level tree at module load, throwing `DerivationError`. Not a
+ * published subpath.
  *
  * @module tree
  */

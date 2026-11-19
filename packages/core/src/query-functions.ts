@@ -1,31 +1,8 @@
 /**
- * @copyright Thomas Foster
- *
- * Context-bound query functions: `select`, `insert`, `update`, `delete`,
- * `query` and the rest of a Drizzle handle's query surface as free functions
- * that find their handle in the Effect context, so a caller writes
- * `yield* select().from(users)` instead of yielding the client first and
- * writing `db.select().from(users)`.
- *
- * Each function returns a **deferred query**: a stand-in for the builder the
- * real handle would return, which records every member read and call made on
- * it (`.from(users)`, `.where(…)`, `.returning()`, `query.users.findMany(…)`)
- * and is itself an Effect. Yielding it resolves the handle, replays the
- * recording against it, and runs the real builder. Because only the public
- * builder API is replayed, the module names no driver and depends on no
- * Drizzle internals; the binding supplies the static surface (for
- * `@effect/sql-pg`, `@thomasfosterau/effect-drizzle-ext-pg`'s
- * `PgQueryFunctions`), so the builders' types are Drizzle's own, inferred
- * from the schema, with the database key added to their requirement channel.
- *
- * The handle is resolved the way {@link DatabaseServices.readHandle} resolves
- * one, for writes as well as reads: the ambient
- * {@link DatabaseServices.CurrentTransaction} when one is open, the
- * {@link DatabaseServices.Database} client otherwise. A write yielded inside
- * {@link DatabaseServices.transact} therefore lands in that transaction rather
- * than on a second pooled connection. That opens no boundary, so it is not
- * the join-if-present `transact` refuses to be: `transact` still opens a
- * SAVEPOINT every time it is called.
+ * Context-bound query functions: a Drizzle handle's query surface as free
+ * functions returning deferred queries, replayed onto `CurrentTransaction` or
+ * `Database` when yielded. See the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/query-functions.md).
  *
  * @module query-functions
  */

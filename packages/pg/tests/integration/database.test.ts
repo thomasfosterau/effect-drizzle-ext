@@ -4,7 +4,7 @@
  * `CurrentTransaction` / `readHandle` behave the way the design decision
  * turns on rather than merely the way the type checker allows.
  *
- * Ported from the consuming applications' `transact.test.ts` (website #1883).
+ * Ported from the consuming applications' `transact.test.ts`.
  * The two properties a type test cannot catch:
  *
  * - **`transact` provides a working handle.** The `CurrentTransaction`

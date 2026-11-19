@@ -4,9 +4,8 @@
  * Two halves, neither needing a database:
  *
  * - **`isRetryableConnectFailure`** — ported from the consuming
- *   applications' `connect-retry.test.ts`. The point of the predicate, and of
- *   this test, is website #1055: the acquisition-timeout / `ECONNRESET` flake
- *   surfaces as a `SqlError` whose reason `@effect/sql-pg` classifies as a
+ *   applications' `connect-retry.test.ts`. The
+ *   acquisition-timeout / `ECONNRESET` flake surfaces as a `SqlError` whose reason `@effect/sql-pg` classifies as a
  *   **non-retryable** `UnknownError` (the cause carries no `08xxx` SQLSTATE),
  *   so a guard trusting `isRetryable` alone never retried it. The predicate
  *   must catch it via the connect/acquire seam `operation` label while still
@@ -84,7 +83,7 @@ const econnresetOnAcquire = () => {
 };
 
 describe("isRetryableConnectFailure", () => {
-  it("retries the website #1055 pool-acquisition timeout (misclassified UnknownError)", () => {
+  it("retries the pool-acquisition timeout (misclassified UnknownError)", () => {
     const error = acquisitionTimeout();
     // Guard against the trap the bug lived in: the reason is genuinely not
     // flagged retryable, yet the predicate must still retry it.
@@ -121,7 +120,7 @@ describe("isRetryableConnectFailure", () => {
   });
 
   it("does NOT retry a non-retryable UnknownError raised during statement execution", () => {
-    // Same reason tag as the #1055 flake, but stamped `execute` — a genuine
+    // Same reason tag as the connect flake, but stamped `execute` — a genuine
     // query fault, not a connect-seam transient. Must not be retried.
     const error = new SqlError({
       reason: new UnknownError({

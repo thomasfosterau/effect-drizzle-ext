@@ -1,55 +1,8 @@
 /**
- * @copyright Thomas Foster
- *
- * **Migrations for the Postgres objects drizzle-kit doesn't manage**:
- * extensions, domains and composite types (effect-drizzle-ext#212). An
- * application declares them next to its Drizzle schema, and
- * {@link generateExtrasMigration} writes the SQL that moves the database from
- * the recorded state to the declared one into a drizzle-kit custom migration.
- * {@link checkExtrasDrift} is the CI gate: it fails when a declaration
- * changed and no migration was generated for it.
- *
- * ## Where the state lives
- *
- * drizzle-kit never reads the SQL of a custom migration, so nothing it keeps
- * says what a custom migration created. The generator records it itself: the
- * migration directory it writes holds, beside drizzle-kit's `migration.sql`
- * and `snapshot.json`, an {@link EXTRAS_STATE_FILE} with the **whole**
- * declared state after that migration. The recorded state is the one in the
- * latest-by-name directory that has the file (none means nothing recorded
- * yet), the same latest-by-name pick `checkMigrationDrift`'s zero-drift check
- * makes. drizzle-kit, `./migrations` and `checkMigrationDrift` all ignore the
- * extra file.
- *
- * ## The directory is drizzle-kit's
- *
- * The generator never names or chains a migration directory itself: it runs
- * `drizzle-kit generate --custom --name <slug> --output json`, so the folder
- * name, its place after its parents and the snapshot's `prevIds` are
- * drizzle-kit's own, then overwrites the placeholder `migration.sql`.
- * Statements are separated by `--> statement-breakpoint`, which `./migrations`
- * and drizzle's migrator both split on.
- *
- * ## Order
- *
- * One migration creates and alters extensions, then domains, then composite
- * types, each in declaration order, so a domain over an extension's type and
- * a composite type over a domain come after what they use. Drops follow, in
- * the reverse order. An extension or type must exist before the drizzle-kit
- * migration whose table first uses it: generate the extras migration first,
- * then run `drizzle-kit generate`.
- *
- * ## What it refuses
- *
- * A change Postgres can't `ALTER` in place (a domain's base type) is an
- * {@link ExtrasError} naming the object, never a silent drop and re-create. A
- * rename reads as a drop plus a create (effect-drizzle-ext#218 adds rename
- * hints). A composite type's attribute order is fixed when it is created;
- * a later attribute is appended, and a fresh database replays the same
- * migrations, so the two agree.
- *
- * Type names, defaults and check expressions are SQL, emitted as written;
- * identifiers are quoted and the extension version is a string literal.
+ * Migrations for what drizzle-kit doesn't manage (extensions, domains,
+ * composite types): `generateExtrasMigration` and the `checkExtrasDrift` gate.
+ * See the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tooling.md).
  *
  * @module tooling/extras
  */

@@ -1,6 +1,4 @@
 /**
- * @copyright Thomas Foster
- *
  * **The `effect-drizzle-kit` commands**: `generate` writes the extras
  * migration, and `check` gates extras drift (and schema drift, when the
  * config names its schema module) in one run. Each is an Effect over a

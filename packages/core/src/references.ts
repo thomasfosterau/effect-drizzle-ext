@@ -1,31 +1,8 @@
 /**
- * @copyright Thomas Foster
- *
- * **FK-reference resolution for annotation-driven columns.**
- *
- * The derivation ({@link ./derive.ts}) reads a column's `references`
- * annotation ({@link DbColumnReference}) as a Drizzle-free **name** pair
- * (`{ table, column }`) and hands it to a `resolveReference` hook that returns
- * the Drizzle column thunk `.references()` needs. This module is one
- * implementation of that hook.
- *
- * Resolution is by **table name**, against a small registry FK-target tables
- * opt into via {@link ReferenceRegistry.register}. Only a table that is
- * actually pointed at by a derived FK column need register. The registry
- * sidesteps the import cycle a static `import { targetTable }` would create
- * (the deriver is imported *by* the table modules): {@link
- * ReferenceRegistry.resolve} returns a **lazy** thunk, and `.references()`
- * invokes it only when the FK is materialised (migration generation / query
- * build) — long after every table module, and its `register` call, has loaded.
- * A reference to an unregistered table fails loudly at that point rather than
- * silently emitting no constraint.
- *
- * **A factory, not a singleton.** The consuming applications each carried one
- * module-scope registry. A library cannot: two independent schemas in one
- * process (an app and its test fixtures, two tenants' table sets) would share
- * one name space and resolve each other's tables. {@link makeReferenceRegistry}
- * hands each derivation its own; a consumer that wants exactly one exports the
- * instance it made.
+ * FK-reference resolution for annotation-driven columns: a `resolveReference`
+ * hook that maps a `{ table, column }` name pair to the Drizzle column thunk.
+ * See the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/references.md).
  *
  * @module references
  */

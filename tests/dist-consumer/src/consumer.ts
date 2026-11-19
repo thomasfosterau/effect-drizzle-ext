@@ -464,8 +464,8 @@ export const drift = PgTooling.checkMigrationDrift({
 /**
  * A caller forwarding its own optional into Drizzle-facing config under
  * `exactOptionalPropertyTypes`: compiles only while that member is spelled
- * `?: T | undefined` (effect-drizzle-ext#29, #57). Options bags the library
- * reads itself take a bare `?: T` (effect-drizzle-ext#105), so a caller omits
+ * `?: T | undefined`. Options bags the library
+ * reads itself take a bare `?: T`, so a caller omits
  * an absent member there instead.
  */
 export const forwardOptionals = (forwarded: { readonly versionDefault?: bigint }) =>
@@ -604,7 +604,7 @@ export type Checks = [
   /** _snapshotDraft */ Assert<Equals<Snapshot["draft"], boolean | undefined>>,
   /** _snapshotVersion */ Assert<Equals<Snapshot["version"], bigint>>,
   // The root entry (Drizzle-free) exports the same read shapes as
-  // `./versioned-chain` (effect-drizzle-ext#191).
+  // `./versioned-chain`.
   /** _rootEntry */ Assert<Equals<RootVersionChainEntry, VersionChainEntry>>,
   /** _rootEntryAction */ Assert<
     Equals<RootVersionChainEntry<"publish">, VersionChainEntry<"publish">>

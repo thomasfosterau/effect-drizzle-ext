@@ -1,6 +1,6 @@
 /**
  * How the views `makeTreeViews` derives resolve a node's head, proven against
- * PostgreSQL (effect-drizzle-ext#199): every view keeps head rows with an
+ * PostgreSQL: every view keeps head rows with an
  * anti-join on the root version key (`NOT EXISTS` a newer root version), not
  * a grouped `max(version)`.
  *
@@ -18,7 +18,7 @@
  *   returns the old row.
  * - **Plans.** A leaf view's paged list uses the leaf's index with no
  *   aggregate over the root version table; a branch view's paged list uses
- *   the branch level's index with no Sort (effect-drizzle-ext#200), and it and
+ *   the branch level's index with no Sort, and it and
  *   a keyed lookup run no aggregate either.
  *
  * The branch views' own single-driver equivalence (against their `UNION ALL`
@@ -52,7 +52,7 @@ const { runInTestTransaction } = makeTestTransaction(database);
 /** The migration that replaced the `max` head with the anti-join. */
 const ANTI_JOIN_MIGRATION = "20261112160706_view-head-antijoin";
 
-/** The `max` head every pre-#199 view drove its FROM from. */
+/** The `max` head every pre-anti-join view drove its FROM from. */
 const MAX_HEAD = `from "ontology"."node_version" group by "ontology"."node_version"."id"`;
 
 /**
@@ -69,12 +69,12 @@ beforeAll(async () => {
 afterAll(() => runtime.dispose());
 
 /**
- * A view's pre-#199 definition; empty for a view the chain never defined, which
+ * A view's pre-anti-join definition; empty for a view the chain never defined, which
  * the specs' `toContain` on the old `max` head then reports.
  */
 const trunkView = (name: string): string => Option.getOrElse(R.get(trunkViews, name), () => "");
 
-/** The pre-#199 `asOf`: the trunk leaf view with its `max` head bounded by `where`. */
+/** The pre-anti-join `asOf`: the trunk leaf view with its `max` head bounded by `where`. */
 const trunkAsOf = (leaf: string, where: string): string => {
   const view = trunkView(`${leaf}_view`);
   expect(view).toContain(MAX_HEAD);
@@ -494,7 +494,7 @@ describe("view heads: plans", () => {
       runtime,
       Effect.gen(function* () {
         yield* seedVolume;
-        // One SELECT driven from `work_version` (effect-drizzle-ext#200), so
+        // One SELECT driven from `work_version`, so
         // the index on the branch level supplies the order and the LIMIT
         // stops early; the UNION ALL of per-leaf arms sorted every row.
         const branch = yield* explain(

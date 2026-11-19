@@ -192,7 +192,7 @@ describe("deriveResourceColumnsWith", () => {
     expect(byName.size.default).toBe(0);
   });
 
-  it("types a defaulted attribute's column as optional on $inferInsert (effect-drizzle-ext#162)", () => {
+  it("types a defaulted attribute's column as optional on $inferInsert", () => {
     const ListResource = Resource.make("lists", {
       attributes: {
         name: dbColumn(Schema.String, { column: "name", pg: "text", notNull: true }),

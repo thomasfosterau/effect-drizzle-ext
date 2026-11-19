@@ -1,7 +1,5 @@
 /**
- * @copyright Thomas Foster
- *
- * The module-graph gate for the Drizzle-free root entry (effect-drizzle-ext#191):
+ * The module-graph gate for the Drizzle-free root entry:
  * walks the BUILT files `publishConfig.exports["."]` names in
  * `packages/core/package.json` (its JavaScript and its declarations) through
  * every relative import and re-export, shared content-hashed chunks included,
@@ -9,7 +7,7 @@
  * of its subpaths). A client-bundled models package imports `.` on that
  * promise; a type-only re-export is enough to break it in the declarations.
  *
- * One exception, by owner decision on effect-drizzle-ext#222: the root
+ * One exception: the root
  * re-exports the PostGIS helpers as the `PostGis` namespace, so the walk does
  * not enter the modules `publishConfig.exports["./postgis"]` itself imports
  * (its own chunk). Everything else those modules import is still walked

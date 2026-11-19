@@ -1,34 +1,8 @@
 /**
- * @copyright Thomas Foster
- *
- * **Effect Schema → Drizzle derivation: the opt-in versioned-chain interpreter
- * (Drizzle).**
- *
- * The generic "tree of levels, each a stable + version table pair, joined up a
- * composite `(id, version)` FK chain to a root, with fail-closed current-version
- * views" structure — the shape a temporal-versioned node hierarchy takes. Two
- * factories, each parameterised over the bits a specific hierarchy pins:
- *
- * - {@link makeSubtypeTables} — the stable + version table-pair builder. Emits
- *   the structural plumbing (stable `id` → parent FK, version `id` / `version`
- *   columns, the `(id, version)` primary key, and the `(id, version)` →
- *   parent-version FK) while the domain columns stay authored per leaf. The
- *   discriminator constraints (a `type` column arced up the tree) are injected,
- *   so a hierarchy without a discriminator, or with different discriminator
- *   semantics, configures its own.
- *
- * - {@link makeCurrentVersionView} — the uniform fail-closed current-version
- *   view. Resolves each node's current version from a **root version table**
- *   (the row no newer version supersedes), then INNER JOINs the leaf (and
- *   any intermediate version tables) at exactly
- *   that `(id, version)`; a node whose root version advanced past its leaf (a
- *   partial-chain tombstone) yields **no row** — the view fails closed rather
- *   than surfacing a stale older leaf row. The root version table and the
- *   always-joined identity row (plus the columns it merges into every view) are
- *   injected.
- *
- * Depends on Drizzle. The annotation layer ({@link .}) stays free of any
- * versioning opinion — this interpreter is opt-in.
+ * The versioned-chain interpreter (imports Drizzle): stable + version table
+ * pairs, joined up a composite `(id, version)` FK chain, with fail-closed
+ * current-version views. See the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/versioned-chain.md).
  *
  * @module versioned-chain
  */
@@ -138,7 +112,7 @@ export interface DiscriminatorColumns {
  *
  * Constraint and column names are canonical (`${name}_version_pkey`,
  * `${name}_version_${parentVersion}_fk`, an `id` column): no deployed schema
- * needs the historical overrides (effect-drizzle-ext#112, decision 4).
+ * needs the historical overrides.
  */
 export interface SubtypeTablesConfig<
   TColumns extends Record<string, ColumnBuilderBase>,
@@ -248,7 +222,7 @@ type SubtypeVersionColumnBuilders<TColumns extends Record<string, ColumnBuilderB
  * reading these tables through the emitted declarations silently gets `any`
  * where it should get the column's real type — a consuming application's
  * database package degrading a table's `$inferSelect["id"]` from `string` to
- * `any` with no type error anywhere in the chain (website #1579). This
+ * `any` with no type error anywhere in the chain. This
  * package's own `tests/dist-consumer` type-checks a consumer fixture against
  * the emitted `dist/`, asserting the chain tables' row types precisely to
  * catch this regression (an unbound name degrades them to `any`, and an
@@ -396,7 +370,7 @@ export const makeSubtypeTables =
           // Cascade on delete, as the stable `id` FK does: erasing a node
           // deletes its root version rows, and without the cascade this arc's
           // check would refuse it before the stable cascade reached the level
-          // version rows (effect-drizzle-ext#145).
+          // version rows.
           foreignKey({
             name: `${name}_version_${getTableName(parentVersion)}_fk`,
             columns: [table.id, table.version],
@@ -558,8 +532,7 @@ const isMergeFunction = <TRoot, TMerge>(
  * Currency is resolved from `rootVersion` (fail-closed): its rows drive the
  * FROM, kept only where `NOT EXISTS` a newer version of the same node (an
  * anti-join on the root's `(id, version)` key, so a read filtered or paged by
- * a leaf column never aggregates the whole root table first;
- * effect-drizzle-ext#199), and the leaf / intermediate version tables INNER
+ * a leaf column never aggregates the whole root table first), and the leaf / intermediate version tables INNER
  * JOIN at that current `(id, version)`. One row per node landing on unique
  * `(id, version)` PKs, so no `DISTINCT ON` / `ORDER BY` is needed. A leaf
  * missing at the current version drops out of the INNER JOIN — the view yields
@@ -583,8 +556,7 @@ export const makeCurrentVersionView =
       // The node's current root version row drives the FROM: a root version
       // no newer version of the same node supersedes (an anti-join on the
       // root's `(id, version)` key, not a grouped `max(version)`, which would
-      // aggregate the whole table before any filter applies;
-      // effect-drizzle-ext#199). The leaf join below fails closed on a partial
+      // aggregate the whole table before any filter applies). The leaf join below fails closed on a partial
       // chain.
       const newer = alias(rootTable, "newer");
       const newerColumns = getTableColumns(newer);
@@ -647,7 +619,7 @@ export const makeCurrentVersionView =
  * The version-chain read shapes: `VersionAction`, `VersionChainEntry` and
  * `VersionSnapshot`. They live in a Drizzle-free module so the root entry
  * (`.`) exports the same types without reaching Drizzle
- * (effect-drizzle-ext#191); this subpath re-exports them unchanged.
+ *; this subpath re-exports them unchanged.
  */
 export type { VersionAction, VersionChainEntry, VersionSnapshot } from "./version-chain-types.ts";
 
@@ -664,7 +636,7 @@ export interface VersionTimestamps {
  * the current version's `timestamp`; `createdAt` is the birth row's own
  * timestamp where the view merges one in (a function `merge` of
  * {@link makeCurrentVersionView}), and falls back to `updatedAt` for a view
- * that carries none (website #1223).
+ * that carries none.
  */
 export const versionTimestamps = (row: {
   readonly timestamp: Date;
@@ -1523,7 +1495,7 @@ export interface TreeViewsConfig<BR, PV = Record<never, never>> {
   readonly branches?: { readonly [K in keyof BR]: true | TreeBranchViewConfig<BR[K]> } | undefined;
   /**
    * Marker levels with columns that a leaf, keyed, pointer or as-of view joins
-   * in its fenced tail rather than as a plain join (effect-drizzle-ext#207). A
+   * in its fenced tail rather than as a plain join. A
    * level with no columns of its own is always fenced; one with columns stays
    * a plain join, so an index on them can drive a filter or a sort. Each plain
    * level adds a relation to the planner's join search, which grows steeply:
@@ -1631,7 +1603,7 @@ interface ArmPlan {
 }
 
 /**
- * The alias of a leaf arm's fenced tail (effect-drizzle-ext#207): the levels
+ * The alias of a leaf arm's fenced tail: the levels
  * past the driver, their stable rows and facts, in one `CROSS JOIN LATERAL
  * (… OFFSET 0)` the planner can't pull up into its join search.
  *
@@ -1770,7 +1742,7 @@ const columnBehind = (value: AnyPgColumn | SQL | SQL.Aliased): Option.Option<Col
  * Every table a SQL chunk reads: a column's table, a table named in it, and
  * those of its nested expressions and aliases. A branch view LEFT JOINs a
  * level below the branch only when its projection reads one of the level's
- * tables (effect-drizzle-ext#204).
+ * tables.
  */
 /** Whether a SQL chunk is a list of chunks (an interpolated array). */
 const isChunkList = (chunk: SQLChunk | SQL.Aliased): chunk is SQLChunk[] => Arr.isArray(chunk);
@@ -1799,7 +1771,7 @@ function tablesReadByWrapper(wrapper: SQLWrapper): ReadonlyArray<Table> {
  * `EXISTS` a row of `table` matching `on`, ending `OFFSET 0` so PostgreSQL
  * keeps it a per-row subplan. Without the fence the planner costs the probe
  * against the whole driver rather than a `LIMIT`'s share and picks a hashed
- * subplan, which seq-scans the table to serve one page (effect-drizzle-ext#204).
+ * subplan, which seq-scans the table to serve one page.
  *
  * Measured on PostgreSQL 16, a 200,000-node branch at two versions, paged list
  * plan/exec: 20 leaves 4.0/104 ms unfenced vs 4.4/1.9 ms fenced; 40 leaves
@@ -1886,19 +1858,19 @@ const caseOverLeaves = (
  *
  * Every leaf view drives from the leaf's own version table, and every branch
  * view from the branch level's (so an index on a branch-level column serves
- * a paged `ORDER BY … LIMIT`, effect-drizzle-ext#200); each keeps only head
+ * a paged `ORDER BY … LIMIT`); each keeps only head
  * rows with an anti-join on the root version key: `NOT EXISTS` a root version of the same node newer than
  * the row (bounded the same way for `asOf`). That probes the primary key per
  * row, where a grouped `MAX(version)` head would aggregate the whole root
  * version table before a filter or `LIMIT` could apply
- * (effect-drizzle-ext#199). It then INNER JOINs the root version row, the
+ *. It then INNER JOINs the root version row, the
  * identity row and the version-0 root row (for `createdAt`); a leaf view
  * INNER JOINs **every other level's version table** from the branch root
  * down to the leaf at that `(id, version)`, and on `id` the stable table of
  * every level that has `stableColumns`, and LEFT JOINs each fact table. A
  * level with columns of its own is a plain join; a level with none (or one
  * `fenced` names) and every stable row sit inside one fenced `CROSS JOIN
- * LATERAL (… OFFSET 0) "tail"` keyed on the driver (effect-drizzle-ext#207),
+ * LATERAL (… OFFSET 0) "tail"` keyed on the driver,
  * out of the planner's join search, and the fact tables join that tail when
  * there is one (a view with nothing to fence LEFT JOINs its facts plainly). A filter or
  * sort on a plain join's column still reaches its index; one on a column
@@ -1915,7 +1887,7 @@ const caseOverLeaves = (
  * spine it LEFT JOINs only the tables below the branch its `project` reads,
  * and keeps a row only when a `CASE` on its `type` finds, by `EXISTS`, every
  * level on the path to the leaf that `type` names at the head
- * (effect-drizzle-ext#204), so it fails closed exactly where a leaf view
+ *, so it fails closed exactly where a leaf view
  * would; a node whose `type` names a leaf with no row at the head, or no
  * subtree leaf, has no row.
  *
@@ -1931,7 +1903,7 @@ const caseOverLeaves = (
  * none, has no row.
  *
  * Every view reads base tables only, never another view, so drizzle-kit's
- * view-on-view DROP ordering can't bite (website #1228). Throws
+ * view-on-view DROP ordering can't bite. Throws
  * `DerivationError` at module load for a root table named `tail` (the fenced
  * tail's alias), a `branches` entry naming a leaf or no level, a `project` whose keys differ between leaves (or whose values for a
  * key name columns of different SQL types, or are unaliased expressions), or
@@ -2016,7 +1988,7 @@ export const makeTreeViews = <
   /**
    * Whether a leaf view joins level `name` in its fenced tail: a level with no
    * version columns of its own (only its row's existence matters), or one
-   * `fenced` names (effect-drizzle-ext#207).
+   * `fenced` names.
    */
   const isFenced = (name: string): boolean =>
     Arr.contains(fencedNames, name) ||
@@ -2027,7 +1999,7 @@ export const makeTreeViews = <
       ),
     );
   // The root tables join outside every leaf view's fenced tail, so one named
-  // like its alias would appear twice in the FROM (effect-drizzle-ext#207).
+  // like its alias would appear twice in the FROM.
   Arr.forEach([tables.root.identity, tables.root.version], (table) => {
     if (getTableName(table) === fencedTail) {
       treeError(
@@ -2078,7 +2050,7 @@ export const makeTreeViews = <
    * `bound`, for `asOf`): the anti-join that keeps only head rows. It probes
    * the root version table's `(id, version)` primary key once per candidate
    * row, where a grouped `max(version)` would aggregate the whole table first
-   * (effect-drizzle-ext#199).
+   *.
    */
   const noNewerVersion = (
     qb: QueryBuilder,
@@ -2134,7 +2106,7 @@ export const makeTreeViews = <
    * effective fact. The root version row, the identity row and every other
    * level on `leaf`'s path join at the driver's `(id, version)`, so the view
    * fails closed; the levels past the driver, their stable rows and facts in
-   * the fenced tail (effect-drizzle-ext#207).
+   * the fenced tail.
    */
   const armOf = (
     qb: QueryBuilder,
@@ -2252,7 +2224,7 @@ export const makeTreeViews = <
     const withFacts = Arr.match(required, {
       // Nothing past the driver to fence: the facts join the core directly.
       onEmpty: () => Arr.reduce(facts, core(selection), (q, fact) => q.leftJoin(fact, atKey(fact))),
-      // The fenced tail (effect-drizzle-ext#207): the required rows and the
+      // The fenced tail: the required rows and the
       // facts, in one `CROSS JOIN LATERAL (… OFFSET 0)` keyed on the driver.
       // An inner join, so a missing level row drops the view row (it fails
       // closed); the facts stay LEFT JOINs inside it.
@@ -2321,15 +2293,15 @@ export const makeTreeViews = <
   );
 
   /**
-   * A branch view (effect-drizzle-ext#200): one SELECT, not a `UNION ALL` of
+   * A branch view: one SELECT, not a `UNION ALL` of
    * per-leaf arms, so an index on a branch-level column can serve a paged
    * `ORDER BY … LIMIT`. It drives from the branch level's own version table
    * with the same anti-join head as a leaf view, INNER JOINs the root version
    * row, the identity row, the birth row and every level from the branch root
    * down to the branch at the driver's `(id, version)`, then LEFT JOINs, in
    * declaration order, only the markers, leaves, stable and fact tables below
-   * the branch that `project` reads (effect-drizzle-ext#204: each nullable
-   * join multiplies the planner's join search). The fail-closed predicate is
+   * the branch that `project` reads (each nullable join multiplies the planner's
+   * join search). The fail-closed predicate is
    * a `CASE` on `type` that, for the leaf `type` names, requires by `EXISTS`
    * every level below the branch on its path (the levels the arm form INNER
    * JOINed), and `ELSE false`: a head that advanced past one of them, or
@@ -2419,7 +2391,7 @@ export const makeTreeViews = <
       );
       // LEFT: a level below the branch (a marker or leaf version table, its
       // stable row, its facts) only when `project` reads one of its columns,
-      // in declaration order (effect-drizzle-ext#204). Each nullable join
+      // in declaration order. Each nullable join
       // multiplies the planner's join search, so a branch that projects no
       // per-leaf column joins none.
       const read = Arr.flatMap(R.values(projection), tablesRead);
