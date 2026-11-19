@@ -89,7 +89,7 @@ catalog:
   # resolves it to this workspace's singleton, which it lints fine against.
   "@enfect/oxlint": 0.10.0
   effect: 4.1.4
-  fallow: 3.43.1
+  fallow: 3.43.2
   # Exists only for `@effect/docgen`, which requires it as a peer and spawns
   # the `tsx` binary itself to run the compiled examples. Scripts run
   # TypeScript with `vpx`, never `tsx`.
