@@ -1,7 +1,5 @@
 /**
- * @copyright Thomas Foster
- *
- * The task graph both published packages share (`check`, `build`,
+ * The task graph every published package shares (`check`, `build`,
  * `test:unit`, `test:coverage`, `docgen`) and the `vp pack` config `build`
  * runs. Each `packages/<name>/vite.config.ts` passes its own cache
  * fingerprint (the inputs differ per package; each config says why) and its
@@ -35,21 +33,9 @@ const packageTasks = (cacheInputs: CacheInputs): RunTasks => {
       dependsOn: [{ task: "check", from: "dependencies" }],
       cache: { input, output: [] },
     },
-    // Emits `dist/` (JavaScript + declarations) with `vp pack` (tsdown); the
-    // package's `pack` block is `packageBuild` below. tsdown cleans `dist/`
-    // first, so a renamed module leaves no stale file.
-    //
-    // One command, so one cached task (effect-drizzle-ext#79, ported from
-    // pulpit#63): Vite+ splits a top-level `&&` into sub-tasks cached
-    // separately, and a separate clean and emit each saw the other's change
-    // to `dist/` as an input change, so the build never hit. Every miss
-    // cleans, and a hit restores `dist/**` from the cache, so a deleted
-    // `dist/` comes back. A restore writes the cached files (adding missing
-    // ones, overwriting edited ones) but never prunes, so a stray file in
-    // `dist/` survives a hit: one written by hand or by a bare `tsc`, or left
-    // by a different task config on another branch (a shared chunk's name
-    // carries a content hash, so one from another branch is a stray too).
-    // `vp run -r --no-cache build` clears a stray.
+    // One command, so one cached task: Vite+ caches each `&&` part
+    // separately. A cache hit restores `dist/**` but never prunes stray files;
+    // `vp run -r --no-cache build` clears them.
     build: {
       command: "vp pack",
       dependsOn: [{ task: "build", from: "dependencies" }],
@@ -107,11 +93,9 @@ const tsgoPath = (): string => {
 };
 
 /**
- * The `vp pack` config for a package (effect-drizzle-ext#88): one entry per
- * `publishConfig.exports` subpath and per `publishConfig.bin` (built from the
- * workspace `bin` of the same name; tsdown keeps its `#!` line), named after its `dist/` path so the
- * published exports map stays as it was, and built from the workspace export
- * of the same subpath. Declarations come from the native compiler over
+ * The `vp pack` config for a package: one entry per `publishConfig.exports`
+ * subpath and `publishConfig.bin`, named after its `dist/` path and built from
+ * the workspace export (or `bin`) of the same name. Declarations come from the native compiler over
  * `tsconfig.build.json` and are then bundled, so the dist-consumer check
  * (`tests/dist-consumer`) asserts the bundled output.
  */

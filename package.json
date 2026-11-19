@@ -3,17 +3,13 @@
   "name": "effect-drizzle-ext-workspace",
   "version": "0.0.0",
   "private": true,
-  "description": "Workspace for @thomasfosterau/effect-drizzle-ext, @thomasfosterau/effect-drizzle-ext-pg and @thomasfosterau/effect-drizzle-ext-kit: the Effect ↔ Drizzle bridge extracted from the website, gardeneria and preferenceflow applications.",
+  "description": "Workspace for the effect-drizzle-ext packages.",
   "license": "MIT",
   "author": "Thomas Foster <me@thomasfoster.au>",
   "type": "module",
   "scripts": {
-    "changeset": "changeset",
-    "version": "changeset version && pnpm install --lockfile-only",
-    "release": "bash scripts/release.sh",
-    "fallow": "fallow --summary",
-    "fallow:audit": "fallow audit",
-    "prepare": "vp config && effect-tsgo patch --typescript --oxlint"
+    "prepare": "vp config && effect-tsgo patch --typescript --oxlint",
+    "release": "bash scripts/release.sh"
   },
   "devDependencies": {
     "@changesets/changelog-github": "catalog:",
@@ -34,9 +30,11 @@
     "vite": "catalog:",
     "vite-plus": "catalog:"
   },
-  "engines": {
-    "node": ">=22.18",
-    "pnpm": ">=11"
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "lts"
+    }
   },
   "packageManager": "pnpm@11.18.0"
 }

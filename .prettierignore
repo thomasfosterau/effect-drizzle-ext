@@ -1,6 +1,3 @@
-# Read by oxfmt (`vp fmt`) as its ignore file — there is no Prettier in the
-# toolchain, but this filename is the ignore surface oxfmt honours (copied
-# from the preferenceflow application). Generated Drizzle migrations — the pg
-# package's fixture chain under tests/fixtures/migrations/ — are drizzle-kit's
-# output and are never hand-formatted.
+# Read by oxfmt as its ignore file. Generated Drizzle migrations (the pg
+# package's fixture chain) are drizzle-kit output, never hand-formatted.
 migrations/
