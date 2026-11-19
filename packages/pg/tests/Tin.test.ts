@@ -1,10 +1,10 @@
 /**
- * The TIN helpers (`src/tin.ts`): the SQL each one renders through Drizzle's
+ * The TIN helpers (`src/Tin.ts`): the SQL each one renders through Drizzle's
  * Postgres dialect, the TINQL phrase escape, and the index options as
  * drizzle-kit writes them. No database: TIN is a PlanetScale extension that
  * the CI service container doesn't ship.
  *
- * @module packages/pg/tests/tin
+ * @module packages/pg/tests/Tin
  */
 
 import { generateDrizzleJson, generateMigration } from "drizzle-kit/api-postgres";
@@ -35,7 +35,7 @@ import {
   type TextOperand,
   tinIndex,
   tinIndexParameters,
-} from "../src/tin.ts";
+} from "../src/Tin.ts";
 
 const posts = pgTable(
   "posts",

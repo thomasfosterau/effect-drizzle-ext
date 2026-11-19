@@ -1,8 +1,8 @@
-# `./tin`
+# `./Tin`
 
 _A guide to [`@thomasfosterau/effect-drizzle-ext-pg`](../../packages/pg/README.md). The API reference is the doc comments on each export (your editor's hover, or `vp run docgen`)._
 
-Typed Drizzle helpers for [TIN](https://planetscale.com/docs/postgres/search), PlanetScale's full-text search extension for Postgres. TIN adds a `tin` index method, the `==>` match operator over its TINQL query language, BM25 scoring and highlighting. These helpers sit beside Drizzle's own `eq` and `ilike`: each builds an `SQL` fragment, and none of them opens a connection, runs an Effect or adds a dependency.
+Typed Drizzle helpers for [TIN](https://planetscale.com/docs/postgres/search), PlanetScale's full-text search extension for Postgres. TIN adds a `tin` index method, the `==>` match operator over its TINQL query language, BM25 scoring and highlighting. These helpers sit beside Drizzle's own `eq` and `ilike`, imported from `@thomasfosterau/effect-drizzle-ext-pg/Tin` or as the `Tin` namespace of the package root: each builds an `SQL` fragment, and none of them opens a connection, runs an Effect or adds a dependency.
 
 | Helper | SQL |
 | --- | --- |
@@ -21,7 +21,7 @@ Typed Drizzle helpers for [TIN](https://planetscale.com/docs/postgres/search), P
 Declare the extension with `./tooling`'s extras so a fresh database gets it, and index each column you search. TIN indexes one column or expression per index, so cross-column search takes one index per column.
 
 ```ts
-import { tinIndex } from "@thomasfosterau/effect-drizzle-ext-pg/tin";
+import { tinIndex } from "@thomasfosterau/effect-drizzle-ext-pg/Tin";
 import { extension } from "@thomasfosterau/effect-drizzle-ext-pg/tooling";
 import { pgTable, serial, text } from "drizzle-orm/pg-core";
 

@@ -35,7 +35,7 @@
     "./chain": "./src/chain.ts",
     "./migrations": "./src/migrations.ts",
     "./testing": "./src/testing.ts",
-    "./tin": "./src/tin.ts",
+    "./Tin": "./src/Tin.ts",
     "./tooling": "./src/tooling/index.ts"
   },
   "publishConfig": {
@@ -56,9 +56,9 @@
         "types": "./dist/testing.d.ts",
         "default": "./dist/testing.js"
       },
-      "./tin": {
-        "types": "./dist/tin.d.ts",
-        "default": "./dist/tin.js"
+      "./Tin": {
+        "types": "./dist/Tin.d.ts",
+        "default": "./dist/Tin.js"
       },
       "./tooling": {
         "types": "./dist/tooling/index.d.ts",

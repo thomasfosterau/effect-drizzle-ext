@@ -27,7 +27,7 @@
  *
  * TIN's reference: https://planetscale.com/docs/postgres/search
  *
- * @module tin
+ * @module Tin
  */
 
 import type { AnyColumn, SQL, SQLWrapper } from "drizzle-orm";
@@ -67,7 +67,7 @@ const text = (value: QueryOperand): SQL => sql`${value}::text`;
  *
  * @example
  * ```ts
- * import { matches, phrase } from "@thomasfosterau/effect-drizzle-ext-pg/tin";
+ * import { matches, phrase } from "@thomasfosterau/effect-drizzle-ext-pg/Tin";
  * import { and } from "drizzle-orm";
  * import { pgTable, serial, text } from "drizzle-orm/pg-core";
  * import * as Option from "effect/Option";
@@ -88,7 +88,7 @@ export const matches = (column: TextOperand, query: QueryOperand): SQL<boolean> 
  *
  * @example
  * ```ts
- * import { matchesAny } from "@thomasfosterau/effect-drizzle-ext-pg/tin";
+ * import { matchesAny } from "@thomasfosterau/effect-drizzle-ext-pg/Tin";
  * import { pgTable, serial, text } from "drizzle-orm/pg-core";
  *
  * const posts = pgTable("posts", { id: serial().primaryKey(), body: text().notNull() });
@@ -173,7 +173,7 @@ const ctid = (table: PgTable): SQL => sql`${table}.ctid`;
  *
  * @example
  * ```ts
- * import { matches, score } from "@thomasfosterau/effect-drizzle-ext-pg/tin";
+ * import { matches, score } from "@thomasfosterau/effect-drizzle-ext-pg/Tin";
  * import { desc } from "drizzle-orm";
  * import { pgTable, serial, text } from "drizzle-orm/pg-core";
  *
@@ -211,7 +211,7 @@ export const fullScore = (table: PgTable, options?: Bm25Options): SQL<number> =>
  *
  * @example
  * ```ts
- * import { maxScore, score } from "@thomasfosterau/effect-drizzle-ext-pg/tin";
+ * import { maxScore, score } from "@thomasfosterau/effect-drizzle-ext-pg/Tin";
  * import { sql } from "drizzle-orm";
  * import { pgTable, serial, text } from "drizzle-orm/pg-core";
  *
@@ -248,7 +248,7 @@ export interface HighlightOptions {
  *
  * @example
  * ```ts
- * import { highlight, matches } from "@thomasfosterau/effect-drizzle-ext-pg/tin";
+ * import { highlight, matches } from "@thomasfosterau/effect-drizzle-ext-pg/Tin";
  * import { pgTable, serial, text } from "drizzle-orm/pg-core";
  *
  * const posts = pgTable("posts", { id: serial().primaryKey(), body: text().notNull() });
@@ -296,7 +296,7 @@ export const highlightAnsi = (column: TextOperand, options?: HighlightAnsiOption
  *
  * @example
  * ```ts
- * import { phrase } from "@thomasfosterau/effect-drizzle-ext-pg/tin";
+ * import { phrase } from "@thomasfosterau/effect-drizzle-ext-pg/Tin";
  * import * as Option from "effect/Option";
  *
  * console.log(Option.getOrThrow(phrase('say "AND" [now]'))); // "say \"AND\" \[now\]"
@@ -382,7 +382,7 @@ const word = (value: string): string =>
  *
  * @example
  * ```ts
- * import { tinIndexParameters } from "@thomasfosterau/effect-drizzle-ext-pg/tin";
+ * import { tinIndexParameters } from "@thomasfosterau/effect-drizzle-ext-pg/Tin";
  *
  * console.log(tinIndexParameters({ stemmer: "en", k1: 1.5 })); // { k1: "1.5", stemmer: "en" }
  * ```
@@ -428,7 +428,7 @@ export const tinIndexParameters = (options: TinIndexOptions): Record<string, str
  *
  * @example
  * ```ts
- * import { tinIndex } from "@thomasfosterau/effect-drizzle-ext-pg/tin";
+ * import { tinIndex } from "@thomasfosterau/effect-drizzle-ext-pg/Tin";
  * import { pgTable, serial, text } from "drizzle-orm/pg-core";
  *
  * export const posts = pgTable(
