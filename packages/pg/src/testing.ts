@@ -1,41 +1,8 @@
 /**
- * @copyright Thomas Foster
- *
- * The integration-test transaction runner: every spec runs inside a real
- * database transaction that is ALWAYS rolled back, so a suite needs no
- * truncation, no fixture reset and no ordering discipline.
- *
- * The mechanics are the ones the consuming applications carry today, with
- * three things removed because they are the caller's, not the library's:
- * the viewer services a spec layers on top, the proxy-client variants an
- * application's own deployment shape needs, and the resolution of the test
- * database URL (the caller passes it — see {@link testDatabaseLayer}).
- *
- * The shape is:
- *
- * 1. `db.transaction(...)` opens an OUTER transaction whose only job is the
- *    always-rollback, and whose handle is discarded.
- * 2. The spec's effect is wrapped in the application's own `transact`, so the
- *    spec opens its own transaction exactly as a request handler does in
- *    production (website #1883) — a SAVEPOINT on the outer one. Binding
- *    `CurrentTransaction` from the harness instead would work and touch far
- *    fewer lines, but it would make the specs the one place in the system
- *    where a write runs without anything having called `transact` — precisely
- *    the code path they exist to exercise.
- * 3. The inner `Exit` is captured, then a sentinel failure forces the outer
- *    transaction to roll back.
- * 4. The captured `Exit` is projected back to a Promise (success resolves,
- *    failure throws the underlying cause) so ordinary
- *    `await expect(...).rejects` assertions keep working.
- *
- * The library owns no schema, so a spec creates the `TEMPORARY` tables it
- * needs inside that transaction: DDL is transactional in PostgreSQL, so the
- * always-rollback disposes of them with everything else.
- *
- * The database the runner connects to is provisioned by
- * {@link provisionTestDatabase} (defined in `./provisioning.ts`, re-exported
- * here): an explicit URL, else a fresh migrated database on a reachable
- * local server, else a Testcontainers container.
+ * The integration-test transaction runner: every spec runs in a real
+ * transaction that is always rolled back, retrying only connect-time failures.
+ * See the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/testing.md).
  *
  * @module testing
  */
@@ -91,7 +58,7 @@ export {
 // contention, but never re-runs test logic. Which `SqlError`s count as a
 // retryable connect failure is decided here.
 //
-// ## Why `isRetryable` alone is not enough (website #1055)
+// ## Why `isRetryable` alone is not enough
 //
 // The observed CI flake surfaces as
 // `SqlError: Failed to acquire connection for transaction (cause: … timeout
@@ -130,7 +97,7 @@ const CONNECT_SEAM_OPERATIONS = HashSet.make("acquireConnection", "connect");
  *    an `08xxx` SQLSTATE, `DeadlockError`, `SerializationError`, the timeout
  *    reasons), and
  *  - a reason whose `operation` is a connect/acquire seam label, which catches
- *    the misclassified `UnknownError` the website #1055 flake surfaces as
+ *    the misclassified `UnknownError` a connect flake surfaces as
  *    (pool "timeout exceeded when trying to connect" / `ECONNRESET`, neither
  *    of which carries an `08` SQLSTATE).
  *
@@ -205,7 +172,7 @@ const containsRollback = (cause: unknown, seen: WeakSet<object>): boolean => {
 // ── Connect-time retry policy ─────────────────────────────────────────
 //
 // See the connect-seam classification above for the flake this guards
-// against and why `isRetryable` alone doesn't catch it (website #1055). The
+// against and why `isRetryable` alone doesn't catch it. The
 // attempt count and backoff floor are tunable here. Five retries over an
 // exponential, jittered backoff (≈0.25s, 0.5s, 1s, 2s, 4s, with jitter to
 // de-correlate the parallel forks) comfortably outlasts a transient
@@ -337,9 +304,8 @@ export const makeTestTransaction = <
       // Two guards keep this honest:
       //  1. `isRetryableConnectFailure(e)` — fires for a `SqlError` that
       //     failed at the connect/acquire seam (the retryable
-      //     `ConnectionError`, plus the misclassified `UnknownError` the
-      //     website #1055 acquisition-timeout / `ECONNRESET` flake surfaces
-      //     as) but NOT for a `UniqueViolation` / `ConstraintError` /
+      //     `ConnectionError`, plus the misclassified `UnknownError` an
+      //     acquisition-timeout / `ECONNRESET` flake surfaces as) but NOT for a `UniqueViolation` / `ConstraintError` /
       //     `SqlSyntaxError` raised by a test's own query. The rollback
       //     sentinel that the body always forces is a plain object, not a
       //     `SqlError`, so a *successful* test and a *genuinely failing* test

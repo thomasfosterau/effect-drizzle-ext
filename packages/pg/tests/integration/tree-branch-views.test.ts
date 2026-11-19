@@ -1,8 +1,8 @@
 /**
  * The branch views `makeTreeViews` derives, as one SELECT driven from the
- * branch level's own version table instead of a `UNION ALL` of per-leaf arms
- * (effect-drizzle-ext#200), failing closed with a `CASE` on `type` over
- * `EXISTS` probes instead of a LEFT JOIN per leaf (effect-drizzle-ext#204),
+ * branch level's own version table instead of a `UNION ALL` of per-leaf arms,
+ * failing closed with a `CASE` on `type` over
+ * `EXISTS` probes instead of a LEFT JOIN per leaf,
  * proven against PostgreSQL.
  *
  * - **Equivalence.** Over mixed histories (multi-version nodes, deleted
@@ -294,8 +294,8 @@ describe("branch views: one driver returns exactly the UNION ALL form's rows", (
           // The oracle really is the union of per-leaf arms; the view is not.
           expect(result.oracle, `${view}: the oracle`).toContain(") union all (");
           expect(result.definition, `${view}: the definition`).not.toContain("UNION ALL");
-          // The single driver's tightening (effect-drizzle-ext#200), kept by
-          // the CASE (effect-drizzle-ext#204): the union showed work's
+          // The single driver's tightening, kept by
+          // the CASE: the union showed work's
           // stale-type and unknown-type rows, the view shows neither; every
           // other row is equal both ways.
           const tightened = view === "work_view" ? [STALE, UNKNOWN] : [];
@@ -433,7 +433,7 @@ const seedWorks = execAll([
 ]);
 
 describe("branch views: the fixture page plan", () => {
-  it("pages work_view through the branch level's index, joining no leaf (effect-drizzle-ext#204)", async () => {
+  it("pages work_view through the branch level's index, joining no leaf", async () => {
     await runInTestTransaction(
       runtime,
       Effect.gen(function* () {

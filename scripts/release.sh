@@ -1,35 +1,9 @@
 #!/usr/bin/env bash
 #
-# The `release` script the Release workflow's changesets/action runs once the
-# "Version Packages" PR has merged: publish every workspace package whose
-# current version is not on npm yet, then `changeset tag`.
-#
-# ## Why per-package `npm publish`, not `pnpm -r publish`
-#
-# npm OIDC trusted publishing exchanges the workflow's GitHub OIDC token for a
-# short-lived publish token scoped to ONE package, and the trusted-publisher
-# binding is configured per package on npmjs.com. `npm publish` (npm >= 11.5.1)
-# is the client npm documents for that exchange: it mints the token for the
-# package it is publishing and attaches a provenance statement itself where the repository
-# supports one (it is never forced with `--provenance`, which fails from a
-# private repository). The
-# 2026-09-18 tooling survey (issue #10) found the old recursive
-# `pnpm -r publish` could not take this path, so each package is published by
-# its own `npm publish` call.
-#
-# ## Why `pnpm pack` first
-#
-# The manifests carry `catalog:peers` / `catalog:` / `workspace:^` specifiers
-# that only pnpm understands; `npm publish` from the package directory would
-# publish them literally. `pnpm pack` writes the tarball with every specifier
-# resolved (the `catalogs.peers` ranges, the sibling's real version) and
-# `publishConfig` applied (the `dist/` exports map), and `npm publish
-# <tarball>` publishes exactly that file.
-#
-# Packages are published in dependency order (core, pg, kit), so each
-# package's workspace dependency on the one before it always resolves.
-# A version already on the registry is skipped, which makes a re-run after a
-# partial failure safe.
+# Publishes every workspace package whose version is not on npm yet, then
+# runs `changeset tag`. Per package because npm trusted publishing mints a
+# token per package; `pnpm pack` first so `catalog:` / `workspace:` specifiers
+# are resolved in the tarball. Core, pg, kit: dependency order. Re-runnable.
 set -euo pipefail
 
 PACKAGES=(packages/core packages/pg packages/kit)

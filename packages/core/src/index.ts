@@ -1,46 +1,8 @@
 /**
- * @copyright Thomas Foster
- *
- * **Effect Schema → Drizzle derivation: the annotation entry (no Drizzle).**
- *
- * A model attribute's base schema carries a {@link dbColumn} annotation
- * describing the database column it backs; a downstream derivation (the
- * {@link ./derive.ts} entry) reads that annotation and emits the matching
- * Drizzle column builder. One declaration — the annotated field — is the single
- * source for both the model projection and the column.
- *
- * This entry point's own code has **no Drizzle dependency**: it is the half a
- * client- / model-layer package can import without pulling the ORM into its
- * bundle. The Drizzle-emitting half lives behind the {@link ./derive.ts} and
- * {@link ./versioned-chain.ts} subpaths. The one exception is the
- * {@link PostGis} namespace re-export, which a tree-shaking bundler drops
- * unless it is read.
- *
- * **Why a phantom rides alongside the annotation.** Effect Schema annotations
- * are erased from the static type (`schema.annotate(...)` returns the *same*
- * type, and `resolveAnnotations` widens every read to the augmented
- * `Annotations` interface). So a purely-annotation-driven derivation cannot stay
- * type-safe — it can neither tell *which* fields are columns nor recover their
- * precise column type at the type level. {@link dbColumn} therefore does two
- * things: it attaches a real runtime annotation (the source of truth the runtime
- * reads) **and** carries the metadata literally in a type-level phantom (so the
- * column map stays precisely typed, preserving `$inferSelect`). Annotations
- * alone are runtime-only; type safety needs the phantom.
- *
- * **Extensible column kinds.** The `pg` kind is an open `string` at this layer —
- * the package bakes in no fixed set of kinds. A consumer pins its own kind union
- * (e.g. `text | integer | boolean | timestamp | …custom`) via {@link dbColumnFor}
- * and supplies the matching Drizzle builders to the derivation. So a repo can
- * inject bespoke column kinds (a block-document store, a JSON codec, …) without
- * the package knowing about them.
- *
- * **Why the readers take `Schema.Constraint`, not `Schema.Top`.** Every reader
- * here only *reads* a schema (`resolveAnnotations`, `.ast`, the structural
- * wrapper members); none of them calls `annotate` / `check` / `rebuild`. That is
- * exactly effect's `Schema.Constraint` surface, and it is also the element type
- * of `Schema.Struct.Fields` — so the field readers below can hand a struct's own
- * field straight to a reader with no cast. `Schema.Top` is strictly narrower, so
- * this widening accepts everything a `Schema.Top` parameter would.
+ * The annotation entry (no Drizzle): `dbColumn` / `dbTable` annotations that
+ * let one Effect Schema field declare its database column, plus `defineTree`.
+ * See the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/annotations.md).
  *
  * @module index
  */
@@ -396,7 +358,7 @@ const IS_INT_REPRESENTATION_ID = "effect/schema/isInt";
  * Whether `check` is `Schema.isInt()` itself. Since effect 4.0.5 its
  * `toJsonSchema` is `{ type: "integer", minimum: MIN_SAFE_INTEGER, maximum:
  * MAX_SAFE_INTEGER }`: the integer type, not a bound the model declared, so
- * the walker reads no bounds from it (effect-drizzle-ext#138). Matched by the
+ * the walker reads no bounds from it. Matched by the
  * filter's identity rather than its fragment's shape, so an explicitly
  * declared safe-integer bound still counts.
  */

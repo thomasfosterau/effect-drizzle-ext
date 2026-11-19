@@ -1,16 +1,7 @@
 name: CI
 
-# ONE pipeline, defined once: the `ci` task in vite.config.ts runs every gate
-# in order (format and lint, type gates, unit, integration, build, docgen,
-# audit), so `vp run ci` locally is what this workflow runs. The `ci` job
-# runs it once per Node version in the matrix; each leg's check,
-# `ci (node <version>)`, is required by name in the ruleset.
-#
-# Integration runs against an EPHEMERAL LOCAL database (fresh per run,
-# provisioned by the suite's own global setup on the job's `postgres` service
-# container) — no stage, no secrets, so every PR class runs it, Dependabot's
-# included: the jobs hold a read-only token, no secrets and no OIDC, every
-# action is pinned, and checkout never persists credentials.
+# `ci` runs `vp run ci` per Node version; the task graph lives in
+# vite.config.ts, so a local `vp run ci` is the same pipeline.
 
 on:
   pull_request:
@@ -23,25 +14,18 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/trunk' }}
 
-# No permissions by default; each job grants only read access.
 permissions: {}
 
 jobs:
   ci:
     name: ci (node ${{ matrix.node }})
-    # Every supported line: the active LTS and the latest release. Both must
-    # sit inside `engines.node` (>=22.18).
     strategy:
       fail-fast: false
       matrix:
         node: [lts, latest]
     runs-on: ubuntu-latest
-    # The integration suite's database. Fresh per job by construction (the
-    # container dies with the job), and the suite's global setup additionally
-    # creates its own database inside it per run. pgvector's image is the
-    # official postgres image plus the `vector` extension — the image the
-    # consuming applications provision, so the library is proven against the
-    # same server they run.
+    # The integration suite's server; its global setup creates a fresh
+    # database inside it per run.
     services:
       postgres:
         image: pgvector/pgvector:pg17
@@ -58,56 +42,47 @@ jobs:
     permissions:
       contents: read
     env:
-      # Where the integration suite finds the service container above; the
-      # suite's global setup reads the standard PG* variables and provisions
-      # its own database there.
       PGPASSWORD: postgres
-      # A modest ceiling for every Node process in the pipeline. NODE_OPTIONS
-      # is inherited by every child, including each vitest fork.
+      # Inherited by every child process, including each vitest fork.
       NODE_OPTIONS: --max-old-space-size=2048
       VITEST_MAX_WORKERS: 2
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-      # Vite+ at the catalog's `vite-plus` pin (auto-detected), the matrix's
-      # Node (via `vp env use`), its pnpm, and the dependency cache. The install is the next step,
-      # so it can retry.
-      - name: Setup Vite+
-        uses: voidzero-dev/setup-vp@v1.22.0
+      - uses: voidzero-dev/setup-vp@v1.22.0
         with:
+          version-file: pnpm-workspace.yaml
           node-version: ${{ matrix.node }}
           cache: true
-          run-install: false
-      # Retried up to three times: pnpm's linker has raced itself transiently
-      # on a cold store (gardeneria CI, 2026-07-26), failing a run before any
-      # check ran. Safe because the install reconciles node_modules against
-      # the committed lockfile on every attempt; `--frozen-lockfile`, install
-      # scripts and the supply-chain policy check still run each time, so a
-      # deterministic failure still turns the job red.
-      - name: Install dependencies
-        run: |
-          for attempt in 1 2 3; do
-            if vp install --frozen-lockfile; then
-              break
-            fi
-            if [ "$attempt" -eq 3 ]; then
-              echo "::error::vp install failed after 3 attempts"
-              exit 1
-            fi
-            delay=$((attempt * 15))
-            echo "::warning::vp install failed (attempt ${attempt}/3); retrying in ${delay}s"
-            sleep "$delay"
-          done
+          run-install: true
       - name: Restore the Vite+ task cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache@v6.1.0
         with:
           path: node_modules/.vite/task-cache
           key: vp-task-v1-${{ runner.os }}-node-${{ matrix.node }}-${{ github.sha }}
           restore-keys: |
             vp-task-v1-${{ runner.os }}-node-${{ matrix.node }}-
-      - name: Node version
-        run: node --version
-      # Every gate, in order: vite.config.ts → `ci`.
-      - name: CI
-        run: vp run ci
+      - run: vp run ci
+
+  devcontainer:
+    name: devcontainer
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      DEVCONTAINER_CLI: "@devcontainers/cli@0.89.0"
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      # Only to run the CLI on the runner; the container installs its own.
+      - uses: voidzero-dev/setup-vp@v1.22.0
+        with:
+          version-file: pnpm-workspace.yaml
+          run-install: false
+      - name: Build and start the container
+        run: vp dlx "$DEVCONTAINER_CLI" up --workspace-folder .
+      - name: Check vp inside the container
+        run: vp dlx "$DEVCONTAINER_CLI" exec --workspace-folder . vp --version

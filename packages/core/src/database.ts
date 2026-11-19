@@ -1,31 +1,8 @@
 /**
- * @copyright Thomas Foster
- *
- * The Effect-native Drizzle transaction boundary, as a per-application
- * service factory: the `Database` and `CurrentTransaction` service keys, the
- * `transact` helper that opens a transaction and discharges its handle into
- * the context, and the `readHandle` resolver that prefers an ambient
- * transaction over the client.
- *
- * The transaction value is whatever `db.transaction((tx) => Effect.gen(…))`
- * passes its callback against the Effect-native Drizzle database. Its query
- * methods (`select`, `insert`, `update`, `delete`, `transaction`) return
- * Effects instead of Promises, so callers `yield*` them directly inside the
- * transactional `Effect.gen`.
- *
- * Nothing here names a driver. The module is generic over the database and
- * transaction types, so `drizzle-orm/effect-postgres` (and any other
- * Effect-native Drizzle driver) binds them from outside;
- * `@thomasfosterau/effect-drizzle-ext-pg` is the binding this repository
- * ships. The only Drizzle type that reaches this file is
- * {@link PgTransactionConfig}, a plain options record.
- *
- * Operations that predate the services took the transaction as an explicit
- * `tx` parameter rather than a `Client | Transaction` union. The pair
- * {@link DatabaseServices.CurrentTransaction} + {@link
- * DatabaseServices.transact} replaces that threading (website #1883); the
- * handle type stays visible because it is still the service's payload and the
- * driver's callback parameter type.
+ * The Effect-native Drizzle transaction boundary as a per-application service
+ * factory: `Database` and `CurrentTransaction` keys, the always-open
+ * `transact`, and `readHandle`. See the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/database.md).
  *
  * @module database
  */
@@ -119,9 +96,9 @@ export interface DatabaseServices<Db, Tx extends ReadSurface, Key extends string
    * The payload is NOT interchangeable with {@link Database}. A transaction
    * handle is the CONCRETE transaction the driver passed to the callback,
    * whereas the `Database` payload can be a proxy the consuming application
-   * wrapped around its client (website #593 depends on that difference for
-   * subquery recursion). Read this key as "the open transaction", not as
-   * "permission to write".
+   * wrapped around its client (subquery recursion can depend on that
+   * difference). Read this key as "the open transaction", not as "permission
+   * to write".
    *
    * The key string is the `Database` key plus `/CurrentTransaction`, so the
    * pair is legible in a context dump and two applications composed into one
@@ -146,8 +123,8 @@ export interface DatabaseServices<Db, Tx extends ReadSurface, Key extends string
    * SAVEPOINT the calling code currently takes, changing rollback granularity
    * without changing a line of that code. If you want to reuse the open
    * transaction, yield {@link CurrentTransaction} directly and do not open
-   * another. Adjudicated on website #1883 (owner, 2026-09-07, condition 3) —
-   * please do not "improve" this into a join-if-present helper.
+   * another. This is deliberate: do not "improve" it into a join-if-present
+   * helper.
    *
    * The nested boundary is opened on the ambient handle
    * (`tx.transaction(…)`), not on the client. Some drivers pin the open
@@ -185,12 +162,12 @@ export interface DatabaseServices<Db, Tx extends ReadSurface, Key extends string
    *
    * This is deliberately **not** what {@link transact} does for writes.
    * There, joining an ambient transaction would delete a SAVEPOINT and change
-   * rollback granularity, which is why it is always-open (website #1883,
-   * owner, 2026-09-07). A read opens nothing, so there is no boundary to lose
-   * — the asymmetry is the point, not an inconsistency.
+   * rollback granularity, which is why it is always-open. A read opens
+   * nothing, so there is no boundary to lose — the asymmetry is the point, not
+   * an inconsistency.
    *
    * Not for a caller that needs a handle which is concretely NOT the
-   * consuming application's proxy (website #593). This falls back to exactly
+   * consuming application's proxy. This falls back to exactly
    * that proxy when no transaction is open, so such a caller must keep
    * opening one of its own.
    *

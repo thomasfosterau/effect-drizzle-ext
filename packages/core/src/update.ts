@@ -1,33 +1,7 @@
 /**
- * @copyright Thomas Foster
- *
- * **The update tri-state at a single seam.** {@link updateSetMap} builds an
- * `UPDATE … SET` map from a decoded update input's **own keys**:
- *
- * | input                | meaning        | in the `SET` map        |
- * | -------------------- | -------------- | ----------------------- |
- * | `{ col: value }`     | set            | `col: value`            |
- * | `{ col: null }`      | clear          | `col: null`             |
- * | key absent / `undefined` | carry forward | not present at all  |
- *
- * An update input schema encodes the three states across key presence and
- * the value — `Schema.optionalKey(Schema.NullOr(X))` for a clearable field,
- * `Schema.optionalKey(X)` for one that may not be cleared — so decoding has
- * already refused `null` for a column that must not be cleared. What this
- * module must never do is fold the first two rows together: `col: input.col
- * ?? null` turns a carry-forward into a clear, which is silent data loss
- * (website #1877).
- *
- * **Nothing here is `Option`.** The `null` / `undefined` split *is* the
- * tri-state; collapsing either side to one `Option` erases the difference
- * between "leave alone" and "clear". The `SET` map is also Drizzle-facing,
- * where `undefined` means "not supplied" and an `Option` would be written as
- * a value.
- *
- * The preferenceflow application's shape (`apps/api/src/operations/
- * update-fields.ts`); the website application's carry-forward merge
- * (`mergeUpdateFields(current, input)`) is the same rule applied to a
- * pre-read row, and needs no helper once the write is a `SET` map.
+ * The update tri-state at one seam: a value sets, `null` clears, an absent key
+ * or `undefined` carries forward. See the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/update.md).
  *
  * @module update
  */

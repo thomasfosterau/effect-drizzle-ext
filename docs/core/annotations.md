@@ -28,7 +28,7 @@ export const fieldColumnBounds: (fields: Schema.Struct.Fields) => Record<string,
 
 ### Declaring a tree
 
-`defineTree(spec)` declares a versioned ontology once, with no Drizzle import, so a models package can state it and the database layer derive every table, constraint and view from it (effect-drizzle-ext#112). Each entry of `spec` is a level:
+`defineTree(spec)` declares a versioned ontology once, with no Drizzle import, so a models package can state it and the database layer derive every table, constraint and view from it. Each entry of `spec` is a level:
 
 - A **marker** has no `leaf`; a **leaf** carries its domain fields (`dbColumn`-annotated), and its name is its discriminator value.
 - `parent` names another level; absent, the level is a branch root under the tree's root (the `node` identity and `node_version` tables).

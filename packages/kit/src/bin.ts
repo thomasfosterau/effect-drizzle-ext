@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 /**
- * @copyright Thomas Foster
- *
  * **The `effect-drizzle-kit` bin**: {@link cli} over the process's arguments,
  * with the Node services, run by `NodeRuntime.runMain` (which sets the exit
  * code and prints a failure's message).

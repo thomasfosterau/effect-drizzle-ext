@@ -1,6 +1,6 @@
 /**
  * Tree declarations with the shape of each consuming application, the fixtures
- * the versioned-ontology slices (effect-drizzle-ext#112) build on. Column kinds
+ * the versioned-ontology slices build on. Column kinds
  * are the generic `text` / `integer` / `boolean` / `timestamp` set; no
  * application's own vocabulary or schema is copied.
  */

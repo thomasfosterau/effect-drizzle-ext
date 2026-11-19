@@ -1,6 +1,4 @@
 /**
- * @copyright Thomas Foster
- *
  * Canary for the annotation entry: the `dbColumn` annotation round-trips, keeps
  * decode behaviour intact, pins column kinds via `dbColumnFor`, carries FK
  * metadata; `dbTable` annotates any object in place; and the struct-field
@@ -228,8 +226,7 @@ describe("numericBounds", () => {
   });
 
   // effect 4.0.5+ gives `isInt` a `toJsonSchema` of the whole safe-integer
-  // range; that is the integer type, not a bound the model declared
-  // (effect-drizzle-ext#138).
+  // range; that is the integer type, not a bound the model declared.
   describe("Schema.isInt's own safe-integer range", () => {
     it("is not a bound on an otherwise unbounded integer", () => {
       expect(numericBounds(Schema.Int)).toStrictEqual(Option.none());

@@ -1,50 +1,8 @@
 /**
- * @copyright Thomas Foster
- *
- * **The version-chain discipline, Drizzle-concrete** (effect-drizzle-ext#112,
- * decision 5): create, carry-forward update, tombstone, restore, history and
- * the expected-version precondition, written straight over the tables
- * `makeTreeTables` (core `./versioned-chain`) derives from a tree.
- *
- * The behavioural spec is pulpit's `version-chain.ts` and its tests; the
- * rules are the same, and the errors carry pulpit's names and fields so a
- * `pulpit-drizzle-pg` store can map them one to one:
- *
- * - **Append-only** (`VERSION-CHAIN-001/002`). Every write lands at
- *   `N_max + 1` on the root version table and on every level of the leaf's
- *   chain; no version row is ever updated or deleted.
- * - **Create is never an upsert.** A caller-supplied id that exists fails
- *   {@link NodeAlreadyExists}.
- * - **Stable columns are written once.** A level's `stableColumns` (immutable
- *   identity facts) are set by `create` alone; no later write touches a stable
- *   row.
- * - **Update carries forward.** A patch is tri-state per field: a value sets,
- *   `null` clears, an absent (or `undefined`) key carries the head's value
- *   forward.
- * - **Delete is a tombstone that carries every column forward**, and is
- *   idempotent: on a tombstoned node it returns the existing tombstone with
- *   `alreadyDeleted: true` and writes nothing.
- * - **A plain update never resurrects** (`VERSION-CHAIN-006`): over a
- *   tombstone it fails {@link NodeNotFound}; only `restore` and
- *   `restoreVersion` write over one.
- * - **No partial restore.** `restoreVersion` reads the whole snapshot (every
- *   level) first and fails {@link VersionNotFound} before writing anything.
- * - **An id that isn't a UUID is an unknown node.** `head` returns
- *   `Option.none()`, and `update` / `restore` / `delete` / `history` fail
- *   {@link NodeNotFound} (`getVersion` / `restoreVersion` fail
- *   {@link VersionNotFound}), all without a query. A malformed id from a URL
- *   is then the wire's 404, not a `22P02` that aborts the transaction.
- * - **Every chain read is bounded** (`PERF-DB-001`): `history` caps its
- *   `limit` at {@link MAX_HISTORY_LIMIT}.
- * - **An expected version is a precondition on the append.** A moved head
- *   fails {@link StaleVersion} and writes nothing; a writer racing between
- *   the read and the append loses the root's `(id, version)` primary key and
- *   fails {@link VersionConflict}.
- *
- * The chain never opens a transaction: every operation requires the
- * application's `CurrentTransaction` (`transact` is always-open, and the
- * boundary is the caller's). A failure mid-write leaves the transaction for
- * the caller to roll back.
+ * The version-chain operations over `makeTreeTables`' tables: create,
+ * carry-forward update, tombstone, restore and history, append-only and inside
+ * `CurrentTransaction`. See the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/chain.md).
  *
  * @module chain
  */
@@ -609,7 +567,7 @@ const onUniqueViolation =
  * whole level (`keyed`), `update` / `restore` a per-key tri-state patch (a
  * patch updates a key, `null` drops it, an absent key carries it forward),
  * `delete` and `restoreVersion` carry or restore every key, and a snapshot
- * reads it back as `keyed`, keyed by key (`{}` for none), pulpit#56's
+ * reads it back as `keyed`, keyed by key (`{}` for none), as pulpit's
  * `LocaleStates`.
  *
  * Throws `DerivationError` at module load when the tables don't carry the

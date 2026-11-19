@@ -1,6 +1,4 @@
 /**
- * @copyright Thomas Foster
- *
  * List-read helpers: the unpaged-total window column and the {@link Page}
  * shape every list read returns, a variadic AND filter combinator, a bounded
  * limit/offset input schema, and the rows-normalising wrapper over a raw-SQL

@@ -2,7 +2,7 @@
 
 _A guide to [`@thomasfosterau/effect-drizzle-ext-kit`](../../packages/kit/README.md). The API reference is the doc comments on each export (your editor's hover, or `vp run docgen`)._
 
-drizzle-kit's postgres diff has no extensions, domains or composite types (effect-drizzle-ext#212). The pg package's `./tooling` fills that gap with bin-less Effects ([guide](../pg/tooling.md#extras-what-drizzle-kit-doesnt-manage)). This package wraps them, together with the migration-drift gate, in a command an application runs next to `drizzle-kit`.
+drizzle-kit's postgres diff has no extensions, domains or composite types. The pg package's `./tooling` fills that gap with bin-less Effects ([guide](../pg/tooling.md#extras-what-drizzle-kit-doesnt-manage)). This package wraps them, together with the migration-drift gate, in a command an application runs next to `drizzle-kit`.
 
 ## The config module
 

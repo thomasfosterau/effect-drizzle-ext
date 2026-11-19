@@ -63,7 +63,7 @@ export const widgetView = fixture.view("widget_view").as((qb) =>
     .innerJoin(widgetVersion, eq(widget.id, widgetVersion.id)),
 );
 
-// ── An ontology tree (effect-drizzle-ext#112) ─────────────────────────
+// ── An ontology tree ─────────────────────────
 
 const ontologyBuilders = {
   text: (column: string) => text(column),
@@ -76,7 +76,7 @@ const ontologyBuilders = {
  * locale), a fact-scoped level, a refinable agent branch whose `person`
  * leaf carries an external key on its stable table, unique across persons, and
  * a `collection` branch with a `series` marker between it and two of its three
- * leaves (effect-drizzle-ext#200), the marker carrying a stable column.
+ * leaves, the marker carrying a stable column.
  */
 export const ontologyTree = defineTree({
   work: {

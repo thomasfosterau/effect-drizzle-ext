@@ -1,43 +1,7 @@
 /**
- * @copyright Thomas Foster
- *
- * **The migration-drift gate**: fails when a committed Drizzle schema and its
- * committed drizzle-kit `migrations/` snapshots disagree, without a database
- * or a deployed stage. Ported from the applications'
- * `packages/database/scripts/check-migration-drift.ts` (website #1200,
- * #1471; preferenceflow's copy is the reference), as a bin-less Effect an
- * application's `db:migration-drift` task runs with its own schema module.
- *
- * Three checks, each guarding "snapshot history is a DAG, not a chain" from a
- * different side:
- *
- * 1. **DAG integrity.** drizzle-kit 1.0's snapshots chain via `prevIds`
- *    (plural — a migration generated after two branches merge names both
- *    tips), so history is a DAG. Divergence is normal while unmerged; it is
- *    broken when two branches both land without a later migration's
- *    `prevIds` reconverging them. Every snapshot id must be unique, every
- *    `prevIds` entry must resolve, and the lineage must have exactly one head
- *    from which everything is reachable, with no cycle.
- * 2. **Zero drift.** The exact drizzle-kit calls a deploy-time regeneration
- *    makes (`generateDrizzleJson` / `generateMigration` from
- *    `drizzle-kit/api-postgres`) against the schema module and the
- *    **lexicographically-latest** migration directory's snapshot — the same
- *    "latest by directory name" selection alchemy's
- *    `Drizzle.Schema.regenerate` uses, NOT a DAG-aware pick — must produce
- *    zero statements. A diff drizzle-kit can only resolve interactively
- *    (rename-or-recreate) is drift too.
- * 3. **Base ancestry (pull requests only).** A migration must be generated on
- *    a checkout whose snapshot chain descends from the base branch's CURRENT
- *    head; checks 1–2 are internal to the checkout, so a branch forked from
- *    week-old `trunk` passes both while carrying a migration whose regenerated
- *    constraints silently omit everything the base added since. Runs only
- *    when a base is supplied ({@link resolveBaseRef} reads one from
- *    `MIGRATION_BASE_REF` / `GITHUB_BASE_REF`), and only when the branch adds
- *    migration directories.
- *
- * Zero drift runs only on a structurally sound DAG (and a base-descended
- * one): with two heads the latest-by-name snapshot is an arbitrary pick of
- * one fork, so its diff would be noise next to the real report.
+ * The migration-drift gate: DAG integrity, zero drift against the latest
+ * snapshot, and base ancestry, without a database. See the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tooling.md).
  *
  * @module tooling/migration-drift
  */

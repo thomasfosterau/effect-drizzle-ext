@@ -610,7 +610,7 @@ describe("head", () => {
   });
 });
 
-describe("an id that isn't a UUID (effect-drizzle-ext#165)", () => {
+describe("an id that isn't a UUID", () => {
   const MALFORMED = "not-a-uuid";
 
   it("is an unknown node for every operation, and never reaches the database", async () => {
@@ -658,7 +658,7 @@ describe("an id that isn't a UUID (effect-drizzle-ext#165)", () => {
   });
 });
 
-describe("stable columns (effect-drizzle-ext#188)", () => {
+describe("stable columns", () => {
   const PERSON = "00000000-0000-4000-8000-0000000000c1";
   const OTHER = "00000000-0000-4000-8000-0000000000c2";
   const QID = "Q42";

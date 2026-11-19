@@ -1,31 +1,7 @@
 /**
- * @copyright Thomas Foster
- *
- * **Typed Drizzle helpers for TIN**, PlanetScale's full-text search extension
- * for Postgres (`CREATE EXTENSION tin`): the `==>` match operator, the BM25
- * score functions, highlighting and the `tin` index method, written to sit
- * beside Drizzle's own `eq`, `ilike` and `cosineDistance`.
- *
- * ```ts
- * db.select({ id: posts.id, score: score(posts) })
- *   .from(posts)
- *   .where(matches(posts.body, "apple OR grape"))
- *   .orderBy(desc(score(posts)))
- *   .limit(10);
- * ```
- *
- * Every helper builds a Drizzle `SQL` fragment and nothing else: no Effect,
- * no connection, no new dependency. The query string is always a bound
- * parameter, never SQL text, as PlanetScale's docs recommend. It is still
- * TINQL, though: uppercase `AND` / `OR` / `NEAR` in user input are operators,
- * and a stray `"` or `(` is a TINQL parse error at query time (the Effect
- * error channel, as a `SqlError`). Wrap raw user input with {@link phrase}
- * to search it literally.
- *
- * The extension itself is declared like any other, with `./tooling`'s
- * `extension("tin")`, so a fresh database gets it from the extras migration.
- *
- * TIN's reference: https://planetscale.com/docs/postgres/search
+ * Typed Drizzle helpers for TIN, PlanetScale's full-text search extension: the
+ * `==>` operator, BM25 scores, highlighting and the `tin` index method. See the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tin.md).
  *
  * @module Tin
  */

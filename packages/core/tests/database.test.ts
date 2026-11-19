@@ -1,6 +1,6 @@
 /**
  * Unit tests for `src/database.ts` — the service factory, the read-path handle
- * resolver and the write-path transaction boundary (website #1883).
+ * resolver and the write-path transaction boundary.
  *
  * `readHandle` is the deliberate asymmetry in the boundary design: `transact`
  * is always-open and never joins an ambient transaction, while a read prefers
@@ -165,7 +165,7 @@ describe("makeDatabaseServices", () => {
   });
 });
 
-describe("readHandle (#1883)", () => {
+describe("readHandle", () => {
   it.effect("returns the ambient transaction when one is open", () =>
     Effect.gen(function* () {
       expect(yield* provideOpenTransaction(readHandle, TX_HANDLE)).toBe(TX_HANDLE);
@@ -205,7 +205,7 @@ describe("readHandle (#1883)", () => {
   );
 });
 
-describe("transact (#1883)", () => {
+describe("transact", () => {
   it.effect("opens on the Database client and provides the new handle as CurrentTransaction", () =>
     Effect.gen(function* () {
       const seen = yield* provideDatabase(transact(CurrentTransaction));
@@ -220,8 +220,7 @@ describe("transact (#1883)", () => {
     Effect.gen(function* () {
       // A join-if-present helper would typecheck identically and record ONE
       // boundary; the second entry here is the SAVEPOINT that preserves rollback
-      // granularity. Adjudicated on website #1883 (owner, 2026-09-07,
-      // condition 3). That the nested boundary is opened on the ambient handle
+      // granularity. That the nested boundary is opened on the ambient handle
       // rather than on the client is what makes it nest on a driver that does
       // not pin the open connection to the fiber.
       const [outer, inner] = yield* provideDatabase(

@@ -1,28 +1,7 @@
 /**
- * @copyright Thomas Foster
- *
- * **The view-on-view gate** (`DB-VIEW-001`, website #1228): fails when any
- * database view in a Drizzle schema selects from another database view.
- * Ported from the website and gardeneria applications'
- * `packages/database/scripts/check-view-dependencies.ts`.
- *
- * drizzle-kit derives migrations from a schema diff, and for views that diff
- * is only ever `DROP VIEW` + `CREATE VIEW`, emitted as two flat blocks in one
- * shared order with **no topological sort** and **no cascade**. A
- * view-on-view edge is then unmigratable two ways:
- *
- * 1. **Both ends change.** The drops come out in the create order, so a drop
- *    runs dependency-first and PostgreSQL rejects it.
- * 2. **Only the dependency changes.** The dependent view is not in the diff
- *    at all, the dependency's `DROP VIEW` still fails, and no reordering of
- *    the emitted statements can help: the one that would have to run first
- *    was never emitted.
- *
- * The only remedy once such a migration exists is hand-editing it, so the
- * constraint is pushed up into the schema: **no view may reference another
- * view**. The graph is read from drizzle-kit's own DDL — the whole schema
- * generated from an empty snapshot, one `CREATE VIEW` per view carrying the
- * exact SQL a migration would — so the gate needs no database.
+ * The view-on-view gate (`DB-VIEW-001`): fails when a view selects from another
+ * view, which drizzle-kit can't order on DROP. See the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tooling.md).
  *
  * @module tooling/view-dependencies
  */

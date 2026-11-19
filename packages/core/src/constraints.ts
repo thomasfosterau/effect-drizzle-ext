@@ -1,18 +1,7 @@
 /**
- * @copyright Thomas Foster
- *
- * **Table-level CHECK / UNIQUE / composite-FK helpers.**
- *
- * Two independent families, both emitting values for a table factory's
- * `extraConstraints` seam:
- *
- * - {@link enumCheck} — the `CHECK (col IN (…))` behind an enum-valued `text`
- *   column, so a vocabulary declared once in a model constrains the database
- *   too.
- * - {@link discriminatorConstraintsFor} — the three constraints that thread a
- *   `type` discriminator up a hierarchy of stable tables, parameterised over
- *   the hierarchy (the library knows no level ontology; the consumer supplies
- *   the leaf set per level).
+ * Table-level CHECK, UNIQUE and composite-FK helpers for a table factory's
+ * `extraConstraints`. See the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/constraints.md).
  *
  * @module constraints
  */

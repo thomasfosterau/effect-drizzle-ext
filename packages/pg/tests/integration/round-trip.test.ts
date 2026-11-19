@@ -5,9 +5,8 @@
  * server. Two runtimes: the plain `pgClientFromUrl` layer, and one that
  * forwards a `types` registry (an int8 -> decimal-string codec) through the
  * helper. The registry was the fix for `bigint({ mode: "string" })` under the
- * `1.0.0-rc.5-ab785fc` commit build (website#2027); the published
- * drizzle-orm `1.0.0-rc.5` decodes it itself, so both runtimes now agree
- * (effect-drizzle-ext#95).
+ * `1.0.0-rc.5-ab785fc` commit build; the published
+ * drizzle-orm `1.0.0-rc.5` decodes it itself, so both runtimes now agree.
  *
  * Both tables live in a rolled-back transaction, so nothing is left behind.
  *

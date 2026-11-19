@@ -1,6 +1,4 @@
 /**
- * @copyright Thomas Foster
- *
  * Column helpers for Drizzle table definitions this library owns outright:
  * a generic JSONB codec bridging any Effect Schema to `jsonb`, `tsvector`
  * and `bytea` custom types, the `created_at` / `updated_at` timestamp pair

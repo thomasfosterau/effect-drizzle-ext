@@ -1,34 +1,8 @@
 /**
- * @copyright Thomas Foster
- *
- * **Effect Schema → Drizzle derivation: the derivation entry (Drizzle).**
- *
- * Reads the {@link DbColumn} metadata a schema declaration carries (via
- * {@link fieldColumns} from the {@link ./index.ts} annotation entry, or via any
- * other projection that yields a `Record<string, DbColumn>`) and emits the
- * matching Drizzle column builders. Depends on Drizzle, so a model / client
- * layer importing only the annotation entry never pulls the ORM.
- *
- * **Extensible column kinds.** The kind → builder mapping is *injected*, not
- * baked in: a consumer passes a builder registry (a record from its own kind
- * union to a Drizzle column builder) to {@link deriveColumnsWith}, and the
- * derivation preserves each column's precise builder type — so the derived
- * column map keeps `$inferSelect` typed — by reading the type-level phantom
- * `dbColumn` stamps alongside the runtime annotation.
- *
- * **Two entry shapes, one interpreter.** {@link deriveColumnsWith} returns both
- * `fromFields` (a `Schema.Struct`'s fields, the generic source) and `fromMeta`
- * (an already-projected metadata map, the seam the `./jsonapi/derive` entry and
- * any other projection build on). They share one builder loop.
- *
- * **Failures here are THROWN, not Effect failures.** Everything in this module
- * runs at *module load*, while a consumer's table modules are being evaluated —
- * before any Effect runtime exists to run a failure in, and before any query
- * can be issued. A misdeclared table must fail at `import`, not at first
- * insert, so a missing builder / a missing reference hook / bounds on a column
- * the table does not carry throw {@link DerivationError}. Runtime query
- * failures are the opposite and are never thrown: they travel in the Effect
- * error channel as the tagged errors of the `./errors` entry.
+ * Effect Schema → Drizzle derivation (imports Drizzle): turns `dbColumn`
+ * metadata into Drizzle column builders through a consumer's builder registry.
+ * See the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/derive.md).
  *
  * @module derive
  */

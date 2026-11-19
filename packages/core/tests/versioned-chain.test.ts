@@ -112,7 +112,7 @@ describe("makeSubtypeTables", () => {
       versionCfg.foreignKeys.some((fk) => fk.getName() === "widget_version_entity_version_fk"),
     ).toBe(true);
     // ...which cascades on delete, so erasing a node removes the whole chain
-    // (effect-drizzle-ext#145)
+    //
     expect(
       versionCfg.foreignKeys.find((fk) => fk.getName() === "widget_version_entity_version_fk")
         ?.onDelete,
@@ -152,7 +152,7 @@ describe("makeSubtypeTables", () => {
   });
 
   // `SubtypeTables` exists so declaration emit can *name* what this builder
-  // returns (website #1579); the hazard is that a future edit keeps it nameable while
+  // returns; the hazard is that a future edit keeps it nameable while
   // quietly widening it, which no runtime assertion would catch and which
   // `skipLibCheck: true` would hide in the emitted `.d.ts`. These pin the row
   // types the annotation has to keep producing. They are compile-time
@@ -177,9 +177,9 @@ describe("makeSubtypeTables", () => {
      * `$inferInsert` row types, which are what a query actually returns and
      * accepts. `Eq<Expected, Actual>` is exact type identity, so `Option` here
      * would not be a modelling improvement — it would simply stop matching and
-     * destroy the website #1579 regression guard these exist to be.
+     * destroy the regression guard these exist to be.
      */
-    // `id` NOT NULL (never `string | null` — the exact degradation website #1579 found),
+    // `id` NOT NULL (never `string | null` — a degradation seen before),
     // `type` nullable without a discriminator.
     exact<{ id: string; type: string | null }>()(stable.$inferSelect);
     // Generated key columns keep their nullability, and the caller's own
@@ -257,7 +257,7 @@ describe("makeCurrentVersionView", () => {
     expect(Object.getOwnPropertySymbols(view).length).toBeGreaterThan(0);
   });
 
-  it("drives from the root version row with no newer version, not a grouped max (effect-drizzle-ext#199)", () => {
+  it("drives from the root version row with no newer version, not a grouped max", () => {
     const { version } = defineSubtypeTables(app, {
       name: "gear",
       parentId: entity.id,
@@ -312,9 +312,9 @@ describe("makeCurrentVersionView", () => {
   });
 
   // A function `merge` additionally joins a `version = 0` alias of
-  // `rootVersion` and hands it to the callback (website #1223) — a plain-object
+  // `rootVersion` and hands it to the callback — a plain-object
   // `merge` (the two tests above) never adds that join, so a view whose
-  // definition must stay byte-identical (website #1228) can opt out just by not
+  // definition must stay byte-identical can opt out just by not
   // passing a function.
   it("builds a view merging a version-zero-derived column via a function merge", () => {
     const currentVersionViewWithCreatedAt = makeCurrentVersionView({
@@ -341,7 +341,7 @@ describe("makeCurrentVersionView", () => {
 
 // A consumer reading only the emitted `.d.ts` (not this source file) is what
 // the `SubtypeTables` / `CurrentVersionViewResult` annotations exist to keep
-// precise (website #1579) — `tests/dist-consumer` is the real gate for that,
+// precise — `tests/dist-consumer` is the real gate for that,
 // but these type-level checks pin the same shape at the source level so a
 // regression here shows up before a `dist/` rebuild is even needed.
 describe("dist-consumer-style type checks", () => {

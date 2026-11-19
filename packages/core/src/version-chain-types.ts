@@ -1,11 +1,9 @@
 /**
- * @copyright Thomas Foster
- *
  * The read shapes of a version chain, kept in a module of their own that
  * imports nothing from Drizzle, so the Drizzle-free entry (`.`) and
  * `./versioned-chain` export the same types: a client-bundled models package
- * names them from `.` without pulling the ORM into its module graph
- * (effect-drizzle-ext#191). Not a published subpath.
+ * names them from `.` without pulling the ORM into its module graph.
+ * Not a published subpath.
  *
  * @module version-chain-types
  */

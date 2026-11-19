@@ -221,7 +221,7 @@ describe("makeTreeTables: fact-scoped levels, resource leaves and hooks", () => 
   });
 });
 
-describe("makeTreeTables: a column key two sources share (effect-drizzle-ext#169)", () => {
+describe("makeTreeTables: a column key two sources share", () => {
   it("throws for a level hook column shadowing a tree column", () => {
     expect(() =>
       makeTreeTables(frbrTree, {
@@ -288,7 +288,7 @@ const stableDdlOf = (table: PgTable) => [
   checksOf(table),
 ];
 
-describe("makeTreeTables: stable-table columns and constraints (effect-drizzle-ext#188)", () => {
+describe("makeTreeTables: stable-table columns and constraints", () => {
   const tables = makeTreeTables(frbrTree, {
     schema,
     builders,

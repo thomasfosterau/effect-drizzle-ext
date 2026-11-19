@@ -93,7 +93,7 @@ describe("makeTreeViews: leaf views", () => {
     // No grouped head: the head is a primary-key probe, not an aggregate.
     expect(query).not.toContain("max(");
     expect(query).not.toContain("group by");
-    // `work` carries columns, so it stays a plain join (effect-drizzle-ext#207):
+    // `work` carries columns, so it stays a plain join:
     // an index on `title` can still drive a page.
     expect(query).toContain(
       `inner join "ontology"."work_version" on (("ontology"."book_version"."id" = "ontology"."work_version"."id") and ("ontology"."book_version"."version" = "ontology"."work_version"."version"))`,
@@ -106,7 +106,7 @@ describe("makeTreeViews: leaf views", () => {
   it("moves a level `fenced` names into one inner CROSS JOIN LATERAL (… OFFSET 0) keyed on the driver", () => {
     const views = makeTreeViews(frbrTree, frbrTables, { schema, fenced: ["work"] });
     const query = sqlOf(views.leaves.book);
-    // effect-drizzle-ext#207: outside the planner's join search; the root
+    // Fenced levels sit outside the planner's join search; the root
     // version, identity and birth rows stay plain joins.
     expect(query).toContain(
       `inner join "ontology"."node" on "ontology"."book_version"."id" = "ontology"."node"."id" cross join lateral (select "title", "url" from "ontology"."work_version" where (("ontology"."book_version"."id" = "ontology"."work_version"."id") and ("ontology"."book_version"."version" = "ontology"."work_version"."version")) offset 0) "tail" inner join "ontology"."node_version" "version_zero"`,
@@ -227,13 +227,12 @@ describe("makeTreeViews: branch views", () => {
       "createdAt",
     ]);
     const query = sqlOf(view);
-    // One driver, not a union of per-leaf arms (effect-drizzle-ext#200).
+    // One driver, not a union of per-leaf arms.
     expect(query).not.toContain("union all");
     expect(query).toContain(`from "ontology"."work_version" inner join "ontology"."node_version"`);
     expect(query.match(/not exists/g)?.length).toBe(1);
     expect(query).toContain(`("newer"."id" = "ontology"."work_version"."id")`);
-    // Nothing below the branch is projected, so no leaf is joined
-    // (effect-drizzle-ext#204).
+    // Nothing below the branch is projected, so no leaf is joined.
     expect(query).not.toContain("left join");
     // Fail closed: a CASE on `type` probes the named leaf's row, in
     // declaration order, and any other `type` (or NULL) is false.
@@ -289,7 +288,7 @@ describe("makeTreeViews: branch views", () => {
     expect(is(note, SQL.Aliased) ? getColumnFromDecoder(note)?.name : undefined).toBe("pages");
   });
 
-  it("LEFT JOINs a leaf read through a custom SQLWrapper in `project` (effect-drizzle-ext#204)", () => {
+  it("LEFT JOINs a leaf read through a custom SQLWrapper in `project`", () => {
     const views = makeTreeViews(frbrTree, frbrTables, {
       schema,
       branches: {
@@ -445,8 +444,8 @@ describe("makeTreeViews: branch views", () => {
       "createdAt",
     ]);
     const query = sqlOf(views.branches.continuant);
-    // Nothing below the branch is projected, so nothing below it is joined
-    // (effect-drizzle-ext#204); each leaf's CASE arm probes its own path.
+    // Nothing below the branch is projected, so nothing below it is joined;
+    // each leaf's CASE arm probes its own path.
     expect(query).not.toContain("left join");
     expect(query).toContain(
       `when 'plant' then ((${probe("independent_continuant")}) and (${probe("material_entity")}) and (${probe("plant")}))`,
@@ -510,7 +509,7 @@ describe("makeTreeViews: as-of reads", () => {
 const textColumn = <const C extends string>(column: C) =>
   dbColumn(Schema.String, { column, pg: "text", notNull: false });
 
-describe("makeTreeViews: a column key two sources share (effect-drizzle-ext#164)", () => {
+describe("makeTreeViews: a column key two sources share", () => {
   const withSlug = { identityColumns: { slug: text("slug") } };
 
   it("throws for a level column shadowing an identity column", () => {
@@ -568,7 +567,7 @@ describe("makeTreeViews: a column key two sources share (effect-drizzle-ext#164)
   });
 });
 
-describe("makeTreeViews: stable-table columns (effect-drizzle-ext#188)", () => {
+describe("makeTreeViews: stable-table columns", () => {
   const tables = makeTreeTables(frbrTree, {
     schema,
     builders,

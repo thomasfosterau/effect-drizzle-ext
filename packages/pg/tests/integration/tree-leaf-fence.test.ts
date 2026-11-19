@@ -2,7 +2,7 @@
  * The leaf, keyed, pointer and as-of views `makeTreeViews` derives with
  * their columnless levels, stable rows and facts (and any level `fenced`
  * names) in one fenced `CROSS JOIN LATERAL (… OFFSET 0)`, and every level
- * with columns of its own a plain join (effect-drizzle-ext#207), proven
+ * with columns of its own a plain join, proven
  * against PostgreSQL.
  *
  * - **Equivalence.** Every fixture leaf, keyed and pointer view returns

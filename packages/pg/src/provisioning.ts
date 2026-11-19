@@ -1,41 +1,8 @@
 /**
- * @copyright Thomas Foster
- *
- * **Ephemeral test-database provisioning** — the half of an integration
- * suite's global setup every consuming application carried as
- * `packages/integration-harness/local-database.ts`. Re-exported from
- * `./testing`; the reference is the preferenceflow application's copy.
- *
- * A suite's database is resolved in this order ({@link resolveDatabaseSource}):
- *
- * 0. **An explicit `DATABASE_URL_TEST` / `DATABASE_URL`** wins and is used
- *    as-is: it must already be migrated — the escape hatch for pointing the
- *    suite at a deployed stage's database or any other prepared server.
- *    Nothing is provisioned and nothing is torn down.
- * 1. **A reachable local server** — a CI service container, a devcontainer's
- *    PostgreSQL, or anything the standard `PG*` variables (`PGHOST`,
- *    `PGPORT`, `PGUSER`, `PGPASSWORD`) point at; the default is a trust-auth
- *    `postgres@127.0.0.1:5432`. Each run gets a **freshly created database**
- *    on it: drop, create, apply every migration.
- * 2. **A Testcontainers-launched container** when nothing is listening and
- *    no `PG*` variable was set explicitly. Needs a Docker daemon and the
- *    optional peer `@testcontainers/postgresql`, which is imported only on
- *    this path. The container is brand new, so migrations apply directly, and
- *    it stops when the provisioning scope closes.
- *
- * Explicit `PG*` config that is unreachable is a hard error
- * ({@link DatabaseUnreachable}), not a silent fallback: if you pointed the
- * suite somewhere, it should not quietly run elsewhere.
- *
- * Either way run N's verdict is independent of run N−1: no state survives
- * between runs. The per-checkout database name
- * `<prefix>_test_<sha256(migrationsDir)[:8]>` keeps parallel worktrees
- * sharing one server from dropping each other's database mid-run — pass the
- * migrations directory as an absolute path, which is per-checkout.
- *
- * What stays with the application: fixture users and seed data (website
- * #1847 keeps the harness → database edge one-way), and the container image
- * and database-name prefix, which are parameters here.
+ * Ephemeral test-database provisioning: an explicit URL, else a reachable local
+ * server, else a Testcontainers container. Re-exported from `./testing`. See
+ * the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/testing.md).
  *
  * @module provisioning
  */

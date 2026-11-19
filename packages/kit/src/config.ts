@@ -1,16 +1,8 @@
 /**
- * @copyright Thomas Foster
- *
- * **The `effect-drizzle-kit` config module**: what {@link defineConfig}
- * types, and how {@link loadConfig} finds, imports and checks it.
- *
- * The config is a TypeScript module (`effect-drizzle-kit.config.ts` by
- * default) whose default export is a {@link KitConfig}. It is imported with
- * Node's own type stripping (Node 22.18+, which `engines` already requires),
- * so it, and every module it imports, must be erasable TypeScript with
- * relative imports that carry their `.ts` extension, the convention this
- * family's applications already follow. Paths in it are relative to the
- * config file's directory, which is also where drizzle-kit runs.
+ * The `effect-drizzle-kit` config module: what `defineConfig` types, and how
+ * `loadConfig` finds, imports (with Node's type stripping) and checks it. See
+ * the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/kit/overview.md).
  *
  * @module config
  */

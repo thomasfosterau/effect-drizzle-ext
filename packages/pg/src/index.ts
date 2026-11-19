@@ -1,28 +1,8 @@
 /**
- * @copyright Thomas Foster
- *
- * The `@effect/sql-pg` binding of the driver-agnostic service factory: one
- * call to {@link makePgDatabase} gives an application the `Database` and
- * `CurrentTransaction` services, the `transact` write boundary and the
- * `readHandle` resolver, all typed over its own `relations` graph, plus the
- * `Effect` and `Layer` that build the Drizzle client itself and the
- * context-bound `queries` (`select`, `insert`, `query`, …) that find the
- * client in the Effect context.
- *
- * `drizzle-orm/effect-postgres` already ships the Effect-native Drizzle
- * driver; nothing here re-implements it. What this module adds is the two
- * pieces every consuming application was spelling out by hand:
- *
- * - the `Layer.effect(Database, PgDrizzle.make({ relations }).pipe(provide(
- *   DefaultServices)))` stanza, which appeared four times per application
- *   (request path, event path, test harness, proxied test harness), and
- * - the choice of `PgClient` construction, which is a real decision rather
- *   than a detail — see {@link pgClientFromUrl} and {@link pgClientFromPool}.
- *
- * Deployment topology stays with the consuming application: resolving a
- * connection string from a platform binding, degrading a failed binding to a
- * chainable proxy client, and any proxy wrapper around the concrete client
- * are all things only the application knows about.
+ * The `@effect/sql-pg` binding: `makePgDatabase` gives an application its
+ * `Database` / `CurrentTransaction` services, `transact`, `readHandle` and
+ * context-bound queries, plus `PgClient` layers. See the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/overview.md).
  *
  * @module index
  */
@@ -309,7 +289,7 @@ export const pgClientFromUrl = (config: {
  * pool with that request, and a connection failure surfaces on the first
  * query as a `SqlError` instead of at build. Platforms that pin I/O to the
  * event that created it require exactly this — a pool must never outlive
- * that event (website #455).
+ * that event.
  *
  * Until `@effect/sql-pg` 4.0.0-rc.115 this wrapped a bare `pg.Pool` via
  * `PgClient.fromPool`, because `PgClient.layer` pinged at build; rc.115

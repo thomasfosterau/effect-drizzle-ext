@@ -2,7 +2,7 @@
  * Pins the `?sort=` resolution seam: which fields a view exposes, what SQL
  * each becomes, that an unknown field is refused rather than ignored, and —
  * the property `LIMIT` / `OFFSET` pagination depends on — that every
- * resolved ordering is total (website #972, #1231).
+ * resolved ordering is total.
  *
  * Ported from the website application's `apps/api/tests/sort.test.ts`; the
  * fixture is a small version chain built with this library's own

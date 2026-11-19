@@ -2,7 +2,7 @@
 
 _A guide to [`@thomasfosterau/effect-drizzle-ext-pg`](../../packages/pg/README.md). The API reference is the doc comments on each export (your editor's hover, or `vp run docgen`)._
 
-The version-chain discipline, Drizzle-concrete, over the tables core's `makeTreeTables` derives (effect-drizzle-ext#112, decision 5). `makeVersionChain({ tree, tables, CurrentTransaction })` returns one `LeafChain` per leaf. Every operation requires the application's `CurrentTransaction`, so the chain never opens a transaction itself, and is traced as `${leaf}.<operation>`.
+The version-chain discipline, Drizzle-concrete, over the tables core's `makeTreeTables` derives. `makeVersionChain({ tree, tables, CurrentTransaction })` returns one `LeafChain` per leaf. Every operation requires the application's `CurrentTransaction`, so the chain never opens a transaction itself, and is traced as `${leaf}.<operation>`.
 
 | Operation | What it does |
 | --- | --- |

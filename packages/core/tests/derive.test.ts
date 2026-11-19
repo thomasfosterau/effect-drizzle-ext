@@ -71,7 +71,7 @@ describe("deriveColumnsWith.fromFields", () => {
     expect(byName.active.notNull).toBe(false);
   });
 
-  it("types a defaulted column as optional on $inferInsert (effect-drizzle-ext#162)", () => {
+  it("types a defaulted column as optional on $inferInsert", () => {
     const table = pgTable(
       "gizmo",
       deriveColumnsWith(builders).fromFields({
@@ -255,7 +255,7 @@ describe("deriveFieldCheckConstraints", () => {
   });
 });
 
-describe("deriveFieldCheckConstraints over Schema.Int (effect-drizzle-ext#138)", () => {
+describe("deriveFieldCheckConstraints over Schema.Int", () => {
   const intFields = {
     count: dbColumn(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)), {
       column: "count",

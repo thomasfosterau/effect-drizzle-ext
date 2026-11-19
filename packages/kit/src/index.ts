@@ -1,6 +1,4 @@
 /**
- * @copyright Thomas Foster
- *
  * **`effect-drizzle-kit`, as a library**: the config module's
  * {@link defineConfig} and {@link loadConfig}, the `generate` / `check`
  * Effects the bin's subcommands run, and the {@link cli} command itself, for

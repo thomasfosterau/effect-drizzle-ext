@@ -1,41 +1,8 @@
 /**
- * @copyright Thomas Foster
- *
- * **The ordered migration runner for a brand-new database.** Reads a
- * drizzle-kit `migrations/` directory and applies every migration in it, in
- * directory-name order, one transaction per migration, with no ledger.
- *
- * It is what an integration suite's provisioning runs against the database it
- * has just created ({@link ../testing.ts}'s `provisionTestDatabase` calls it by
- * default), and it mirrors the apply order and per-migration transaction
- * shape of alchemy's deploy-time `migrationsDir` runner, minus its ledger:
- * the database is **always** brand new, so every migration applies
- * unconditionally and no bookkeeping table is needed. A database that already
- * holds some of the migrations is not this runner's input — use the
- * deployment's own migrator there.
- *
- * ## The layout it reads
- *
- * drizzle-kit writes one directory per migration, `<digits>_<slug>/`,
- * holding `migration.sql` (and `snapshot.json`, which this runner ignores).
- * The all-digit, fixed-width prefixes make name order chronological. A
- * directory with no `migration.sql` is skipped rather than failing the run —
- * drizzle-kit writes the snapshot before the SQL, and a sanctioned
- * hand-written bootstrap directory may carry only SQL.
- *
- * ## Statements, not files
- *
- * `@effect/sql-pg` speaks the extended query protocol, which rejects more
- * than one statement per query ("cannot insert multiple commands into a
- * prepared statement"). drizzle-kit separates the statements of a migration
- * with a `--> statement-breakpoint` line, and drizzle's own migrator splits
- * on exactly that marker, so this runner does the same: each migration's
- * statements run in order inside that migration's one transaction. A
- * hand-written migration must keep the marker between statements.
- *
- * Idiomatic Effect: the directory is read through the `FileSystem` / `Path`
- * services (a Node consumer provides `@effect/platform-node`'s
- * `NodeServices.layer`), and the statements run on the ambient `SqlClient`.
+ * The migration runner for a brand-new database: applies a drizzle-kit
+ * `migrations/` directory in name order, one transaction per migration, with no
+ * ledger. See the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/migrations.md).
  *
  * @module migrations
  */

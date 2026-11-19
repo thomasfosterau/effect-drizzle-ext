@@ -1,66 +1,7 @@
 /**
- * @copyright Thomas Foster
- *
- * **The `?sort=` resolution seam: which fields a list may be sorted by, and
- * the `ORDER BY` terms a decoded sort list becomes.**
- *
- * The wire grammar (`?sort=-publishedAt,name`) and its bounds are the
- * request decoder's: by the time anything here runs, a malformed or
- * over-wide `?sort=` has already been refused, and what arrives is a list of
- * {@link SortKey}s. What this module owns is the half that needs to know
- * about columns — **which** fields a view may be sorted by, and what SQL each
- * one becomes.
- *
- * ## The allow-list is derived, not hand-listed
- *
- * {@link sortableColumnsFor} derives a view's sortable set from the view
- * itself, filtered to columns of a scalar, orderable type and published under
- * stable public names:
- *
- * - every column whose Drizzle `dataType` is a string / number / bigint /
- *   boolean / timestamp, under the column's own key;
- * - the {@link SortableColumnsOptions.aliased | aliased} expressions it is
- *   told to admit by name (a `SQL.Aliased` carries no `dataType`) —
- *   by default `createdAt`, the birth-row timestamp a function `merge` of
- *   `./versioned-chain`'s `makeCurrentVersionView` merges in;
- * - the {@link SortableColumnsOptions.renamed | renamed} columns under their
- *   public names — by default the current version's `timestamp` as
- *   `updatedAt`.
- *
- * Everything else is refused with {@link UnsupportedSortError}: a field that
- * does not exist, a column whose type has no useful order (a document
- * column, an embedding), and the version-chain internals
- * ({@link SortableColumnsOptions.internal}, by default `action` and the raw
- * `timestamp` key) that are not part of any resource's vocabulary. Deriving
- * is what makes the surface uniform: a resource gains its sort surface by
- * existing, and a new attribute is sortable the moment its column lands in
- * the view. A resource whose sortable set the view cannot express passes an
- * explicit `sortable` map instead.
- *
- * ## Cost
- *
- * Sorting here is bounded but not necessarily index-backed: a current-version
- * view is a projection over an append-only chain, so the database
- * materialises the current set and sorts it whatever the `ORDER BY` is. A
- * client `?sort=` changes *which* column is sorted, not the cost class of the
- * query, and the page stays `LIMIT`-bounded exactly as before. If a view
- * grows past the point where sorting its whole current set is cheap, the fix
- * is an indexed ordering column, not a narrower allow-list.
- *
- * ## Total order (website #972, #1231)
- *
- * `LIMIT` / `OFFSET` over a non-total order lets a row repeat across pages or
- * fall through the gap between them. Every order {@link resolveSortOrder}
- * returns therefore ends in the view's `id`, mirroring the direction of the
- * last sort key, unless the caller already sorted by `id`.
- *
- * A field repeated in `?sort=` (JSON:API's grammar allows it) keeps its first
- * occurrence only: the later key could never break a tie the first already
- * ordered, and counting it would let a redundant key flip the tiebreak's
- * direction (`name,-name` orders exactly as `name` does).
- *
- * Ported from the website and gardeneria applications'
- * `apps/api/src/operations/sort.ts`.
+ * The `?sort=` seam: a view's sortable columns, derived from the view, and the
+ * `ORDER BY` a decoded sort list becomes, always closed on `id`. See the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/sort.md).
  *
  * @module sort
  */
