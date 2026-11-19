@@ -1,33 +1,4 @@
-# Dependabot version updates. The `npm` ecosystem at `/` reads the pnpm
-# workspace, its catalogs and pnpm-lock.yaml.
-#
-# Groups exist only for sets that must move in ONE pull request because
-# updating one member without the others breaks the install or the build;
-# every other dependency (fallow, `@changesets/*`, `@enfect/oxlint`, `tsx`,
-# `@testcontainers/postgresql`, each GitHub Action, …) gets a PR of its own.
-# Dependabot puts a dependency in the FIRST group whose patterns match, and
-# each group takes every update type (major included) so its members can
-# never move apart:
-#
-# - `toolchain`: `effect-tsgo patch` matches the native `tsc` (@typescript/native)
-#   and the `oxlint` / `oxlint-tsgolint` that vite-plus carries by gitHead and
-#   hard-errors on a pairing it has no artifact for, failing `pnpm install`;
-#   vite-plus pins its own oxlint, oxfmt and vitest exactly, and the `vite` /
-#   `vitest` catalog entries and `@vitest/coverage-istanbul` must equal those
-#   pins. A group PR can still go red when no @effect/tsgo release supports
-#   the new oxlint yet: read the `components` table in
-#   node_modules/@effect/tsgo/dist/effect-tsgo.cjs (pnpm-workspace.yaml's
-#   comments say how). `@enfect/oxlint` is not in it: its `@oxlint/plugins`
-#   dependency is a caret range, not tied to vite-plus's oxlint.
-# - `effect`: the Effect 4 line is a lockstep-versioned singleton set
-#   (`effect`, `@effect/sql-pg`, `@effect/platform-node`, `@effect/vitest`,
-#   the language service, and `@effect/docgen`, which depends on `effect` and
-#   `@effect/platform-node` of its own release); `@effect/tsgo` belongs to
-#   the toolchain set instead.
-# - `drizzle`: drizzle-kit is always the drizzle-orm pin. Both are
-#   commit-suffixed prereleases with no meaningful semver bump to compute, so
-#   their *version* updates are ignored below and the group carries only
-#   security updates; move them by hand, together.
+# Dependabot version updates.
 #
 # Not bumpable by Dependabot, so moved by hand (AGENTS.md → Commands):
 # - the npm-alias catalog entries: `vite` (`npm:@voidzero-dev/vite-plus-core`,
@@ -41,17 +12,6 @@
 #   floors, each dropped once its comment's condition holds.
 # - the `ghcr.io/voidzero-dev/vite-plus:<tag>` image in .devcontainer/devcontainer.json:
 #   it equals the catalog's `vite-plus` pin, moved on the toolchain PR.
-#
-# `cooldown` is 1 day, Dependabot's smallest unit (it takes whole days only).
-# pnpm-workspace.yaml's `minimumReleaseAge` holds a new version for 8 hours,
-# so the cooldown is the longer wait and a Dependabot PR never proposes a
-# version pnpm would still refuse. First-party `@thomasfosterau/*` is exempt,
-# as `minimumReleaseAgeExclude` exempts it.
-#
-# `devcontainers` keeps the dev container's features and their lockfile
-# current (.devcontainer/devcontainer.json). Its base image tag is not a
-# feature: it equals the catalog's `vite-plus` pin and is moved by hand on the
-# `toolchain` PR.
 version: 2
 updates:
   - package-ecosystem: "npm"
@@ -130,6 +90,10 @@ updates:
       prefix: "chore"
     cooldown:
       default-days: 1
+  # `devcontainers` keeps the dev container's features and their lockfile
+  # current (.devcontainer/devcontainer.json). Its base image tag is not a
+  # feature: it equals the catalog's `vite-plus` pin and is moved by hand on the
+  # `toolchain` PR.
   - package-ecosystem: "devcontainers"
     directory: "/"
     assignees:
