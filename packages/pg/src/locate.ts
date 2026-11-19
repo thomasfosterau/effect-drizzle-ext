@@ -1,6 +1,4 @@
 /**
- * @copyright Thomas Foster
- *
  * Resolves the names a Postgres error carries (`table`, `schema`, `column`,
  * `constraint`, the `DETAIL` key) back to the Drizzle table and columns an
  * application declared, through its `relations` graph. Internal: the public

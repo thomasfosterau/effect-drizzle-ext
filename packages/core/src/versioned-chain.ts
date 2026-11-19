@@ -618,8 +618,8 @@ export const makeCurrentVersionView =
 /**
  * The version-chain read shapes: `VersionAction`, `VersionChainEntry` and
  * `VersionSnapshot`. They live in a Drizzle-free module so the root entry
- * (`.`) exports the same types without reaching Drizzle
- *; this subpath re-exports them unchanged.
+ * (`.`) exports the same types without reaching Drizzle; this subpath
+ * re-exports them unchanged.
  */
 export type { VersionAction, VersionChainEntry, VersionSnapshot } from "./version-chain-types.ts";
 
@@ -1862,8 +1862,7 @@ const caseOverLeaves = (
  * rows with an anti-join on the root version key: `NOT EXISTS` a root version of the same node newer than
  * the row (bounded the same way for `asOf`). That probes the primary key per
  * row, where a grouped `MAX(version)` head would aggregate the whole root
- * version table before a filter or `LIMIT` could apply
- *. It then INNER JOINs the root version row, the
+ * version table before a filter or `LIMIT` could apply. It then INNER JOINs the root version row, the
  * identity row and the version-0 root row (for `createdAt`); a leaf view
  * INNER JOINs **every other level's version table** from the branch root
  * down to the leaf at that `(id, version)`, and on `id` the stable table of
@@ -1886,8 +1885,7 @@ const caseOverLeaves = (
  * A branch view is one SELECT, not a `UNION ALL` of per-leaf arms: past its
  * spine it LEFT JOINs only the tables below the branch its `project` reads,
  * and keeps a row only when a `CASE` on its `type` finds, by `EXISTS`, every
- * level on the path to the leaf that `type` names at the head
- *, so it fails closed exactly where a leaf view
+ * level on the path to the leaf that `type` names at the head, so it fails closed exactly where a leaf view
  * would; a node whose `type` names a leaf with no row at the head, or no
  * subtree leaf, has no row.
  *
@@ -2049,8 +2047,7 @@ export const makeTreeViews = <
    * `NOT EXISTS` a root version newer than `version` for node `id` (within
    * `bound`, for `asOf`): the anti-join that keeps only head rows. It probes
    * the root version table's `(id, version)` primary key once per candidate
-   * row, where a grouped `max(version)` would aggregate the whole table first
-   *.
+   * row, where a grouped `max(version)` would aggregate the whole table first.
    */
   const noNewerVersion = (
     qb: QueryBuilder,

@@ -226,8 +226,7 @@ describe("numericBounds", () => {
   });
 
   // effect 4.0.5+ gives `isInt` a `toJsonSchema` of the whole safe-integer
-  // range; that is the integer type, not a bound the model declared
-  //.
+  // range; that is the integer type, not a bound the model declared.
   describe("Schema.isInt's own safe-integer range", () => {
     it("is not a bound on an otherwise unbounded integer", () => {
       expect(numericBounds(Schema.Int)).toStrictEqual(Option.none());

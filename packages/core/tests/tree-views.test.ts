@@ -232,8 +232,7 @@ describe("makeTreeViews: branch views", () => {
     expect(query).toContain(`from "ontology"."work_version" inner join "ontology"."node_version"`);
     expect(query.match(/not exists/g)?.length).toBe(1);
     expect(query).toContain(`("newer"."id" = "ontology"."work_version"."id")`);
-    // Nothing below the branch is projected, so no leaf is joined
-    //.
+    // Nothing below the branch is projected, so no leaf is joined.
     expect(query).not.toContain("left join");
     // Fail closed: a CASE on `type` probes the named leaf's row, in
     // declaration order, and any other `type` (or NULL) is false.
@@ -445,8 +444,8 @@ describe("makeTreeViews: branch views", () => {
       "createdAt",
     ]);
     const query = sqlOf(views.branches.continuant);
-    // Nothing below the branch is projected, so nothing below it is joined
-    //; each leaf's CASE arm probes its own path.
+    // Nothing below the branch is projected, so nothing below it is joined;
+    // each leaf's CASE arm probes its own path.
     expect(query).not.toContain("left join");
     expect(query).toContain(
       `when 'plant' then ((${probe("independent_continuant")}) and (${probe("material_entity")}) and (${probe("plant")}))`,

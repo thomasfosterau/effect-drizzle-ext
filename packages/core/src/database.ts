@@ -96,8 +96,9 @@ export interface DatabaseServices<Db, Tx extends ReadSurface, Key extends string
    * The payload is NOT interchangeable with {@link Database}. A transaction
    * handle is the CONCRETE transaction the driver passed to the callback,
    * whereas the `Database` payload can be a proxy the consuming application
-   * wrapped around its client (subquery recursion can depend on that difference). Read this key as "the open transaction", not as
-   * "permission to write".
+   * wrapped around its client (subquery recursion can depend on that
+   * difference). Read this key as "the open transaction", not as "permission
+   * to write".
    *
    * The key string is the `Database` key plus `/CurrentTransaction`, so the
    * pair is legible in a context dump and two applications composed into one
@@ -161,8 +162,9 @@ export interface DatabaseServices<Db, Tx extends ReadSurface, Key extends string
    *
    * This is deliberately **not** what {@link transact} does for writes.
    * There, joining an ambient transaction would delete a SAVEPOINT and change
-   * rollback granularity, which is why it is always-open. A read opens nothing, so there is no boundary to lose
-   * — the asymmetry is the point, not an inconsistency.
+   * rollback granularity, which is why it is always-open. A read opens
+   * nothing, so there is no boundary to lose — the asymmetry is the point, not
+   * an inconsistency.
    *
    * Not for a caller that needs a handle which is concretely NOT the
    * consuming application's proxy. This falls back to exactly

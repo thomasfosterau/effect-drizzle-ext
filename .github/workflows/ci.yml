@@ -1,6 +1,6 @@
 name: CI
 
-# One job per Node version running `vp run ci`; the task graph lives in
+# `ci` runs `vp run ci` per Node version; the task graph lives in
 # vite.config.ts, so a local `vp run ci` is the same pipeline.
 
 on:
@@ -64,3 +64,25 @@ jobs:
           restore-keys: |
             vp-task-v1-${{ runner.os }}-node-${{ matrix.node }}-
       - run: vp run ci
+
+  devcontainer:
+    name: devcontainer
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      DEVCONTAINER_CLI: "@devcontainers/cli@0.89.0"
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      # Only to run the CLI on the runner; the container installs its own.
+      - uses: voidzero-dev/setup-vp@v1.22.0
+        with:
+          version-file: pnpm-workspace.yaml
+          run-install: false
+      - name: Build and start the container
+        run: vp dlx "$DEVCONTAINER_CLI" up --workspace-folder .
+      - name: Check vp inside the container
+        run: vp dlx "$DEVCONTAINER_CLI" exec --workspace-folder . vp --version
