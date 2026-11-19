@@ -14,6 +14,7 @@ describe("subpaths", () => {
       import("@thomasfosterau/effect-drizzle-ext/constraints"),
       import("@thomasfosterau/effect-drizzle-ext/columns"),
       import("@thomasfosterau/effect-drizzle-ext/query"),
+      import("@thomasfosterau/effect-drizzle-ext/query-functions"),
       import("@thomasfosterau/effect-drizzle-ext/sort"),
       import("@thomasfosterau/effect-drizzle-ext/update"),
       import("@thomasfosterau/effect-drizzle-ext/errors"),
@@ -22,6 +23,6 @@ describe("subpaths", () => {
       import("@thomasfosterau/effect-drizzle-ext/jsonapi"),
       import("@thomasfosterau/effect-drizzle-ext/jsonapi/derive"),
     ]);
-    expect(modules).toHaveLength(13);
+    expect(modules).toHaveLength(14);
   });
 });

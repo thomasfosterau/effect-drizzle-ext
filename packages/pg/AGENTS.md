@@ -19,7 +19,7 @@ May import from `packages/core` only (`.fallowrc.json` zone `pg`), for the drive
 
 ## Terms
 
-- **Database services** — the `{ Database, CurrentTransaction, transact, readHandle, make, layer }` record `makePgDatabase` returns, typed over one application's `relations` graph. An application calls it once.
+- **Database services** — the `{ Database, CurrentTransaction, transact, readHandle, make, layer, queries }` record `makePgDatabase` returns, typed over one application's `relations` graph. An application calls it once.
 - **Always-open** — `transact` never joins an ambient transaction; nested calls are SAVEPOINTs. The invariant lives in [core's AGENTS.md](../core/AGENTS.md#invariants).
 - **Sentinel rollback** — the `./testing` runner wraps a spec in an outer transaction it always fails with a sentinel so nothing the spec wrote survives.
 - **Fixture chain** — `tests/fixtures/`: a schema module and the drizzle-kit migrations generated from it (regenerate with `vp exec drizzle-kit generate --config tests/fixtures/drizzle.config.ts --name <slug>` from `packages/pg`; never hand-edit `migrations/`, and `.prettierignore` keeps the formatter off it). The integration suite provisions from it; the `./tooling` guards run against it in the unit suite.

@@ -380,6 +380,14 @@ const appDatabase = Pg.makePgDatabase({ relations: {}, key: "AppDb" });
 export type AppDb = typeof appDatabase.Database.Identifier;
 export const appWrite = appDatabase.transact(Effect.as(appDatabase.readHandle, "written"));
 export const appLayer: Layer.Layer<"AppDb", never, PgClient.PgClient> = appDatabase.layer;
+export const appBooks = appDatabase.queries
+  .select({ id: book.id, title: book.title })
+  .from(book)
+  .where(sql`true`);
+export const appInserted = appDatabase.queries
+  .insert(book)
+  .values({ id: "b", title: "t", pages: null })
+  .returning({ id: book.id });
 export const pooled: Layer.Layer<PgClient.PgClient, SqlError> = Pg.pgClientFromPool({
   connectionString: Redacted.make("postgresql://postgres@127.0.0.1:5432/app"),
 });
@@ -504,6 +512,13 @@ export type Checks = [
     Equals<typeof appDatabase.CurrentTransaction.Identifier, "AppDb/CurrentTransaction">
   >,
   /** _appWriteRequiresDb */ Assert<Equals<Effect.Services<typeof appWrite>, "AppDb">>,
+  /** _appSelectRows */ Assert<
+    Equals<Effect.Success<typeof appBooks>, { id: string; title: string }[]>
+  >,
+  /** _appSelectRequiresDb */ Assert<Equals<Effect.Services<typeof appBooks>, "AppDb">>,
+  /** _appSelectError */ Assert<Equals<Effect.Error<typeof appBooks>, EffectDrizzleQueryError>>,
+  /** _appInsertReturning */ Assert<Equals<Effect.Success<typeof appInserted>, { id: string }[]>>,
+  /** _appInsertRequiresDb */ Assert<Equals<Effect.Services<typeof appInserted>, "AppDb">>,
   /** _savepointRequiresTx */ Assert<
     Equals<Effect.Services<typeof savepointed>, "AppDb/CurrentTransaction">
   >,

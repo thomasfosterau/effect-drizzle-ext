@@ -38,6 +38,7 @@
     "./constraints": "./src/constraints.ts",
     "./columns": "./src/columns.ts",
     "./query": "./src/query.ts",
+    "./query-functions": "./src/query-functions.ts",
     "./sort": "./src/sort.ts",
     "./update": "./src/update.ts",
     "./errors": "./src/errors.ts",
@@ -71,6 +72,10 @@
       "./query": {
         "types": "./dist/query.d.ts",
         "default": "./dist/query.js"
+      },
+      "./query-functions": {
+        "types": "./dist/query-functions.d.ts",
+        "default": "./dist/query-functions.js"
       },
       "./sort": {
         "types": "./dist/sort.d.ts",

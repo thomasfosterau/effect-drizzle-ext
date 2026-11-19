@@ -9,6 +9,7 @@ _A guide to [`@thomasfosterau/effect-drizzle-ext-pg`](../../packages/pg/README.m
 - **`readHandle`** — the read resolver: the ambient `CurrentTransaction` when one is open, `Database` otherwise.
 - **`make`** — the `Effect` that builds the Drizzle client (`drizzle-orm/effect-postgres`'s `make` plus its `DefaultServices`) over an ambient `PgClient`.
 - **`layer`** — `make` installed under the `Database` key, requiring only `PgClient`.
+- **`queries`** — the client's query surface (`select`, `insert`, `update`, `delete`, `query`, …) as free functions that find the client in the Effect context (see [below](#context-bound-query-functions)).
 
 Call it once, at module scope, and export what it returns:
 
@@ -125,3 +126,21 @@ const program = transact(
 **`transact` is always-open, never join-if-present.** Calling it while a transaction is already open deliberately opens a _nested_ one — a SAVEPOINT on the same connection (`tx.transaction(...)`, not `db.transaction(...)`), never a silent join of the ambient one. A join-if-present variant is easy to write and is the wrong call: it would delete every SAVEPOINT the calling code currently takes, changing rollback granularity without changing a line of that code. To reuse the open transaction instead of nesting, yield `CurrentTransaction` directly and don't call `transact` again. This is adjudicated (website #1883), not something to "improve" into join-if-present.
 
 Reads prefer the ambient transaction for the same reason nesting is deliberate: a read issued against `Database` from inside an open transaction takes its own pooled connection and is not guaranteed to see that transaction's uncommitted writes, so `readHandle` joins the open `CurrentTransaction` whenever there is one and falls back to `Database` — the client — only when there isn't.
+
+## Context-bound query functions
+
+`database.queries` is the client's query surface as free functions, so a caller writes `select().from(widgets)` with no handle in sight:
+
+```ts
+export const { select, insert, update, delete: deleteFrom, query, $count } = database.queries;
+
+const createWidget = (name: string) => transact(insert(widgets).values({ name }).returning());
+
+const findWidget = (name: string) => select().from(widgets).where(eq(widgets.name, name));
+```
+
+`delete` is a reserved word, so it takes another name when destructured. The members are `select`, `selectDistinct`, `selectDistinctOn`, `with`, `$count`, `insert`, `update`, `delete`, `execute`, `refreshMaterializedView` and the relational `query`; `transaction` is left out on purpose (the boundary is `transact`), and so is `$with`.
+
+Every builder is Drizzle's own type with the database key in its requirement channel (`PgQueryFunctions<Relations, Key>`, over the `PgContextQueryEffectHKT<Key>` query-effect kind), so result types are inferred from the schema exactly as on the client, and a program missing the `Database` layer doesn't compile. Each query runs on the open `CurrentTransaction` when there is one and on the `Database` client otherwise, so `createWidget` above writes inside its own `transact`, and `findWidget` called inside it sees the uncommitted row.
+
+A deferred query is only for running: it can't render SQL (`toSQL`) or become a subquery (`as`). Build those with Drizzle's `QueryBuilder` or the handle itself. The mechanism and its limits are in [the core package's `./query-functions`](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/query-functions.md).

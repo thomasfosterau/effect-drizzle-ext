@@ -127,7 +127,7 @@ export default defineConfig({
       // compute from the runtime value that has it, and no guard can recover
       // that type, because the precision lives only in the type. Narrowing at
       // a guard-able boundary is fixed in code instead, so a new `as` in any
-      // other file is an error. The 17 sites:
+      // other file is an error. The 18 sites:
       // - core derive.ts (3): the `FluentColumn` bridge over the registry's
       //   widened `ColumnBuilderBase`, and `fromMeta` / `fromFields` naming
       //   the per-entry `DerivedColumns` the builder loop computes.
@@ -141,8 +141,11 @@ export default defineConfig({
       //   the type-only phantom (never present at runtime) onto the value.
       // - core update.ts (1): `updateSetMap`'s key-filtered `UpdateSet`.
       // - pg chain.ts (1): `makeVersionChain` naming per-leaf operations.
+      // - core query-functions.ts (1): `makeQueryFunctions` naming the
+      //   binding's query surface on the recording proxy.
       {
         files: [
+          "packages/core/src/query-functions.ts",
           "packages/core/src/derive.ts",
           "packages/core/src/jsonapi/derive.ts",
           "packages/core/src/versioned-chain.ts",
@@ -164,6 +167,21 @@ export default defineConfig({
         rules: {
           "effect/no-chained-type-assertions": "off",
           "effect/avoid-any": "off",
+        },
+      },
+      // The replay seam of `./query-functions`: a deferred query records
+      // member reads and calls on a Proxy and replays them onto whatever
+      // handle the context holds, so the values it passes along (a member,
+      // its receiver, a call's result, the replayed builder's Effect) are
+      // typed by the binding's surface, never by this file. `unknown` is the
+      // honest type at each step; the replayed Effect's error and requirement
+      // channels are re-typed by that surface, not here.
+      {
+        files: ["packages/core/src/query-functions.ts"],
+        rules: {
+          "effect/no-unknown-parameters": "off",
+          "effect/no-unknown-returns": "off",
+          "effecttsgo/any-unknown-in-error-context": "off",
         },
       },
       // The Drizzle and driver boundary for `prefer-option-over-null`
@@ -194,6 +212,7 @@ export default defineConfig({
           "packages/pg/src/chain.ts",
           "packages/core/tests/versioned-chain.test.ts",
           "packages/core/tests/update.test.ts",
+          "packages/pg/tests/query-functions.test.ts",
           "tests/dist-consumer/src/consumer.ts",
         ],
         rules: {
