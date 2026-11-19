@@ -1,7 +1,7 @@
 {
   "name": "@thomasfosterau/effect-drizzle-ext-pg",
   "version": "0.5.0",
-  "description": "The @effect/sql-pg binding for @thomasfosterau/effect-drizzle-ext: Database / CurrentTransaction services over drizzle-orm/effect-postgres, PgClient layers, a sentinel-rollback test runner with test-database provisioning, a fresh-database migration runner, and migration-drift / view-dependency guards.",
+  "description": "The @effect/sql-pg binding for @thomasfosterau/effect-drizzle-ext: Database / CurrentTransaction services over drizzle-orm/effect-postgres, PgClient layers, a sentinel-rollback test runner with test-database provisioning, a fresh-database migration runner, typed helpers for PlanetScale's TIN full-text search, and migration-drift / view-dependency guards.",
   "keywords": [
     "drizzle",
     "drizzle-orm",
@@ -35,6 +35,7 @@
     "./chain": "./src/chain.ts",
     "./migrations": "./src/migrations.ts",
     "./testing": "./src/testing.ts",
+    "./Tin": "./src/Tin.ts",
     "./tooling": "./src/tooling/index.ts"
   },
   "publishConfig": {
@@ -54,6 +55,10 @@
       "./testing": {
         "types": "./dist/testing.d.ts",
         "default": "./dist/testing.js"
+      },
+      "./Tin": {
+        "types": "./dist/Tin.d.ts",
+        "default": "./dist/Tin.js"
       },
       "./tooling": {
         "types": "./dist/tooling/index.d.ts",

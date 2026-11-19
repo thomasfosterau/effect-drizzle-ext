@@ -114,6 +114,7 @@ import * as Pg from "@thomasfosterau/effect-drizzle-ext-pg";
 import * as PgChain from "@thomasfosterau/effect-drizzle-ext-pg/chain";
 import * as PgMigrations from "@thomasfosterau/effect-drizzle-ext-pg/migrations";
 import * as PgTesting from "@thomasfosterau/effect-drizzle-ext-pg/testing";
+import * as PgTin from "@thomasfosterau/effect-drizzle-ext-pg/Tin";
 import * as PgTooling from "@thomasfosterau/effect-drizzle-ext-pg/tooling";
 import type * as FileSystem from "effect/FileSystem";
 import type * as Path from "effect/Path";
@@ -470,6 +471,19 @@ export const forwardOptionals = (forwarded: { readonly versionDefault?: bigint }
 export const views = PgTooling.checkViewDependencies({ schema: {} });
 export const dagIssues: ReadonlyArray<string> = PgTooling.checkDagIntegrity([]);
 
+// ── tin ───────────────────────────────────────────────────────────────────
+
+export const post = pgTable(
+  "post",
+  { id: uuid("id").primaryKey(), body: text("body").notNull() },
+  (t) => [PgTin.tinIndex("post_body_tin", t.body, { stemmer: "en" })],
+);
+export const tinMatch = PgTin.matches(post.body, "apple");
+export const tinScore = PgTin.score(post, { k1: 1.5 });
+export const tinHighlight = PgTin.highlight(post.body, { begin: "<mark>" });
+export const tinPhrase = PgTin.phrase("AND");
+export const tinFromRoot = Pg.Tin.matches(post.body, "apple");
+
 /**
  * Every compile-time assertion, exported so `noUnusedLocals` keeps them and a
  * failing one names itself in the error.
@@ -626,6 +640,11 @@ export type Checks = [
   /** _viewError */ Assert<
     Equals<Effect.Error<typeof views>, PgTooling.ViewDependencyError | PgTooling.SchemaDiffError>
   >,
+  /** _tinMatch */ Assert<Equals<typeof tinMatch, SQL<boolean>>>,
+  /** _tinScore */ Assert<Equals<typeof tinScore, SQL<number>>>,
+  /** _tinHighlight */ Assert<Equals<typeof tinHighlight, SQL<string>>>,
+  /** _tinFromRoot */ Assert<Equals<typeof tinFromRoot, SQL<boolean>>>,
+  /** _tinPhrase */ Assert<Equals<typeof tinPhrase, Option.Option<string>>>,
   /** _timestamps */ Assert<
     Equals<typeof filmTimestamps, { readonly createdAt: Date; readonly updatedAt: Date }>
   >,

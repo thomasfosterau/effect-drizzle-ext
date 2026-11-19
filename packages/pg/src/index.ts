@@ -298,3 +298,10 @@ export const pgClientFromPool = (options: {
     types: options.types,
     prepare: options.prepare,
   });
+
+/**
+ * The typed Drizzle helpers for PlanetScale's TIN full-text search, as one
+ * namespace (`Tin.matches`, `Tin.score`, `Tin.tinIndex`, …); the same module
+ * as the `./Tin` subpath.
+ */
+export * as Tin from "./Tin.ts";
