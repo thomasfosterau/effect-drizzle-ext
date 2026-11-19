@@ -69,10 +69,6 @@ export default defineConfig({
         },
       ],
 
-      "typescript/no-explicit-any": "off",
-      "typescript/no-empty-object-type": "off",
-      "typescript/ban-ts-comment": "off",
-      "unicorn/no-empty-file": "off",
       "vite-plus/prefer-vite-plus-imports": "error",
       // `@effect/vitest`'s Effect-running test blocks, so `expect` inside one
       // is inside a test.
