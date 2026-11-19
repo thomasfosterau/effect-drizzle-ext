@@ -347,30 +347,64 @@ const makeTransactionFailure = (
 ): Option.Option<SerializationFailure | DeadlockDetected> =>
   Option.map(R.get(TRANSACTION_FAILURE_BY_CODE, facts.code), (make) => make(cause));
 
+/** The five constraint-family classes, for the already-classified guard. */
+const CONSTRAINT_VIOLATION_CLASSES = [
+  UniqueViolation,
+  ForeignKeyViolation,
+  NotNullViolation,
+  CheckViolation,
+  ExclusionViolation,
+] as const;
+
+/** True when `u` is already one of the five {@link ConstraintViolation} classes. */
+const isConstraintViolationInstance = (u: unknown): u is ConstraintViolation =>
+  Arr.some(CONSTRAINT_VIOLATION_CLASSES, (Class) => u instanceof Class);
+
+/**
+ * True when `u` is already one of the seven classified errors — an instance
+ * of {@link UniqueViolation} … {@link DeadlockDetected}, not merely a value
+ * that would classify into one.
+ *
+ * {@link classifyError} returns such a value as it is, so classifying twice
+ * (a query classified by the pg binding, then caught by
+ * {@link catchUniqueViolation}) never wraps one classification in another.
+ */
+export const isClassifiedError = (u: unknown): u is ClassifiedError =>
+  isConstraintViolationInstance(u) ||
+  u instanceof SerializationFailure ||
+  u instanceof DeadlockDetected;
+
 /**
  * Classifies any value into one of the seven tagged errors, by finding the
  * driver's Postgres error in its graph ({@link findPgError}) and dispatching on the
  * SQLSTATE. `Option.none()` when the graph holds no driver error, or holds one
  * whose SQLSTATE is outside the classified families (a syntax error, a
- * connection failure — `SqlError.reason` already covers those well).
+ * connection failure — `SqlError.reason` already covers those well). A value
+ * that is already a classified error comes back as it is.
  */
 export const classifyError = (cause: unknown): Option.Option<ClassifiedError> =>
-  Option.flatMap(findPgError(cause), (facts) =>
-    Option.orElse<ClassifiedError, ClassifiedError>(makeConstraintViolation(facts, cause), () =>
-      makeTransactionFailure(facts, cause),
-    ),
-  );
+  isClassifiedError(cause)
+    ? Option.some(cause)
+    : Option.flatMap(findPgError(cause), (facts) =>
+        Option.orElse<ClassifiedError, ClassifiedError>(makeConstraintViolation(facts, cause), () =>
+          makeTransactionFailure(facts, cause),
+        ),
+      );
 
 /** The `23505` classification for `error`, if that is what it is. */
 const uniqueViolationOf = (cause: unknown): Option.Option<UniqueViolation> =>
-  Option.map(
-    Option.filter(findPgError(cause), (facts) => facts.code === UNIQUE_VIOLATION),
-    (facts) => makeUniqueViolation(facts, cause),
-  );
+  cause instanceof UniqueViolation
+    ? Option.some(cause)
+    : Option.map(
+        Option.filter(findPgError(cause), (facts) => facts.code === UNIQUE_VIOLATION),
+        (facts) => makeUniqueViolation(facts, cause),
+      );
 
 /** The constraint-family classification for `error`, if that is what it is. */
 const constraintViolationOf = (cause: unknown): Option.Option<ConstraintViolation> =>
-  Option.flatMap(findPgError(cause), (facts) => makeConstraintViolation(facts, cause));
+  isConstraintViolationInstance(cause)
+    ? Option.some(cause)
+    : Option.flatMap(findPgError(cause), (facts) => makeConstraintViolation(facts, cause));
 
 // ── Predicates ─────────────────────────────────────────────────────
 
@@ -422,6 +456,44 @@ export const isRetryableTransactionFailure = (cause: unknown): boolean =>
   );
 
 // ── Effect combinators ─────────────────────────────────────────────
+
+/**
+ * Puts the classified error in the error channel: every failure that
+ * {@link classifyError} recognises is replaced by its tagged class, and every
+ * other failure passes through unchanged. The error type widens to
+ * `E | ClassifiedError`, so a caller can `Effect.catchTag("UniqueViolation", …)`
+ * (or `catchTags`) on the specific case instead of probing the driver error.
+ *
+ * The classified error keeps the original failure as its `cause`, so
+ * drizzle's query text and params survive. `@thomasfosterau/effect-drizzle-ext-pg`'s
+ * context-bound `queries` already apply it to every query; pipe it onto a
+ * `transact` (where a commit can fail with `40001`) or onto a query run on
+ * a handle directly.
+ *
+ * @example
+ * ```ts
+ * import { classifyErrors } from "@thomasfosterau/effect-drizzle-ext/errors";
+ * import * as Effect from "effect/Effect";
+ * import * as Option from "effect/Option";
+ *
+ * // A stand-in for a failed insert: the driver error, as `@effect/sql-pg` raises it.
+ * const insertWidget = Effect.fail({ code: "23505", constraint: "widget_slug_key" });
+ *
+ * const program = insertWidget.pipe(
+ *   classifyErrors,
+ *   Effect.catchTag("UniqueViolation", (violation) =>
+ *     Effect.succeed(`taken: ${Option.getOrElse(violation.constraint, () => "?")}`),
+ *   ),
+ * );
+ * console.log(Effect.runSync(program)); // "taken: widget_slug_key"
+ * ```
+ */
+export const classifyErrors = <A, E, R>(
+  self: Effect.Effect<A, E, R>,
+): Effect.Effect<A, E | ClassifiedError, R> =>
+  Effect.mapError(self, (error): E | ClassifiedError =>
+    Option.getOrElse(classifyError(error), (): E | ClassifiedError => error),
+  );
 
 /**
  * Recovers from a constraint violation in the error channel, leaving every

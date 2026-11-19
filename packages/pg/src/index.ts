@@ -33,6 +33,7 @@ import {
   type DatabaseServices,
   makeDatabaseServices,
 } from "@thomasfosterau/effect-drizzle-ext/database";
+import { type ClassifiedError, classifyErrors } from "@thomasfosterau/effect-drizzle-ext/errors";
 import { makeQueryFunctions } from "@thomasfosterau/effect-drizzle-ext/query-functions";
 import type { QueryEffectHKTBase } from "drizzle-orm/effect-core";
 import * as PgDrizzle from "drizzle-orm/effect-postgres";
@@ -78,8 +79,9 @@ export type PgTransaction<Relations extends AnyRelations> = EffectPgTransaction<
 >;
 
 /**
- * The query-effect kind of a context-bound query: the driver's own error, and
- * the database key added to its requirement channel.
+ * The query-effect kind of a context-bound query: the driver's own error
+ * widened by the classified Postgres errors, and the database key added to
+ * its requirement channel.
  *
  * Drizzle types every Effect-native builder over one of these kinds, so
  * swapping it is what turns the client's whole query surface (every builder,
@@ -87,9 +89,16 @@ export type PgTransaction<Relations extends AnyRelations> = EffectPgTransaction<
  * with each result type still inferred by Drizzle from the schema. The
  * driver's own context (`EffectPgQueryEffectHKT["context"]`) is `never`, so
  * the key is the whole requirement; `tests/query-functions.test.ts` pins it.
+ *
+ * The error is `EffectDrizzleQueryError | ClassifiedError`: a failure whose
+ * SQLSTATE core's `./errors` classifies (`UniqueViolation`,
+ * `ForeignKeyViolation`, `NotNullViolation`, `CheckViolation`,
+ * `ExclusionViolation`, `SerializationFailure`, `DeadlockDetected`) arrives as
+ * that tagged class, ready for `Effect.catchTag`; every other failure is the
+ * driver's `EffectDrizzleQueryError`, unchanged.
  */
 export interface PgContextQueryEffectHKT<Key extends string> extends QueryEffectHKTBase {
-  readonly error: EffectPgQueryEffectHKT["error"];
+  readonly error: EffectPgQueryEffectHKT["error"] | ClassifiedError;
   readonly context: Key;
 }
 
@@ -168,6 +177,12 @@ export interface PgDatabase<
    * or on the {@link DatabaseServices.Database} client otherwise. A deferred
    * query is only for running: it can't render SQL or become a subquery
    * (both throw a `DeferredQueryError`); see core's `./query-functions`.
+   *
+   * A query's failure is classified on the way out (core's `./errors`
+   * `classifyErrors`): a unique, foreign key, NOT NULL, CHECK or EXCLUDE
+   * violation, a serialization failure or a deadlock fails with its tagged
+   * class, so `Effect.catchTag("UniqueViolation", …)` works on the query
+   * itself; see {@link PgContextQueryEffectHKT}.
    */
   readonly queries: PgQueryFunctions<Relations, Key>;
 }
@@ -214,7 +229,9 @@ export const makePgDatabase = <Relations extends AnyRelations, const Key extends
     ...services,
     make,
     layer: Layer.effect(services.Database, make),
-    queries: makeQueryFunctions<PgQueryFunctions<Relations, Key>>()(services),
+    queries: makeQueryFunctions<PgQueryFunctions<Relations, Key>>()(services, {
+      mapQuery: classifyErrors,
+    }),
   };
 };
 

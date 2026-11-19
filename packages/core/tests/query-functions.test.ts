@@ -197,3 +197,25 @@ describe("makeQueryFunctions", () => {
     }),
   );
 });
+
+/** A `mapQuery` that marks every row set it saw, so a test can tell it ran. */
+const wrapRows = <A, E, R>(built: Effect.Effect<A, E, R>): Effect.Effect<string, E, R> =>
+  Effect.map(built, (rows) => `mapped(${String(rows)})`);
+
+describe("makeQueryFunctions mapQuery", () => {
+  const mapped = makeQueryFunctions<StubSurface>()(services, { mapQuery: wrapRows });
+
+  it.effect("wraps the real query a deferred one replays to", () =>
+    Effect.gen(function* () {
+      const rows = yield* withDatabase(mapped.select().from("users"));
+      expect(rows).toBe("mapped(database: select * from users)");
+    }),
+  );
+
+  it.effect("runs inside the query's context, on the open transaction", () =>
+    Effect.gen(function* () {
+      const rows = yield* withDatabase(transact(mapped.query.users.findFirst()));
+      expect(rows).toBe("mapped(database>tx: first user)");
+    }),
+  );
+});

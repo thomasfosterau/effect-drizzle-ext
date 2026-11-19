@@ -69,6 +69,7 @@ import {
   type ClassifiedError,
   catchUniqueViolation,
   classifyError,
+  classifyErrors,
   findPgError,
   UniqueViolation,
 } from "@thomasfosterau/effect-drizzle-ext/errors";
@@ -223,6 +224,9 @@ export const recovered = Effect.fail(
     cause: new ProbeError({ message: "dup" }),
   }),
 ).pipe(catchUniqueViolation((violation) => Effect.succeed(violation.constraint)));
+export const classifiedInChannel = Effect.fail(new ProbeError({ message: "x" })).pipe(
+  classifyErrors,
+);
 
 // ── database ──────────────────────────────────────────────────────────────
 
@@ -516,7 +520,12 @@ export type Checks = [
     Equals<Effect.Success<typeof appBooks>, { id: string; title: string }[]>
   >,
   /** _appSelectRequiresDb */ Assert<Equals<Effect.Services<typeof appBooks>, "AppDb">>,
-  /** _appSelectError */ Assert<Equals<Effect.Error<typeof appBooks>, EffectDrizzleQueryError>>,
+  /** _classifyErrorsWidens */ Assert<
+    Equals<Effect.Error<typeof classifiedInChannel>, ProbeError | ClassifiedError>
+  >,
+  /** _appSelectError */ Assert<
+    Equals<Effect.Error<typeof appBooks>, EffectDrizzleQueryError | ClassifiedError>
+  >,
   /** _appInsertReturning */ Assert<Equals<Effect.Success<typeof appInserted>, { id: string }[]>>,
   /** _appInsertRequiresDb */ Assert<Equals<Effect.Services<typeof appInserted>, "AppDb">>,
   /** _savepointRequiresTx */ Assert<

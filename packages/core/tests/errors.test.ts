@@ -22,10 +22,12 @@ import {
   catchUniqueViolation,
   CheckViolation,
   classifyError,
+  classifyErrors,
   DeadlockDetected,
   ExclusionViolation,
   findPgError,
   ForeignKeyViolation,
+  isClassifiedError,
   isConstraintViolation,
   isRetryableTransactionFailure,
   isUniqueViolation,
@@ -431,6 +433,64 @@ describe("catchUniqueViolation", () => {
         ),
       );
       expect(failure).toBe(foreignKeyFixture);
+    }),
+  );
+});
+
+describe("classifyError on an already-classified error", () => {
+  it("returns the classified error as it is, never wrapping it again", () => {
+    const violation = classifiedAs(drizzleWrapped(uniqueFixture), "UniqueViolation");
+    expect(classifyError(violation)).toStrictEqual(Option.some(violation));
+    expect(isClassifiedError(violation)).toBe(true);
+    expect(isClassifiedError(uniqueFixture)).toBe(false);
+    expect(isClassifiedError(new DeadlockDetected({ cause: deadlockFixture }))).toBe(true);
+  });
+
+  it.effect("lets catchUniqueViolation recover a UniqueViolation already in the channel", () =>
+    Effect.gen(function* () {
+      const violation = classifiedAs(uniqueFixture, "UniqueViolation");
+      const recovered = yield* Effect.fail(violation).pipe(
+        catchUniqueViolation((caught) => Effect.succeed(caught)),
+      );
+      expect(recovered).toBe(violation);
+    }),
+  );
+});
+
+describe("classifyErrors", () => {
+  it.effect("replaces a classifiable failure with its tagged class, for catchTag", () =>
+    Effect.gen(function* () {
+      const constraint = yield* Effect.fail(drizzleWrapped(uniqueFixture)).pipe(
+        classifyErrors,
+        Effect.catchTag("UniqueViolation", (violation) =>
+          Effect.succeed(Option.getOrElse(violation.constraint, () => "?")),
+        ),
+      );
+      expect(constraint).toBe("widget_slug_unique");
+    }),
+  );
+
+  it.effect("keeps the original failure as the classified error's cause", () =>
+    Effect.gen(function* () {
+      const wrapped = drizzleWrapped(serializationFixture);
+      const failure = yield* Effect.flip(Effect.fail(wrapped).pipe(classifyErrors));
+      const classified = Option.liftPredicate(failure, Schema.is(SerializationFailure));
+      expect(Option.map(classified, (error) => error.cause)).toStrictEqual(Option.some(wrapped));
+    }),
+  );
+
+  it.effect("passes an unclassified failure through unchanged", () =>
+    Effect.gen(function* () {
+      const syntax = pgError({ code: "42601", message: "syntax error" });
+      expect(yield* Effect.flip(Effect.fail(syntax).pipe(classifyErrors))).toBe(syntax);
+      const boom = new Boom({ message: "boom" });
+      expect(yield* Effect.flip(Effect.fail(boom).pipe(classifyErrors))).toBe(boom);
+    }),
+  );
+
+  it.effect("does not touch a success", () =>
+    Effect.gen(function* () {
+      expect(yield* Effect.succeed("ok").pipe(classifyErrors)).toBe("ok");
     }),
   );
 });
