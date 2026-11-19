@@ -26,6 +26,9 @@ import { relations } from "./relations.ts"; // this application's drizzle relati
 
 const database = makePgDatabase({ relations, key: "Database" });
 export const { Database, CurrentTransaction, transact, readHandle } = database;
+// The client's query surface, finding the client in the Effect context:
+// `yield* select().from(users)`, no handle in sight.
+export const { select, insert, update, delete: deleteFrom, query } = database.queries;
 
 // Wire the client: a pool that lives and dies with the runtime that built it.
 const DatabaseLive = database.layer.pipe(
@@ -39,7 +42,7 @@ The [overview](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/d
 
 | Subpath | Contents | Guide |
 | --- | --- | --- |
-| `.` | The `makePgDatabase` services and the `PgClient` layers (`pgClientFromUrl`, `pgClientFromPool`). | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/overview.md) |
+| `.` | The `makePgDatabase` services (with the context-bound `queries`) and the `PgClient` layers (`pgClientFromUrl`, `pgClientFromPool`). | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/overview.md) |
 | `./chain` | The version-chain discipline over a tree's tables: `makeVersionChain`, append-only writes, the pulpit errors. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/chain.md) |
 | `./migrations` | The fresh-database migration runner, `applyMigrations`. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/migrations.md) |
 | `./testing` | The sentinel-rollback test runner, test-database provisioning and the connect-seam retry. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/testing.md) |

@@ -5,7 +5,9 @@
  * call to {@link makePgDatabase} gives an application the `Database` and
  * `CurrentTransaction` services, the `transact` write boundary and the
  * `readHandle` resolver, all typed over its own `relations` graph, plus the
- * `Effect` and `Layer` that build the Drizzle client itself.
+ * `Effect` and `Layer` that build the Drizzle client itself and the
+ * context-bound `queries` (`select`, `insert`, `query`, …) that find the
+ * client in the Effect context.
  *
  * `drizzle-orm/effect-postgres` already ships the Effect-native Drizzle
  * driver; nothing here re-implements it. What this module adds is the two
@@ -31,12 +33,16 @@ import {
   type DatabaseServices,
   makeDatabaseServices,
 } from "@thomasfosterau/effect-drizzle-ext/database";
+import { makeQueryFunctions } from "@thomasfosterau/effect-drizzle-ext/query-functions";
+import type { QueryEffectHKTBase } from "drizzle-orm/effect-core";
 import * as PgDrizzle from "drizzle-orm/effect-postgres";
 import type {
   EffectPgDatabase,
+  EffectPgQueryEffectHKT,
   EffectPgQueryResultHKT,
   EffectPgTransaction,
 } from "drizzle-orm/effect-postgres";
+import type { PgEffectDatabase } from "drizzle-orm/pg-core/effect";
 import type { AnyRelations } from "drizzle-orm/relations";
 import type * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -69,6 +75,50 @@ export type PgDatabaseClient<Relations extends AnyRelations> = EffectPgDatabase<
 export type PgTransaction<Relations extends AnyRelations> = EffectPgTransaction<
   EffectPgQueryResultHKT,
   Relations
+>;
+
+/**
+ * The query-effect kind of a context-bound query: the driver's own error, and
+ * the database key added to its requirement channel.
+ *
+ * Drizzle types every Effect-native builder over one of these kinds, so
+ * swapping it is what turns the client's whole query surface (every builder,
+ * every chained method, every relational query) into one that requires `Key`,
+ * with each result type still inferred by Drizzle from the schema. The
+ * driver's own context (`EffectPgQueryEffectHKT["context"]`) is `never`, so
+ * the key is the whole requirement; `tests/query-functions.test.ts` pins it.
+ */
+export interface PgContextQueryEffectHKT<Key extends string> extends QueryEffectHKTBase {
+  readonly error: EffectPgQueryEffectHKT["error"];
+  readonly context: Key;
+}
+
+/**
+ * The context-bound query functions of one application's database: the
+ * client's query surface as free functions whose queries require the `Key`
+ * service instead of a handle.
+ *
+ * Each is the matching `EffectPgDatabase` member, typed by Drizzle over
+ * {@link PgContextQueryEffectHKT}: `select`, `selectDistinct`,
+ * `selectDistinctOn`, `with`, `$count`, `insert`, `update`, `delete`,
+ * `execute`, `refreshMaterializedView`, and the relational `query`.
+ * `transaction` is left out on purpose: the boundary is
+ * {@link DatabaseServices.transact}. So is `$with`, which builds a CTE from a
+ * real builder; use Drizzle's `QueryBuilder` for CTEs and subqueries.
+ */
+export type PgQueryFunctions<Relations extends AnyRelations, Key extends string> = Pick<
+  PgEffectDatabase<PgContextQueryEffectHKT<Key>, EffectPgQueryResultHKT, Relations>,
+  | "select"
+  | "selectDistinct"
+  | "selectDistinctOn"
+  | "with"
+  | "$count"
+  | "insert"
+  | "update"
+  | "delete"
+  | "execute"
+  | "refreshMaterializedView"
+  | "query"
 >;
 
 /**
@@ -105,6 +155,21 @@ export interface PgDatabase<
    * URL-configured pool in a harness.
    */
   readonly layer: Layer.Layer<Key, never, PgClient.PgClient>;
+
+  /**
+   * The context-bound query functions: `select`, `insert`, `update`,
+   * `delete`, `query` and the rest of the client's query surface, each
+   * finding its handle in the Effect context, so a caller writes
+   * `yield* select().from(users)` with no client in sight.
+   *
+   * Every query requires `Key` and runs on the open
+   * {@link DatabaseServices.CurrentTransaction} when there is one (inside
+   * {@link DatabaseServices.transact}, a write lands in that transaction),
+   * or on the {@link DatabaseServices.Database} client otherwise. A deferred
+   * query is only for running: it can't render SQL or become a subquery
+   * (both throw a `DeferredQueryError`); see core's `./query-functions`.
+   */
+  readonly queries: PgQueryFunctions<Relations, Key>;
 }
 
 /**
@@ -123,6 +188,8 @@ export interface PgDatabase<
  * const database = makePgDatabase({ relations, key: "Database" });
  * export const { Database, CurrentTransaction, transact, readHandle } = database;
  * export type Database = typeof database.Database.Identifier; // "Database"
+ * // `delete` is a reserved word, so it takes another name when destructured.
+ * export const { select, insert, update, delete: deleteFrom, query } = database.queries;
  *
  * console.log(Database.key); // "Database"
  * ```
@@ -143,7 +210,12 @@ export const makePgDatabase = <Relations extends AnyRelations, const Key extends
     Effect.provide(PgDrizzle.DefaultServices),
   );
 
-  return { ...services, make, layer: Layer.effect(services.Database, make) };
+  return {
+    ...services,
+    make,
+    layer: Layer.effect(services.Database, make),
+    queries: makeQueryFunctions<PgQueryFunctions<Relations, Key>>()(services),
+  };
 };
 
 /**
