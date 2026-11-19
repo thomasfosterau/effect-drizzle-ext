@@ -43,7 +43,7 @@ The [overview](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/d
 | `./chain` | The version-chain discipline over a tree's tables: `makeVersionChain`, append-only writes, the pulpit errors. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/chain.md) |
 | `./migrations` | The fresh-database migration runner, `applyMigrations`. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/migrations.md) |
 | `./testing` | The sentinel-rollback test runner, test-database provisioning and the connect-seam retry. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/testing.md) |
-| `./tooling` | The migration-drift and view-dependency schema guards (optional peer `drizzle-kit`). | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tooling.md) |
+| `./tooling` | The migration-drift and view-dependency schema guards, and migrations for the extensions, domains and composite types drizzle-kit doesn't manage (optional peer `drizzle-kit`). | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tooling.md) |
 
 ## Links
 
