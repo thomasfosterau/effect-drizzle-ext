@@ -20,6 +20,7 @@ describe("subpaths", () => {
       import("@thomasfosterau/effect-drizzle-ext/errors"),
       import("@thomasfosterau/effect-drizzle-ext/database"),
       import("@thomasfosterau/effect-drizzle-ext/versioned-chain"),
+      import("@thomasfosterau/effect-drizzle-ext/postgis"),
       import("@thomasfosterau/effect-drizzle-ext/jsonapi"),
       import("@thomasfosterau/effect-drizzle-ext/jsonapi/derive"),
     ]);

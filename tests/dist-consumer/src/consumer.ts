@@ -97,6 +97,18 @@ import {
   dbTable,
 } from "@thomasfosterau/effect-drizzle-ext/jsonapi";
 import { deriveResourceColumnsWith } from "@thomasfosterau/effect-drizzle-ext/jsonapi/derive";
+import {
+  asGeography,
+  geographyColumn,
+  geometryColumn,
+  stDistance,
+  stDWithin,
+  stPoint,
+  type Geography,
+  type Geometry,
+  type SameKindOperand,
+  type GeographyOperand,
+} from "@thomasfosterau/effect-drizzle-ext/postgis";
 import * as Pg from "@thomasfosterau/effect-drizzle-ext-pg";
 import * as PgChain from "@thomasfosterau/effect-drizzle-ext-pg/chain";
 import * as PgMigrations from "@thomasfosterau/effect-drizzle-ext-pg/migrations";
@@ -185,6 +197,17 @@ export const blob = pgTable("blob", {
 });
 type BlobRow = typeof blob.$inferSelect;
 export const roundTrip: Uint8Array = hexToBytea(byteaToHex(new Uint8Array([1, 2])));
+
+// ── postgis ───────────────────────────────────────────────────────────────
+
+export const site = pgTable("site", {
+  footprint: geometryColumn("footprint", { type: "Polygon", srid: 4326 }).notNull(),
+  location: geographyColumn("location", { type: "Point", srid: 4326 }).notNull(),
+});
+type SiteRow = typeof site.$inferSelect;
+const here = asGeography(stPoint(151.2, -33.8, 4326));
+export const nearSite: SQL<boolean> = stDWithin(site.location, here, 500);
+export const siteDistance: SQL<number> = stDistance(site.location, here);
 
 // ── query ─────────────────────────────────────────────────────────────────
 
@@ -456,6 +479,11 @@ export type Checks = [
   /** _bookCreatedAt */ Assert<Equals<BookRow["createdAt"], Date>>,
   /** _derivationErrorIsTagged */ Assert<Equals<DerivationError["_tag"], "DerivationError">>,
   /** _hashIsBytes */ Assert<Equals<BlobRow["hash"], Uint8Array>>,
+  /** _footprintIsGeometry */ Assert<Equals<SiteRow["footprint"], Geometry>>,
+  /** _locationIsGeography */ Assert<Equals<SiteRow["location"], Geography>>,
+  /** _sameKindIsGeography */ Assert<
+    Equals<SameKindOperand<typeof site.location>, GeographyOperand>
+  >,
   /** _payloadIsDecoded */ Assert<Equals<BlobRow["payload"], { readonly a: number }>>,
   /** _pageItems */ Assert<Equals<(typeof page)["items"], readonly string[]>>,
   /** _limitIsNumber */ Assert<Equals<(typeof pagination.Limit)["Type"], number>>,

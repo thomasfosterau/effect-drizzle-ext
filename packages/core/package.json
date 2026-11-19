@@ -44,6 +44,7 @@
     "./errors": "./src/errors.ts",
     "./database": "./src/database.ts",
     "./versioned-chain": "./src/versioned-chain.ts",
+    "./postgis": "./src/postgis.ts",
     "./jsonapi": "./src/jsonapi/index.ts",
     "./jsonapi/derive": "./src/jsonapi/derive.ts"
   },
@@ -96,6 +97,10 @@
       "./versioned-chain": {
         "types": "./dist/versioned-chain.d.ts",
         "default": "./dist/versioned-chain.js"
+      },
+      "./postgis": {
+        "types": "./dist/postgis.d.ts",
+        "default": "./dist/postgis.js"
       },
       "./jsonapi": {
         "types": "./dist/jsonapi/index.d.ts",
