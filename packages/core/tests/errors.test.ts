@@ -233,9 +233,9 @@ describe("findPgError", () => {
   });
 
   it("stops at the depth cap", () => {
-    // The driver error at depth 7 is inside the bound; at depth 8 it is not.
-    expect(Option.isSome(findPgError(nest(7)))).toBe(true);
-    expect(findPgError(nest(8))).toStrictEqual(Option.none());
+    // The driver error at depth 11 is inside the bound; at depth 12 it is not.
+    expect(Option.isSome(findPgError(nest(11)))).toBe(true);
+    expect(findPgError(nest(12))).toStrictEqual(Option.none());
   });
 
   it("is none for a graph with no SQLSTATE and for non-object input", () => {
@@ -493,4 +493,20 @@ describe("classifyErrors", () => {
       expect(yield* Effect.succeed("ok").pipe(classifyErrors)).toBe("ok");
     }),
   );
+});
+
+describe("findPgError through a classified error", () => {
+  it("reaches the driver error from the Cause a classified query fails with", () => {
+    // The shape `Effect.exit` gives a query whose failure `classifyErrors`
+    // replaced: Cause → Fail → UniqueViolation → (Cause → Fail →) the
+    // drizzle-wrapped driver error.
+    const classified = classifiedAs(
+      { reasons: [{ _tag: "Fail", error: drizzleWrapped(uniqueFixture) }] },
+      "UniqueViolation",
+    );
+    const exitCause = { reasons: [{ _tag: "Fail", error: classified }] };
+    expect(Option.map(findPgError(exitCause), (facts) => facts.table)).toStrictEqual(
+      Option.some(Option.some("widget")),
+    );
+  });
 });

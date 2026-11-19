@@ -78,8 +78,17 @@ const PG_UNIQUE_VIOLATION_MESSAGE = "duplicate key value violates unique constra
  */
 const PG_SQLSTATE = /^[0-9A-Z]{5}$/;
 
-/** How deep into the error graph to search for the driver error. */
-const MAX_ERROR_DEPTH = 8;
+/**
+ * How deep into the error graph to search for the driver error.
+ *
+ * A query's failure, as its `Exit` holds it, already puts the driver error at
+ * depth 6 (`Cause` → `Fail` → `EffectDrizzleQueryError` → `Cause` → `Fail` →
+ * `SqlError` → its reason → the driver error, counting from 0 and flattening
+ * arrays); a classified error ({@link classifyErrors}) wraps that in two more
+ * (`Fail` → `UniqueViolation` → …), so the cap leaves room for both plus a
+ * caller's own wrapper or two.
+ */
+const MAX_ERROR_DEPTH = 12;
 
 /**
  * An error node as the walk sees it: an arbitrary object read as a bag of
@@ -200,7 +209,7 @@ const searchErrorGraph = <A>(
  * Effect `Cause` that holds the `SqlError`. `Option.none()` when the graph
  * holds no node declaring a SQLSTATE, including for a non-object input.
  *
- * The walk is bounded (depth 8) and cycle-guarded, so a self-referential or
+ * The walk is bounded (depth 12) and cycle-guarded, so a self-referential or
  * pathologically deep graph terminates.
  */
 export const findPgError = (cause: unknown): Option.Option<PgErrorFacts> =>
@@ -358,7 +367,7 @@ const CONSTRAINT_VIOLATION_CLASSES = [
 
 /** True when `u` is already one of the five {@link ConstraintViolation} classes. */
 const isConstraintViolationInstance = (u: unknown): u is ConstraintViolation =>
-  Arr.some(CONSTRAINT_VIOLATION_CLASSES, (Class) => u instanceof Class);
+  Arr.some(CONSTRAINT_VIOLATION_CLASSES, (Class) => Schema.is(Class)(u));
 
 /**
  * True when `u` is already one of the seven classified errors — an instance
@@ -371,8 +380,8 @@ const isConstraintViolationInstance = (u: unknown): u is ConstraintViolation =>
  */
 export const isClassifiedError = (u: unknown): u is ClassifiedError =>
   isConstraintViolationInstance(u) ||
-  u instanceof SerializationFailure ||
-  u instanceof DeadlockDetected;
+  Schema.is(SerializationFailure)(u) ||
+  Schema.is(DeadlockDetected)(u);
 
 /**
  * Classifies any value into one of the seven tagged errors, by finding the
@@ -393,7 +402,7 @@ export const classifyError = (cause: unknown): Option.Option<ClassifiedError> =>
 
 /** The `23505` classification for `error`, if that is what it is. */
 const uniqueViolationOf = (cause: unknown): Option.Option<UniqueViolation> =>
-  cause instanceof UniqueViolation
+  Schema.is(UniqueViolation)(cause)
     ? Option.some(cause)
     : Option.map(
         Option.filter(findPgError(cause), (facts) => facts.code === UNIQUE_VIOLATION),
