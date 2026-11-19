@@ -187,3 +187,44 @@ describe("classifyError against the live driver", () => {
     );
   });
 });
+
+describe("the context-bound queries against the live driver", () => {
+  const { execute } = database.queries;
+
+  it("fail with the tagged class, so catchTag reads the facts directly", async () => {
+    await runInTestTransaction(
+      runtime,
+      Effect.gen(function* () {
+        yield* seed();
+        const attempt = yield* attemptInSavepoint(
+          execute(
+            sql.raw(
+              `INSERT INTO edx_child (id, parent_id, slug, score) VALUES (7, 1, 'first', 10)`,
+            ),
+          ),
+        );
+        assert(Exit.isFailure(attempt), "unreachable: the statement should have failed");
+        // An `Exit` is an Effect: re-running it re-raises the failure.
+        const constraint = yield* attempt.pipe(
+          Effect.as(Option.none<string>()),
+          Effect.catchTag("UniqueViolation", (violation) => Effect.succeed(violation.constraint)),
+        );
+        expect(constraint).toEqual(Option.some("edx_child_slug_key"));
+      }),
+    );
+  });
+
+  it("leave an unclassified failure as the driver's error", async () => {
+    await runInTestTransaction(
+      runtime,
+      Effect.gen(function* () {
+        const attempt = yield* attemptInSavepoint(
+          execute(sql.raw(`SELECT * FROM edx_no_such_table`)),
+        );
+        assert(Exit.isFailure(attempt), "unreachable: the statement should have failed");
+        const failure = yield* Effect.flip(attempt);
+        expect(P.isTagged(failure, "EffectDrizzleQueryError")).toBe(true);
+      }),
+    );
+  });
+});

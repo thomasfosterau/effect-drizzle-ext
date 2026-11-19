@@ -42,5 +42,13 @@ export const makeQueryFunctions: <Surface extends object>() => <
   Key extends string,
 >(
   services: Pick<DatabaseServices<Db, Tx, Key>, "Database" | "CurrentTransaction">,
+  options?: QueryFunctionsOptions,
 ) => Surface;
+export interface QueryFunctionsOptions {
+  readonly mapQuery?: (
+    query: Effect.Effect<unknown, unknown, unknown>,
+  ) => Effect.Effect<unknown, unknown, unknown>;
+}
 ```
+
+`options.mapQuery` wraps the real query each deferred one replays to, just before it runs, inside the query's own context. The pg binding passes `./errors`' `classifyErrors`, so its queries fail with the tagged Postgres classes; its `Surface` type is what says so, since `mapQuery`'s own types are erased.

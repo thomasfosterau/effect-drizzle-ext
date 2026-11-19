@@ -172,6 +172,27 @@ const makeRecorder = <Proto extends object>(proto: Proto) => {
   return record;
 };
 
+/** A query as {@link QueryFunctionsOptions.mapQuery} sees it, its types erased. */
+type AnyQuery = Effect.Effect<unknown, unknown, unknown>;
+
+/** The default {@link QueryFunctionsOptions.mapQuery}: runs the query as built. */
+const identityQuery = (query: AnyQuery): AnyQuery => query;
+
+/** What a binding can add around every query {@link makeQueryFunctions} runs. */
+export interface QueryFunctionsOptions {
+  /**
+   * Wraps the real query a deferred one replays to, just before it runs —
+   * the pg binding classifies the driver's failures here (core's
+   * `./errors` `classifyErrors`).
+   *
+   * Its types are erased, as the surface's are: the binding's `Surface`
+   * type is what states the result, so a `mapQuery` that changes the error
+   * channel needs a `Surface` that says so. It runs inside the query's
+   * Effect, so it sees the same context.
+   */
+  readonly mapQuery?: (query: AnyQuery) => AnyQuery;
+}
+
 /**
  * Builds the context-bound query functions over one application's database
  * services: `select`, `insert`, `update`, `delete`, `query`, `execute` and the
@@ -192,7 +213,8 @@ const makeRecorder = <Proto extends object>(proto: Proto) => {
  * `Database` client otherwise; see the module comment for why that is not a
  * join-if-present transaction. A deferred query is only for running: one
  * can't render SQL (`toSQL`) or become a subquery (`as`), and doing so throws
- * a `DeferredQueryError`.
+ * a `DeferredQueryError`. `options.mapQuery`, when given, wraps every real
+ * query before it runs (see {@link QueryFunctionsOptions}).
  *
  * @example
  * ```ts
@@ -234,7 +256,9 @@ export const makeQueryFunctions =
   <Surface extends object>() =>
   <Db, Tx extends ReadSurface, Key extends string>(
     services: Pick<DatabaseServices<Db, Tx, Key>, "Database" | "CurrentTransaction">,
+    options?: QueryFunctionsOptions,
   ): Surface => {
+    const mapQuery = options?.mapQuery ?? identityQuery;
     const resolve: Effect.Effect<Db | Tx, never, Key> = Effect.flatMap(
       Effect.serviceOption(services.CurrentTransaction),
       (open) =>
@@ -251,7 +275,7 @@ export const makeQueryFunctions =
             Broken: ({ reason }) => Effect.die(new DeferredQueryError({ message: reason })),
             At: ({ value }) =>
               Effect.isEffect(value)
-                ? value
+                ? mapQuery(value)
                 : Effect.die(
                     new DeferredQueryError({
                       message: `${renderChain(steps)} did not build a query: the handle returned a value that is not an Effect`,

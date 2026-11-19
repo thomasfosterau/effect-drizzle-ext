@@ -15,7 +15,9 @@
 import { eq } from "drizzle-orm";
 import { defineRelations } from "drizzle-orm";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
-import type * as Effect from "effect/Effect";
+import type { ClassifiedError, UniqueViolation } from "@thomasfosterau/effect-drizzle-ext/errors";
+import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import { describe, expect, expectTypeOf, it } from "vite-plus/test";
 import { makePgDatabase } from "../src/index.ts";
 
@@ -71,12 +73,25 @@ describe("makePgDatabase queries", () => {
     expectTypeOf<Channels<typeof counted>["R"]>().toEqualTypeOf<"TypedDb">();
   });
 
-  it("keeps the client's own error type", () => {
+  it("widens the client's own error type by the classified Postgres errors", () => {
     const rows = select().from(users);
     const fromClient = (db: Effect.Success<typeof database.make>) => db.select().from(users);
     expectTypeOf<Channels<typeof rows>["E"]>().toEqualTypeOf<
-      Channels<ReturnType<typeof fromClient>>["E"]
+      Channels<ReturnType<typeof fromClient>>["E"] | ClassifiedError
     >();
+  });
+
+  it("lets a caller catchTag a classified failure on the query itself", () => {
+    const plain = insert(users).values({ id: 1, name: "Ada" });
+    const inserted = plain.pipe(
+      Effect.catchTag("UniqueViolation", (violation) =>
+        Effect.succeed(Option.getOrElse(violation.constraint, () => "?")),
+      ),
+    );
+    expectTypeOf<Channels<typeof inserted>["E"]>().toEqualTypeOf<
+      Exclude<Channels<typeof plain>["E"], UniqueViolation>
+    >();
+    expect(Effect.isEffect(inserted)).toBe(true);
   });
 
   it("leaves out the transaction boundary", () => {
