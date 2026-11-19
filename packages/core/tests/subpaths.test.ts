@@ -24,6 +24,6 @@ describe("subpaths", () => {
       import("@thomasfosterau/effect-drizzle-ext/jsonapi"),
       import("@thomasfosterau/effect-drizzle-ext/jsonapi/derive"),
     ]);
-    expect(modules).toHaveLength(14);
+    expect(modules).toHaveLength(15);
   });
 });
