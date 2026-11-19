@@ -9,10 +9,12 @@
  * Drizzle column builder. One declaration — the annotated field — is the single
  * source for both the model projection and the column.
  *
- * This entry point has **no Drizzle dependency**: it is the half a client- /
- * model-layer package can import without pulling the ORM into its bundle. The
- * Drizzle-emitting half lives behind the {@link ./derive.ts} and
- * {@link ./versioned-chain.ts} subpaths.
+ * This entry point's own code has **no Drizzle dependency**: it is the half a
+ * client- / model-layer package can import without pulling the ORM into its
+ * bundle. The Drizzle-emitting half lives behind the {@link ./derive.ts} and
+ * {@link ./versioned-chain.ts} subpaths. The one exception is the
+ * {@link PostGis} namespace re-export, which a tree-shaking bundler drops
+ * unless it is read.
  *
  * **Why a phantom rides alongside the annotation.** Effect Schema annotations
  * are erased from the static type (`schema.annotate(...)` returns the *same*
@@ -82,6 +84,13 @@ export type {
  * client-bundled package can name them without importing Drizzle.
  */
 export type { VersionAction, VersionChainEntry, VersionSnapshot } from "./version-chain-types.ts";
+
+/**
+ * The typed PostGIS helpers, the same module `./postgis` exports. The one
+ * part of this entry that imports Drizzle (`drizzle-orm`, `drizzle-orm/pg-core`):
+ * a client bundle that tree-shakes drops it unless it reads `PostGis`.
+ */
+export * as PostGis from "./PostGis.ts";
 
 /**
  * A referential action for a derived foreign-key column — the Drizzle

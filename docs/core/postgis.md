@@ -2,7 +2,7 @@
 
 _A guide to [`@thomasfosterau/effect-drizzle-ext`](../../packages/core/README.md). The API reference is the doc comments on each export (your editor's hover, or `vp run docgen`)._
 
-Typed [PostGIS](https://postgis.net) helpers that sit beside Drizzle's `eq` and `and`. Each one returns a typed Drizzle `SQL` value for a `where`, an `orderBy`, a select map or an insert's values.
+Typed [PostGIS](https://postgis.net) helpers that sit beside Drizzle's `eq` and `and`, from this subpath or as the root entry's `PostGis` namespace (`import { PostGis } from "@thomasfosterau/effect-drizzle-ext"`). The namespace is the only part of the root entry that imports Drizzle; a tree-shaking bundler drops it unless it is read. Each one returns a typed Drizzle `SQL` value for a `where`, an `orderBy`, a select map or an insert's values.
 
 ## What Drizzle already ships, and what this adds
 

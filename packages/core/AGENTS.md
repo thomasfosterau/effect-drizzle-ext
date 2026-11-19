@@ -26,7 +26,7 @@ Imports nothing from this workspace (`.fallowrc.json` zone `core`, no outbound r
 
 ## Terms
 
-- **Annotation entry** (`.`) — the `dbColumn` / `dbTable` vocabulary. Drizzle-free, so a client-bundled models package can import it.
+- **Annotation entry** (`.`) — the `dbColumn` / `dbTable` vocabulary. Drizzle-free, so a client-bundled models package can import it, except the `PostGis` namespace re-export (`./postgis`, by owner decision on effect-drizzle-ext#222), which a tree-shaking bundler drops unless it is read; `tests/dist-consumer/scripts/root-entry-graph.ts` allows that chunk and nothing else.
 - **Phantom** — the type-level metadata `dbColumn` / `dbTable` carry alongside the runtime annotation. Effect Schema erases annotation values from the static type; the phantom is what keeps a derived column map precise.
 - **Builder registry** — a consumer's `Record<Kind, (column) => ColumnBuilderBase>`; the library ships no fixed set of column kinds.
 - **Derivation error** — `DerivationError`, the one tagged error thrown at module load when a table or tree cannot be built (missing builder, unresolved reference, bounds without a column, a misdeclared tree level). Never an Effect failure: no runtime exists yet.

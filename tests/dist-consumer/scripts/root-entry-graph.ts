@@ -9,6 +9,12 @@
  * of its subpaths). A client-bundled models package imports `.` on that
  * promise; a type-only re-export is enough to break it in the declarations.
  *
+ * One exception, by owner decision on effect-drizzle-ext#222: the root
+ * re-exports the PostGIS helpers as the `PostGis` namespace, so the walk does
+ * not enter the modules `publishConfig.exports["./postgis"]` itself imports
+ * (its own chunk). Everything else those modules import is still walked
+ * when the root reaches it, so Drizzle anywhere else still fails.
+ *
  * Runs after `tsc` in this package's `check` task, so `vp run check` gates it
  * against fresh `dist/` output. Imports are read with TypeScript's own
  * `preProcessFile`, which skips comments and strings, so a doc comment's
@@ -43,6 +49,7 @@ const Manifest = Schema.Struct({
   publishConfig: Schema.Struct({
     exports: Schema.Struct({
       ".": Schema.Struct({ types: Schema.String, default: Schema.String }),
+      "./postgis": Schema.Struct({ types: Schema.String, default: Schema.String }),
     }),
   }),
 });
@@ -95,7 +102,7 @@ const nextFiles = (
     onSome: (specifier) =>
       Effect.fail(
         new DrizzleReachedError({
-          message: `${path.relative(root, file)} imports "${specifier}", but the Drizzle-free root entry reaches it: ${describeChain(root, chain, path)}`,
+          message: `${path.relative(root, file)} imports "${specifier}", but the root entry reaches it outside PostGis: ${describeChain(root, chain, path)}`,
         }),
       ),
   });
@@ -128,6 +135,7 @@ const visit = Effect.fnUntraced(function* (
   root: string,
   chain: Arr.NonEmptyReadonlyArray<string>,
   seen: HashSet.HashSet<string>,
+  allowed: HashSet.HashSet<string>,
 ): Effect.fn.Return<
   HashSet.HashSet<string>,
   DrizzleReachedError | UnreadableModuleError,
@@ -140,9 +148,9 @@ const visit = Effect.fnUntraced(function* (
     next,
     () => seen,
     (walked, file) =>
-      HashSet.has(walked, file)
+      HashSet.has(walked, file) || HashSet.has(allowed, file)
         ? Effect.succeed(walked)
-        : visit(root, [...chain, file], HashSet.add(walked, file)),
+        : visit(root, [...chain, file], HashSet.add(walked, file), allowed),
   );
 });
 
@@ -156,13 +164,28 @@ const checkRootEntry = Effect.fn("checkRootEntry")(function* () {
     .pipe(Effect.flatMap(Schema.decodeUnknownEffect(Schema.fromJsonString(Manifest))));
   const entry = manifest.publishConfig.exports["."];
   const starts = [entry.default, entry.types].map((file) => path.resolve(root, file));
+  const postGis = manifest.publishConfig.exports["./postgis"];
+  const postGisFiles = [postGis.default, postGis.types].map((file) => path.resolve(root, file));
+  const postGisChunks = yield* Effect.forEach(
+    postGisFiles,
+    (file) =>
+      readModule(root, [file]).pipe(
+        Effect.map((source) =>
+          specifiersOf(source)
+            .filter(isRelative)
+            .map((specifier) => path.resolve(path.dirname(file), targetOf(file, specifier))),
+        ),
+      ),
+    { concurrency: 1 },
+  );
+  const allowed = HashSet.fromIterable([...postGisFiles, ...postGisChunks.flat()]);
   const walked = yield* Effect.reduce(
     starts,
     () => HashSet.fromIterable(starts),
-    (seen, start) => visit(root, [start], seen),
+    (seen, start) => visit(root, [start], seen, allowed),
   );
   yield* Effect.log(
-    `root entry reaches no drizzle-orm import (${HashSet.size(walked)} built files walked from ${starts.map((file) => path.relative(root, file)).join(", ")})`,
+    `root entry reaches no drizzle-orm import outside PostGis (${HashSet.size(walked)} built files walked from ${starts.map((file) => path.relative(root, file)).join(", ")})`,
   );
 });
 

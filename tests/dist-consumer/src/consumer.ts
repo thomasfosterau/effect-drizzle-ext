@@ -29,6 +29,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import {
+  PostGis,
   type DbColumnOf,
   dbColumn,
   dbColumnFor,
@@ -208,6 +209,8 @@ type SiteRow = typeof site.$inferSelect;
 const here = asGeography(stPoint(151.2, -33.8, 4326));
 export const nearSite: SQL<boolean> = stDWithin(site.location, here, 500);
 export const siteDistance: SQL<number> = stDistance(site.location, here);
+// The root entry's `PostGis` namespace is the `./postgis` module itself.
+export const nearSiteFromRoot: SQL<boolean> = PostGis.stDWithin(site.location, here, 500);
 
 // ── query ─────────────────────────────────────────────────────────────────
 
@@ -481,6 +484,7 @@ export type Checks = [
   /** _hashIsBytes */ Assert<Equals<BlobRow["hash"], Uint8Array>>,
   /** _footprintIsGeometry */ Assert<Equals<SiteRow["footprint"], Geometry>>,
   /** _locationIsGeography */ Assert<Equals<SiteRow["location"], Geography>>,
+  /** _rootPostGisIsSubpath */ Assert<Equals<typeof PostGis.stDWithin, typeof stDWithin>>,
   /** _sameKindIsGeography */ Assert<
     Equals<SameKindOperand<typeof site.location>, GeographyOperand>
   >,
