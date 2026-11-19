@@ -3,7 +3,13 @@
   "changelog": ["@changesets/changelog-github", { "repo": "thomasfosterau/effect-drizzle-ext" }],
   "commit": false,
   "fixed": [],
-  "linked": [["@thomasfosterau/effect-drizzle-ext", "@thomasfosterau/effect-drizzle-ext-pg"]],
+  "linked": [
+    [
+      "@thomasfosterau/effect-drizzle-ext",
+      "@thomasfosterau/effect-drizzle-ext-pg",
+      "@thomasfosterau/effect-drizzle-ext-kit"
+    ]
+  ],
   "access": "public",
   "baseBranch": "trunk",
   "format": false,

@@ -1,0 +1,79 @@
+{
+  "name": "@thomasfosterau/effect-drizzle-ext-kit",
+  "version": "0.0.0",
+  "description": "effect-drizzle-kit: a command-line companion to drizzle-kit that migrates what drizzle-kit doesn't (extensions, domains, composite types) and gates schema and extras drift in one check.",
+  "keywords": [
+    "cli",
+    "drizzle",
+    "drizzle-kit",
+    "effect",
+    "migrations",
+    "postgres"
+  ],
+  "homepage": "https://github.com/thomasfosterau/effect-drizzle-ext#readme",
+  "bugs": {
+    "url": "https://github.com/thomasfosterau/effect-drizzle-ext/issues"
+  },
+  "license": "MIT",
+  "author": "Thomas Foster <me@thomasfoster.au>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thomasfosterau/effect-drizzle-ext.git",
+    "directory": "packages/kit"
+  },
+  "bin": {
+    "effect-drizzle-kit": "./src/bin.ts"
+  },
+  "files": [
+    "dist",
+    "src",
+    "!src/**/*.test.ts",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "./src/bin.ts",
+    "./dist/bin.js"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "bin": {
+      "effect-drizzle-kit": "./dist/bin.js"
+    },
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    },
+    "access": "public"
+  },
+  "dependencies": {
+    "@thomasfosterau/effect-drizzle-ext-pg": "workspace:^"
+  },
+  "devDependencies": {
+    "@effect/language-service": "catalog:",
+    "@effect/platform-node": "catalog:",
+    "@effect/sql-pg": "catalog:",
+    "@types/node": "catalog:",
+    "@vitest/coverage-istanbul": "catalog:",
+    "drizzle-kit": "catalog:",
+    "drizzle-orm": "catalog:",
+    "effect": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@effect/platform-node": "catalog:peers",
+    "@effect/sql-pg": "catalog:peers",
+    "drizzle-kit": "catalog:peers",
+    "drizzle-orm": "catalog:peers",
+    "effect": "catalog:peers"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}

@@ -2,14 +2,14 @@
 
 Project conventions for every coding agent live here; Claude Code reads them through [`.claude/CLAUDE.md`](.claude/CLAUDE.md), which adds only what is specific to Claude Code (its hooks, settings, worktrees and session limits). Personal style preferences live in user memory.
 
-This repo publishes the Effect ↔ Drizzle bridge as two npm packages, `@thomasfosterau/effect-drizzle-ext` (`packages/core`) and `@thomasfosterau/effect-drizzle-ext-pg` (`packages/pg`), extracted from three applications (`thomasfosterau/website`, the foundation; `thomasfosterau/gardeneria`; `thomasfosterau/preferenceflow`). Those apps are the consumers, and their toolchain — pnpm + Vite+ (`vp`), a strict catalog, the TypeScript 6/7 split, the Effect oxlint preset, fallow — is copied here so the library builds against exactly what they run. A `#NNN` citation inside a ported comment names an issue in the app it was ported from (website unless stated), the evidence behind a decision, not a ticket in this tracker; a reference to this tracker is written `effect-drizzle-ext#NNN`.
+This repo publishes the Effect ↔ Drizzle bridge as three npm packages, `@thomasfosterau/effect-drizzle-ext` (`packages/core`), `@thomasfosterau/effect-drizzle-ext-pg` (`packages/pg`) and `@thomasfosterau/effect-drizzle-ext-kit` (`packages/kit`, the `effect-drizzle-kit` bin over pg's `./tooling`), extracted from three applications (`thomasfosterau/website`, the foundation; `thomasfosterau/gardeneria`; `thomasfosterau/preferenceflow`). Those apps are the consumers, and their toolchain — pnpm + Vite+ (`vp`), a strict catalog, the TypeScript 6/7 split, the Effect oxlint preset, fallow — is copied here so the library builds against exactly what they run. A `#NNN` citation inside a ported comment names an issue in the app it was ported from (website unless stated), the evidence behind a decision, not a ticket in this tracker; a reference to this tracker is written `effect-drizzle-ext#NNN`.
 
 ## Common pitfalls
 
 - **No application vocabulary.** No `owner_id`, owner / viewer / role vocabulary, id brands, Hyperdrive, KV caches, fixture users or seed data, and no application's own level names. Those stay in the apps. The generic versioned-ontology vocabulary is the library's (effect-drizzle-ext#112, decision 2): a level tree (`defineTree`), its markers, leaves and level columns, and the node / node-version root a tree derives. The generic migration tooling (the fresh-database runner, test-database provisioning, the drift and view-dependency guards) moved here by owner decision (effect-drizzle-ext#9); anything that knows an application's schema does not.
 - **Declare every required peer of a dependency.** A missing one passes on a warm local tree and fails CI on a fresh runner.
 
-Package-local invariants, terms and import boundaries live only in each package's `AGENTS.md` ([`packages/core`](packages/core/AGENTS.md), [`packages/pg`](packages/pg/AGENTS.md)); read it before changing that package. Each package's `CLAUDE.md` is the one line `@AGENTS.md`.
+Package-local invariants, terms and import boundaries live only in each package's `AGENTS.md` ([`packages/core`](packages/core/AGENTS.md), [`packages/pg`](packages/pg/AGENTS.md), [`packages/kit`](packages/kit/AGENTS.md)); read it before changing that package. Each package's `CLAUDE.md` is the one line `@AGENTS.md`.
 
 ## Conventions
 

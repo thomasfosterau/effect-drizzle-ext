@@ -127,6 +127,9 @@ catalogs:
     # on `effect` / `@effect/sql-pg` `>=4.0.0`, and @effect/sql-pg 4.0.0 on
     # `effect ^4.0.0`.
     "@effect/sql-pg": ^4.0.0
+    # The kit package's bin runs on Node: `NodeRuntime` / `NodeServices`.
+    # Released in lockstep with `effect`, so the same `^4.0.0`.
+    "@effect/platform-node": ^4.0.0
     "@thomasfosterau/effect-jsonapi": ">=0.16.0"
     drizzle-kit: ">=1.0.0-rc.5"
     drizzle-orm: ">=1.0.0-rc.5"

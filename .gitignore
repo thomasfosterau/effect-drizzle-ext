@@ -32,3 +32,6 @@ dist/
 # the README is the reference consumers read.
 packages/*/docs/
 .vitest/
+
+# packages/kit/tests scratch projects (removed when a test finishes; left behind by a killed run)
+packages/kit/tests/.scratch-*

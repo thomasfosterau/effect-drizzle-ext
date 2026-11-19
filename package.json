@@ -3,7 +3,7 @@
   "name": "effect-drizzle-ext-workspace",
   "version": "0.0.0",
   "private": true,
-  "description": "Workspace for @thomasfosterau/effect-drizzle-ext and @thomasfosterau/effect-drizzle-ext-pg: the Effect ↔ Drizzle bridge extracted from the website, gardeneria and preferenceflow applications.",
+  "description": "Workspace for @thomasfosterau/effect-drizzle-ext, @thomasfosterau/effect-drizzle-ext-pg and @thomasfosterau/effect-drizzle-ext-kit: the Effect ↔ Drizzle bridge extracted from the website, gardeneria and preferenceflow applications.",
   "license": "MIT",
   "author": "Thomas Foster <me@thomasfoster.au>",
   "type": "module",
