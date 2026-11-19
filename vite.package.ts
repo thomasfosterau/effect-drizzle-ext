@@ -77,12 +77,20 @@ const packageTasks = (cacheInputs: CacheInputs): RunTasks => {
 /** The slice of a package's `package.json` the bundle's entries come from. */
 interface PackageManifest {
   readonly exports: { readonly [subpath: string]: string };
+  /** Each bin's workspace source (the kit package's `effect-drizzle-kit`). */
+  readonly bin?: { readonly [name: string]: string };
   readonly publishConfig: {
     readonly exports: {
       readonly [subpath: string]: { readonly types: string; readonly default: string };
     };
+    /** Each bin's published `dist/` file, built from the workspace `bin` of the same name. */
+    readonly bin?: { readonly [name: string]: string };
   };
 }
+
+/** A `dist/` target's entry name: its path under `dist/`, without the extension. */
+const entryName = (target: string): string =>
+  target.replace(/^\.\/dist\//, "").replace(/\.js$/, "");
 
 /**
  * The native TypeScript 7 binary (`@typescript/native`, the same compiler
@@ -100,19 +108,23 @@ const tsgoPath = (): string => {
 
 /**
  * The `vp pack` config for a package (effect-drizzle-ext#88): one entry per
- * `publishConfig.exports` subpath, named after its `dist/` path so the
+ * `publishConfig.exports` subpath and per `publishConfig.bin` (built from the
+ * workspace `bin` of the same name; tsdown keeps its `#!` line), named after its `dist/` path so the
  * published exports map stays as it was, and built from the workspace export
  * of the same subpath. Declarations come from the native compiler over
  * `tsconfig.build.json` and are then bundled, so the dist-consumer check
  * (`tests/dist-consumer`) asserts the bundled output.
  */
 const packageBuild = (manifest: PackageManifest): PackUserConfig => ({
-  entry: R.fromEntries(
-    R.toEntries(manifest.publishConfig.exports).map(([subpath, target]) => [
-      target.default.replace(/^\.\/dist\//, "").replace(/\.js$/, ""),
-      manifest.exports[subpath],
-    ]),
-  ),
+  entry: R.fromEntries([
+    ...R.toEntries(manifest.publishConfig.exports).map(
+      ([subpath, target]) => [entryName(target.default), manifest.exports[subpath]] as const,
+    ),
+    ...R.toEntries(manifest.publishConfig.bin ?? {}).flatMap(([name, target]) => {
+      const source = manifest.bin?.[name];
+      return source === undefined ? [] : [[entryName(target), source] as const];
+    }),
+  ]),
   format: "esm",
   platform: "neutral",
   sourcemap: true,

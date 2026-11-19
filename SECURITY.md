@@ -8,7 +8,7 @@ You can expect an initial response within a few days. Please include a descripti
 
 ## Supply-chain hardening
 
-Both packages are published by an automated pipeline built to resist supply-chain attacks (e.g. self-propagating npm worms that steal credentials and publish trojanized versions):
+Every package is published by an automated pipeline built to resist supply-chain attacks (e.g. self-propagating npm worms that steal credentials and publish trojanized versions):
 
 - **No long-lived npm token.** Releases use npm [**OIDC trusted publishing**](https://docs.npmjs.com/trusted-publishers): GitHub Actions proves its identity to npm with a short-lived, workflow-bound OIDC token. There is no `NPM_TOKEN` secret to steal from CI.
 - **Provenance.** Once the source repository is public, npm attaches [provenance](https://docs.npmjs.com/generating-provenance-statements) to every version the release workflow publishes, linking the artifact to the exact source commit and workflow. It is never forced, because forcing it fails from a private repository.

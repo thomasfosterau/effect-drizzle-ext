@@ -26,13 +26,13 @@
 # `publishConfig` applied (the `dist/` exports map), and `npm publish
 # <tarball>` publishes exactly that file.
 #
-# Packages are published in dependency order (core before pg), so the pg
-# package's `@thomasfosterau/effect-drizzle-ext` dependency always resolves.
+# Packages are published in dependency order (core, pg, kit), so each
+# package's workspace dependency on the one before it always resolves.
 # A version already on the registry is skipped, which makes a re-run after a
 # partial failure safe.
 set -euo pipefail
 
-PACKAGES=(packages/core packages/pg)
+PACKAGES=(packages/core packages/pg packages/kit)
 
 npm_version="$(npm --version)"
 # Only the real publish needs the OIDC-capable client.

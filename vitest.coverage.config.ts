@@ -16,7 +16,11 @@ import { defineConfig } from "vite-plus";
 
 export default defineConfig({
   test: {
-    projects: ["packages/core/vite.config.ts", "packages/pg/vite.config.ts"],
+    projects: [
+      "packages/core/vite.config.ts",
+      "packages/pg/vite.config.ts",
+      "packages/kit/vite.config.ts",
+    ],
     coverage: {
       provider: "istanbul",
       reporter: ["text-summary", "json"],

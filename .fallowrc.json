@@ -18,6 +18,8 @@
     "packages/pg/src/migrations.ts",
     "packages/pg/src/testing.ts",
     "packages/pg/src/tooling/index.ts",
+    "packages/kit/src/index.ts",
+    "packages/kit/src/bin.ts",
     "packages/*/tests/**/*.test.ts",
     "packages/pg/tests/integration/global-setup.ts",
     "packages/pg/vitest.integration.config.ts",
@@ -61,11 +63,13 @@
     "zones": [
       { "name": "core", "patterns": ["packages/core/**"] },
       { "name": "pg", "patterns": ["packages/pg/**"] },
+      { "name": "kit", "patterns": ["packages/kit/**"] },
       { "name": "dist-consumer", "patterns": ["tests/dist-consumer/**"] }
     ],
     "rules": [
       { "from": "core", "allow": [] },
       { "from": "pg", "allow": ["core"] },
+      { "from": "kit", "allow": ["pg"] },
       { "from": "dist-consumer", "allow": ["core", "pg"] }
     ]
   },

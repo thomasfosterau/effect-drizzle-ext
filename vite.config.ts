@@ -301,11 +301,12 @@ export default defineConfig({
         dependsOn: [
           "@thomasfosterau/effect-drizzle-ext#check",
           "@thomasfosterau/effect-drizzle-ext-pg#check",
+          "@thomasfosterau/effect-drizzle-ext-kit#check",
           "@effect-drizzle-ext/dist-consumer#check",
         ],
         cache: false,
       },
-      // Both packages' unit suites under one Istanbul map at
+      // Every package's unit suite under one Istanbul map at
       // `coverage/coverage-final.json`, the map `fallow audit` reads
       // (`.fallowrc.json` → `health.coverage`); see vitest.coverage.config.ts.
       // Not a CI step: run it before the fallow gate (AGENTS.md →
@@ -322,6 +323,7 @@ export default defineConfig({
         dependsOn: [
           "@thomasfosterau/effect-drizzle-ext#docgen",
           "@thomasfosterau/effect-drizzle-ext-pg#docgen",
+          "@thomasfosterau/effect-drizzle-ext-kit#docgen",
         ],
         cache: false,
       },
