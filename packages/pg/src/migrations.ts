@@ -56,58 +56,54 @@ export const splitStatements = (sql: string): ReadonlyArray<string> =>
  * Every migration under `dir`, in apply order (directory-name order). Only
  * directories count; one with no `migration.sql` is skipped.
  */
-export const readMigrations = (
+export const readMigrations = Effect.fn("Migrations.readMigrations")(function* (
   dir: string,
-): Effect.Effect<ReadonlyArray<Migration>, PlatformError, FileSystem.FileSystem | Path.Path> =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const names = Arr.sort(yield* fs.readDirectory(dir), Order.String);
-    const read = yield* Effect.forEach(
-      names,
-      (name) =>
-        Effect.gen(function* () {
-          const info = yield* fs.stat(path.join(dir, name));
-          if (info.type !== "Directory") return [];
-          const file = path.join(dir, name, "migration.sql");
-          if (!(yield* fs.exists(file))) return [];
-          const sql = yield* fs.readFileString(file);
-          return [{ name, statements: splitStatements(sql) }];
-        }),
-      { concurrency: 1 },
-    );
-    return read.flat();
-  });
+): Effect.fn.Return<ReadonlyArray<Migration>, PlatformError, FileSystem.FileSystem | Path.Path> {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const names = Arr.sort(yield* fs.readDirectory(dir), Order.String);
+  const read = yield* Effect.forEach(
+    names,
+    (name) =>
+      Effect.gen(function* () {
+        const info = yield* fs.stat(path.join(dir, name));
+        if (info.type !== "Directory") return [];
+        const file = path.join(dir, name, "migration.sql");
+        if (!(yield* fs.exists(file))) return [];
+        const sql = yield* fs.readFileString(file);
+        return [{ name, statements: splitStatements(sql) }];
+      }),
+    { concurrency: 1 },
+  );
+  return read.flat();
+});
 
 /**
  * Apply `migrations` in order on the ambient `SqlClient`, each inside its own
  * transaction, returning how many ran. Stops at the first failure with a
  * {@link MigrationError} naming the migration.
  */
-export const applyMigrationList = (
+export const applyMigrationList = Effect.fn("Migrations.applyMigrationList")(function* (
   migrations: ReadonlyArray<Migration>,
-): Effect.Effect<number, MigrationError, SqlClient> =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient;
-    yield* Effect.forEach(
-      migrations,
-      (migration) =>
-        sql
-          .withTransaction(
-            // In order, one at a time: a migration's statements depend on each other.
-            Effect.forEach(migration.statements, (statement) => sql.unsafe(statement), {
-              concurrency: 1,
-              discard: true,
-            }),
-          )
-          .pipe(
-            Effect.mapError((cause) => new MigrationError({ migration: migration.name, cause })),
-          ),
-      // Strictly sequential: a later migration may depend on an earlier one.
-      { concurrency: 1, discard: true },
-    );
-    return migrations.length;
-  });
+): Effect.fn.Return<number, MigrationError, SqlClient> {
+  const sql = yield* SqlClient;
+  yield* Effect.forEach(
+    migrations,
+    (migration) =>
+      sql
+        .withTransaction(
+          // In order, one at a time: a migration's statements depend on each other.
+          Effect.forEach(migration.statements, (statement) => sql.unsafe(statement), {
+            concurrency: 1,
+            discard: true,
+          }),
+        )
+        .pipe(Effect.mapError((cause) => new MigrationError({ migration: migration.name, cause }))),
+    // Strictly sequential: a later migration may depend on an earlier one.
+    { concurrency: 1, discard: true },
+  );
+  return migrations.length;
+});
 
 /**
  * Apply every migration under `dir` to the (brand-new) database behind the

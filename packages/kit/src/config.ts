@@ -106,45 +106,48 @@ export interface LoadedConfig {
  * and check its default export. Fails with {@link KitConfigError} naming the
  * file when it is missing, throws while importing, or exports the wrong shape.
  */
-export const loadConfig = (
+export const loadConfig = Effect.fn("KitConfig.loadConfig")(function* (
   file: string,
-): Effect.Effect<LoadedConfig, KitConfigError | PlatformError, FileSystem.FileSystem | Path.Path> =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const absolute = path.resolve(file);
-    if (!(yield* fs.exists(absolute))) {
-      return yield* new KitConfigError({
-        file: absolute,
-        reason: `no config file; create one whose default export is defineConfig({ … }), or pass --config.`,
-        cause: undefined,
-      });
-    }
-    const url = yield* path
-      .toFileUrl(absolute)
-      .pipe(
-        Effect.mapError(
-          (cause) => new KitConfigError({ file: absolute, reason: "not a file path", cause }),
-        ),
-      );
-    const imported: unknown = yield* Effect.tryPromise({
-      try: () => import(url.href),
-      catch: (cause) =>
-        new KitConfigError({
-          file: absolute,
-          reason: `failed to import: ${P.isError(cause) ? cause.message : String(cause)}`,
-          cause,
-        }),
+): Effect.fn.Return<
+  LoadedConfig,
+  KitConfigError | PlatformError,
+  FileSystem.FileSystem | Path.Path
+> {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const absolute = path.resolve(file);
+  if (!(yield* fs.exists(absolute))) {
+    return yield* new KitConfigError({
+      file: absolute,
+      reason: `no config file; create one whose default export is defineConfig({ … }), or pass --config.`,
+      cause: undefined,
     });
-    const loaded = yield* Schema.decodeUnknownEffect(ConfigModule)(imported).pipe(
+  }
+  const url = yield* path
+    .toFileUrl(absolute)
+    .pipe(
       Effect.mapError(
-        (cause) =>
-          new KitConfigError({
-            file: absolute,
-            reason: `its default export isn't a defineConfig({ … }) config:\n${cause.message}`,
-            cause,
-          }),
+        (cause) => new KitConfigError({ file: absolute, reason: "not a file path", cause }),
       ),
     );
-    return { file: absolute, dir: path.dirname(absolute), config: loaded.default };
+  const imported: unknown = yield* Effect.tryPromise({
+    try: () => import(url.href),
+    catch: (cause) =>
+      new KitConfigError({
+        file: absolute,
+        reason: `failed to import: ${P.isError(cause) ? cause.message : String(cause)}`,
+        cause,
+      }),
   });
+  const loaded = yield* Schema.decodeUnknownEffect(ConfigModule)(imported).pipe(
+    Effect.mapError(
+      (cause) =>
+        new KitConfigError({
+          file: absolute,
+          reason: `its default export isn't a defineConfig({ … }) config:\n${cause.message}`,
+          cause,
+        }),
+    ),
+  );
+  return { file: absolute, dir: path.dirname(absolute), config: loaded.default };
+});

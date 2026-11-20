@@ -346,36 +346,35 @@ const toEntry = (dir: string, raw: ParsedSnapshot): ReadSnapshot => ({
  * hand-written bootstrap) is listed but carries no entry — exactly like
  * alchemy's `readLatestSnapshot`.
  */
-const readLocal = (
+const readLocal = Effect.fn("Tooling.readLocal")(function* (
   migrationsDir: string,
-): Effect.Effect<
+): Effect.fn.Return<
   { readonly dirs: ReadonlyArray<string>; readonly entries: ReadonlyArray<ReadSnapshot> },
   MalformedSnapshot | PlatformError,
   FileSystem.FileSystem | Path.Path
-> =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const names = Arr.sort(
-      (yield* fs.readDirectory(migrationsDir)).filter((name) => MIGRATION_DIR.test(name)),
-      Order.String,
-    );
-    const dirs = yield* Effect.filter(names, (name) =>
-      Effect.map(fs.stat(path.join(migrationsDir, name)), (info) => info.type === "Directory"),
-    );
-    const entries = yield* Effect.forEach(
-      dirs,
-      (dir) =>
-        Effect.gen(function* () {
-          const file = path.join(migrationsDir, dir, "snapshot.json");
-          if (!(yield* fs.exists(file))) return [];
-          const raw = yield* parseSnapshot(file, yield* fs.readFileString(file));
-          return [toEntry(dir, raw)];
-        }),
-      { concurrency: 1 },
-    );
-    return { dirs, entries: entries.flat() };
-  });
+> {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const names = Arr.sort(
+    (yield* fs.readDirectory(migrationsDir)).filter((name) => MIGRATION_DIR.test(name)),
+    Order.String,
+  );
+  const dirs = yield* Effect.filter(names, (name) =>
+    Effect.map(fs.stat(path.join(migrationsDir, name)), (info) => info.type === "Directory"),
+  );
+  const entries = yield* Effect.forEach(
+    dirs,
+    (dir) =>
+      Effect.gen(function* () {
+        const file = path.join(migrationsDir, dir, "snapshot.json");
+        if (!(yield* fs.exists(file))) return [];
+        const raw = yield* parseSnapshot(file, yield* fs.readFileString(file));
+        return [toEntry(dir, raw)];
+      }),
+    { concurrency: 1 },
+  );
+  return { dirs, entries: entries.flat() };
+});
 
 /** Where the base branch's migrations are read from, through `git`. */
 export interface GitBase {
@@ -398,14 +397,13 @@ const gitOptions = (cwd: string): ChildProcess.CommandOptions => ({
   extendEnv: true,
 });
 
-const git = (
+const git = Effect.fn("Tooling.git")(function* (
   base: GitBase,
   args: ReadonlyArray<string>,
-): Effect.Effect<string, PlatformError, ChildProcessSpawner> =>
-  Effect.gen(function* () {
-    const spawner = yield* ChildProcessSpawner;
-    return yield* spawner.string(ChildProcess.make("git", [...args], gitOptions(base.cwd)));
-  });
+): Effect.fn.Return<string, PlatformError, ChildProcessSpawner> {
+  const spawner = yield* ChildProcessSpawner;
+  return yield* spawner.string(ChildProcess.make("git", [...args], gitOptions(base.cwd)));
+});
 
 /**
  * The latest-by-name base directory carrying a readable snapshot — the same
@@ -432,36 +430,30 @@ const findBaseHead = (
  * it reflects the base's CURRENT tip. Fetches the base first when the
  * checkout lacks it (a shallow pull-request checkout does).
  */
-export const readBaseMigrations = (
+export const readBaseMigrations = Effect.fn("Tooling.readBaseMigrations")(function* (
   base: GitBase,
-): Effect.Effect<BaseMigrations, PlatformError, ChildProcessSpawner> =>
-  Effect.gen(function* () {
-    const spawner = yield* ChildProcessSpawner;
-    const present = yield* spawner.exitCode(
-      ChildProcess.make(
-        "git",
-        ["rev-parse", "--verify", "--quiet", `${base.ref}^{commit}`],
-        gitOptions(base.cwd),
-      ),
-    );
-    if (present !== 0) {
-      yield* git(base, ["fetch", "--depth=1", "origin", base.ref.replace(/^origin\//, "")]);
-    }
-    const listing = yield* git(base, [
-      "ls-tree",
-      "--name-only",
-      base.ref,
-      `${base.migrationsPath}/`,
-    ]);
-    const dirs = Arr.sort(
-      listing
-        .split("\n")
-        .map((line) => line.trim().split("/").at(-1) ?? "")
-        .filter((name) => MIGRATION_DIR.test(name)),
-      Order.String,
-    );
-    return { ref: base.ref, dirs, head: yield* findBaseHead(base, dirs) };
-  });
+): Effect.fn.Return<BaseMigrations, PlatformError, ChildProcessSpawner> {
+  const spawner = yield* ChildProcessSpawner;
+  const present = yield* spawner.exitCode(
+    ChildProcess.make(
+      "git",
+      ["rev-parse", "--verify", "--quiet", `${base.ref}^{commit}`],
+      gitOptions(base.cwd),
+    ),
+  );
+  if (present !== 0) {
+    yield* git(base, ["fetch", "--depth=1", "origin", base.ref.replace(/^origin\//, "")]);
+  }
+  const listing = yield* git(base, ["ls-tree", "--name-only", base.ref, `${base.migrationsPath}/`]);
+  const dirs = Arr.sort(
+    listing
+      .split("\n")
+      .map((line) => line.trim().split("/").at(-1) ?? "")
+      .filter((name) => MIGRATION_DIR.test(name)),
+    Order.String,
+  );
+  return { ref: base.ref, dirs, head: yield* findBaseHead(base, dirs) };
+});
 
 // ── 2. Zero drift ───────────────────────────────────────────────────────
 
@@ -474,73 +466,72 @@ export const readBaseMigrations = (
 const isAmbiguousDiff = (cause: unknown): boolean =>
   P.isError(cause) && cause.message.includes("was called without a HintsHandler");
 
-const checkZeroDrift = (
+const checkZeroDrift = Effect.fn("Tooling.checkZeroDrift")(function* (
   schema: MigrationDriftOptions["schema"],
   entries: ReadonlyArray<ReadSnapshot>,
   latest: Option.Option<ReadSnapshot>,
   label: string,
-): Effect.Effect<ReadonlyArray<string>, SchemaDiffError> =>
-  Effect.gen(function* () {
-    const where = Option.match(latest, {
-      onNone: () => `${label} (no snapshot yet)`,
-      onSome: (entry) => `${label}/${entry.dir}/snapshot.json`,
-    });
-    // The state the latest snapshot records: a v8 snapshot is that state; a
-    // v9 one is rebuilt from the chain (every directory's snapshot, keyed by
-    // directory name, as drizzle-kit's own folder reader keys them).
-    const stateOf = (entry: ReadSnapshot): Option.Option<Effect.Effect<object, SchemaDiffError>> =>
-      isPostgresSnapshot(entry.raw)
-        ? Option.some(Effect.succeed(entry.raw))
-        : isChainSnapshot(entry.raw)
-          ? Option.some(
-              drizzleKit(() =>
-                reconstruct(
-                  R.fromEntries(Arr.map(entries, (each) => [each.dir, each.raw])),
-                  entry.snapshot.id,
-                ),
-              ),
-            )
-          : Option.none();
-    const prevState = Option.match(latest, {
-      onNone: () => Option.some(drizzleKit(() => generateDrizzleJson({}))),
-      onSome: stateOf,
-    });
-    if (Option.isNone(prevState)) {
-      return [
-        `${where} doesn't match a drizzle-kit snapshot contract \`generateMigration\` reads ` +
-          '(`version: "8"` with a `ddl` array, or `version: "9"` with `type` `base` / `diff`; `dialect: "postgres"`): a stale (pre-v8) or hand-edited snapshot.',
-      ];
-    }
-    const cur = yield* drizzleKit(() =>
-      generateDrizzleJson(
-        schema,
-        Option.getOrUndefined(Option.map(latest, (entry) => entry.snapshot.id)),
-      ),
-    );
-    const prev = yield* prevState.value;
-    return yield* drizzleKit(() => generateMigration(prev, cur)).pipe(
-      Effect.map((statements) =>
-        Arr.isReadonlyArrayNonEmpty(statements)
-          ? [
-              `Schema drift detected against the latest committed migration snapshot (${where}): ` +
-                `${statements.length} statement(s) would be generated:\n\n` +
-                statements.map((statement) => `  ${statement}`).join("\n") +
-                "\n\nFix: generate a migration (`drizzle-kit generate --name <slug>`) and commit it with its snapshot.",
-            ]
-          : [],
-      ),
-      Effect.catchTag("SchemaDiffError", ({ cause }) =>
-        isAmbiguousDiff(cause)
-          ? Effect.succeed([
-              `Schema drift detected against the latest committed migration snapshot (${where}), and ` +
-                "the diff is ambiguous: drizzle-kit found a created+deleted pair it would interactively " +
-                "ask to resolve as rename-or-recreate. An ambiguous diff is still a non-empty diff.\n" +
-                "Fix: generate a migration (`drizzle-kit generate --name <slug>`) and commit it with its snapshot.",
-            ])
-          : Effect.fail(new SchemaDiffError({ cause })),
-      ),
-    );
+): Effect.fn.Return<ReadonlyArray<string>, SchemaDiffError> {
+  const where = Option.match(latest, {
+    onNone: () => `${label} (no snapshot yet)`,
+    onSome: (entry) => `${label}/${entry.dir}/snapshot.json`,
   });
+  // The state the latest snapshot records: a v8 snapshot is that state; a
+  // v9 one is rebuilt from the chain (every directory's snapshot, keyed by
+  // directory name, as drizzle-kit's own folder reader keys them).
+  const stateOf = (entry: ReadSnapshot): Option.Option<Effect.Effect<object, SchemaDiffError>> =>
+    isPostgresSnapshot(entry.raw)
+      ? Option.some(Effect.succeed(entry.raw))
+      : isChainSnapshot(entry.raw)
+        ? Option.some(
+            drizzleKit(() =>
+              reconstruct(
+                R.fromEntries(Arr.map(entries, (each) => [each.dir, each.raw])),
+                entry.snapshot.id,
+              ),
+            ),
+          )
+        : Option.none();
+  const prevState = Option.match(latest, {
+    onNone: () => Option.some(drizzleKit(() => generateDrizzleJson({}))),
+    onSome: stateOf,
+  });
+  if (Option.isNone(prevState)) {
+    return [
+      `${where} doesn't match a drizzle-kit snapshot contract \`generateMigration\` reads ` +
+        '(`version: "8"` with a `ddl` array, or `version: "9"` with `type` `base` / `diff`; `dialect: "postgres"`): a stale (pre-v8) or hand-edited snapshot.',
+    ];
+  }
+  const cur = yield* drizzleKit(() =>
+    generateDrizzleJson(
+      schema,
+      Option.getOrUndefined(Option.map(latest, (entry) => entry.snapshot.id)),
+    ),
+  );
+  const prev = yield* prevState.value;
+  return yield* drizzleKit(() => generateMigration(prev, cur)).pipe(
+    Effect.map((statements) =>
+      Arr.isReadonlyArrayNonEmpty(statements)
+        ? [
+            `Schema drift detected against the latest committed migration snapshot (${where}): ` +
+              `${statements.length} statement(s) would be generated:\n\n` +
+              statements.map((statement) => `  ${statement}`).join("\n") +
+              "\n\nFix: generate a migration (`drizzle-kit generate --name <slug>`) and commit it with its snapshot.",
+          ]
+        : [],
+    ),
+    Effect.catchTag("SchemaDiffError", ({ cause }) =>
+      isAmbiguousDiff(cause)
+        ? Effect.succeed([
+            `Schema drift detected against the latest committed migration snapshot (${where}), and ` +
+              "the diff is ambiguous: drizzle-kit found a created+deleted pair it would interactively " +
+              "ask to resolve as rename-or-recreate. An ambiguous diff is still a non-empty diff.\n" +
+              "Fix: generate a migration (`drizzle-kit generate --name <slug>`) and commit it with its snapshot.",
+          ])
+        : Effect.fail(new SchemaDiffError({ cause })),
+    ),
+  );
+});
 
 // ── The gate ────────────────────────────────────────────────────────────
 
@@ -599,26 +590,25 @@ export interface MigrationDriftReport {
  * }).pipe(Effect.provide(NodeServices.layer));
  * ```
  */
-export const checkMigrationDrift = (
+export const checkMigrationDrift = Effect.fn("Tooling.checkMigrationDrift")(function* (
   options: MigrationDriftOptions,
-): Effect.Effect<
+): Effect.fn.Return<
   MigrationDriftReport,
   MigrationDriftError | MalformedSnapshot | SchemaDiffError | PlatformError,
   FileSystem.FileSystem | Path.Path | ChildProcessSpawner
-> =>
-  Effect.gen(function* () {
-    const { dirs, entries } = yield* readLocal(options.migrationsDir);
-    const base = yield* Effect.transposeOption(
-      Option.map(options.base ?? Option.none(), readBaseMigrations),
-    );
-    const structural = [
-      ...checkDagIntegrity(entries),
-      ...Option.match(base, { onNone: () => [], onSome: (b) => checkBaseAncestry(entries, b) }),
-    ];
-    const latest = Arr.findFirst(entries.toReversed(), (entry) => dirs.includes(entry.dir));
-    const issues = Arr.isReadonlyArrayNonEmpty(structural)
-      ? structural
-      : yield* checkZeroDrift(options.schema, entries, latest, options.migrationsDir);
-    if (Arr.isReadonlyArrayNonEmpty(issues)) return yield* new MigrationDriftError({ issues });
-    return { snapshots: entries.length, baseRef: Option.map(base, (b) => b.ref) };
-  });
+> {
+  const { dirs, entries } = yield* readLocal(options.migrationsDir);
+  const base = yield* Effect.transposeOption(
+    Option.map(options.base ?? Option.none(), readBaseMigrations),
+  );
+  const structural = [
+    ...checkDagIntegrity(entries),
+    ...Option.match(base, { onNone: () => [], onSome: (b) => checkBaseAncestry(entries, b) }),
+  ];
+  const latest = Arr.findFirst(entries.toReversed(), (entry) => dirs.includes(entry.dir));
+  const issues = Arr.isReadonlyArrayNonEmpty(structural)
+    ? structural
+    : yield* checkZeroDrift(options.schema, entries, latest, options.migrationsDir);
+  if (Arr.isReadonlyArrayNonEmpty(issues)) return yield* new MigrationDriftError({ issues });
+  return { snapshots: entries.length, baseRef: Option.map(base, (b) => b.ref) };
+});

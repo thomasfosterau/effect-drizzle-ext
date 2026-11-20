@@ -214,27 +214,26 @@ export interface RecordedExtras {
  * {@link emptyExtrasState} when none does. A file that doesn't decode fails
  * with {@link MalformedExtrasState}.
  */
-export const readExtrasState = (
+export const readExtrasState = Effect.fn("Tooling.readExtrasState")(function* (
   migrationsDir: string,
-): Effect.Effect<
+): Effect.fn.Return<
   RecordedExtras,
   MalformedExtrasState | PlatformError,
   FileSystem.FileSystem | Path.Path
-> =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const names = Arr.sort(yield* fs.readDirectory(migrationsDir), Order.String).toReversed();
-    const dir = yield* Effect.findFirst(names, (name) =>
-      fs.exists(path.join(migrationsDir, name, EXTRAS_STATE_FILE)),
-    );
-    if (Option.isNone(dir)) return { dir, state: emptyExtrasState };
-    const file = path.join(migrationsDir, dir.value, EXTRAS_STATE_FILE);
-    const state = yield* Schema.decodeEffect(ExtrasStateJson)(yield* fs.readFileString(file)).pipe(
-      Effect.mapError((cause) => new MalformedExtrasState({ file, cause })),
-    );
-    return { dir, state };
-  });
+> {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const names = Arr.sort(yield* fs.readDirectory(migrationsDir), Order.String).toReversed();
+  const dir = yield* Effect.findFirst(names, (name) =>
+    fs.exists(path.join(migrationsDir, name, EXTRAS_STATE_FILE)),
+  );
+  if (Option.isNone(dir)) return { dir, state: emptyExtrasState };
+  const file = path.join(migrationsDir, dir.value, EXTRAS_STATE_FILE);
+  const state = yield* Schema.decodeEffect(ExtrasStateJson)(yield* fs.readFileString(file)).pipe(
+    Effect.mapError((cause) => new MalformedExtrasState({ file, cause })),
+  );
+  return { dir, state };
+});
 
 // ── The plan (pure) ─────────────────────────────────────────────────────
 
@@ -511,47 +510,46 @@ export interface GeneratedExtrasMigration {
   readonly statements: ReadonlyArray<string>;
 }
 
-const runDrizzleKit = (
+const runDrizzleKit = Effect.fn("Tooling.runDrizzleKit")(function* (
   options: GenerateExtrasOptions,
-): Effect.Effect<string, DrizzleKitError | PlatformError, ChildProcessSpawner> =>
-  Effect.gen(function* () {
-    const spawner = yield* ChildProcessSpawner;
-    const [bin, ...prefix] = options.command ?? ["drizzle-kit"];
-    const target =
-      "config" in options.drizzleKit
-        ? ["--config", options.drizzleKit.config]
-        : [
-            "--dialect",
-            "postgresql",
-            "--schema",
-            options.drizzleKit.schema,
-            "--out",
-            options.migrationsDir,
-          ];
-    const args = [
-      ...prefix,
-      "generate",
-      "--custom",
-      "--name",
-      options.name,
-      ...target,
-      "--output",
-      "json",
-    ];
-    const output = yield* spawner.string(
-      ChildProcess.make(bin, args, options.cwd === undefined ? {} : { cwd: options.cwd }),
-      { includeStderr: false },
-    );
-    // `--output json` prints one JSON envelope line, last.
-    const envelope = Option.getOrElse(
-      Arr.findLast(output.split("\n"), (line) => Str.isNonEmpty(line.trim())),
-      () => "",
-    );
-    return yield* Schema.decodeEffect(GenerateOk)(envelope).pipe(
-      Effect.map((ok) => ok.migration_path),
-      Effect.mapError(() => new DrizzleKitError({ output })),
-    );
-  });
+): Effect.fn.Return<string, DrizzleKitError | PlatformError, ChildProcessSpawner> {
+  const spawner = yield* ChildProcessSpawner;
+  const [bin, ...prefix] = options.command ?? ["drizzle-kit"];
+  const target =
+    "config" in options.drizzleKit
+      ? ["--config", options.drizzleKit.config]
+      : [
+          "--dialect",
+          "postgresql",
+          "--schema",
+          options.drizzleKit.schema,
+          "--out",
+          options.migrationsDir,
+        ];
+  const args = [
+    ...prefix,
+    "generate",
+    "--custom",
+    "--name",
+    options.name,
+    ...target,
+    "--output",
+    "json",
+  ];
+  const output = yield* spawner.string(
+    ChildProcess.make(bin, args, options.cwd === undefined ? {} : { cwd: options.cwd }),
+    { includeStderr: false },
+  );
+  // `--output json` prints one JSON envelope line, last.
+  const envelope = Option.getOrElse(
+    Arr.findLast(output.split("\n"), (line) => Str.isNonEmpty(line.trim())),
+    () => "",
+  );
+  return yield* Schema.decodeEffect(GenerateOk)(envelope).pipe(
+    Effect.map((ok) => ok.migration_path),
+    Effect.mapError(() => new DrizzleKitError({ output })),
+  );
+});
 
 /**
  * Plan the declared extras against the recorded state and, when the plan has
@@ -579,41 +577,40 @@ const runDrizzleKit = (
  * }).pipe(Effect.provide(NodeServices.layer));
  * ```
  */
-export const generateExtrasMigration = (
+export const generateExtrasMigration = Effect.fn("Tooling.generateExtrasMigration")(function* (
   options: GenerateExtrasOptions,
-): Effect.Effect<
+): Effect.fn.Return<
   Option.Option<GeneratedExtrasMigration>,
   ExtrasError | MalformedExtrasState | DrizzleKitError | PlatformError,
   FileSystem.FileSystem | Path.Path | ChildProcessSpawner
-> =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const { state } = yield* readExtrasState(options.migrationsDir);
-    const next = toExtrasState(options.extras);
-    const plan = planExtras(state, next);
-    if (Arr.isReadonlyArrayNonEmpty(plan.issues)) {
-      return yield* new ExtrasError({ issues: plan.issues });
-    }
-    if (!Arr.isReadonlyArrayNonEmpty(plan.statements)) return Option.none();
-    const migrationPath = yield* runDrizzleKit(options);
-    const base = options.cwd ?? path.resolve(".");
-    const dir = path.dirname(path.resolve(base, migrationPath));
-    if (path.dirname(dir) !== path.resolve(base, options.migrationsDir)) {
-      return yield* new DrizzleKitError({
-        output: `drizzle-kit wrote ${migrationPath}, outside the migrations directory ${options.migrationsDir}; its config's \`out\` must be that directory.`,
-      });
-    }
-    yield* fs.writeFileString(
-      path.join(dir, "migration.sql"),
-      renderExtrasMigration(plan.statements),
-    );
-    yield* fs.writeFileString(
-      path.join(dir, EXTRAS_STATE_FILE),
-      `${yield* Schema.encodeEffect(Schema.fromJsonString(ExtrasState, { space: 2 }))(next).pipe(Effect.orDie)}\n`,
-    );
-    return Option.some({ dir, statements: plan.statements });
-  });
+> {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const { state } = yield* readExtrasState(options.migrationsDir);
+  const next = toExtrasState(options.extras);
+  const plan = planExtras(state, next);
+  if (Arr.isReadonlyArrayNonEmpty(plan.issues)) {
+    return yield* new ExtrasError({ issues: plan.issues });
+  }
+  if (!Arr.isReadonlyArrayNonEmpty(plan.statements)) return Option.none();
+  const migrationPath = yield* runDrizzleKit(options);
+  const base = options.cwd ?? path.resolve(".");
+  const dir = path.dirname(path.resolve(base, migrationPath));
+  if (path.dirname(dir) !== path.resolve(base, options.migrationsDir)) {
+    return yield* new DrizzleKitError({
+      output: `drizzle-kit wrote ${migrationPath}, outside the migrations directory ${options.migrationsDir}; its config's \`out\` must be that directory.`,
+    });
+  }
+  yield* fs.writeFileString(
+    path.join(dir, "migration.sql"),
+    renderExtrasMigration(plan.statements),
+  );
+  yield* fs.writeFileString(
+    path.join(dir, EXTRAS_STATE_FILE),
+    `${yield* Schema.encodeEffect(Schema.fromJsonString(ExtrasState, { space: 2 }))(next).pipe(Effect.orDie)}\n`,
+  );
+  return Option.some({ dir, statements: plan.statements });
+});
 
 // ── The gate ────────────────────────────────────────────────────────────
 
@@ -662,24 +659,23 @@ export interface ExtrasDriftOptions {
  * }).pipe(Effect.provide(NodeServices.layer));
  * ```
  */
-export const checkExtrasDrift = (
+export const checkExtrasDrift = Effect.fn("Tooling.checkExtrasDrift")(function* (
   options: ExtrasDriftOptions,
-): Effect.Effect<
+): Effect.fn.Return<
   Option.Option<string>,
   ExtrasDriftError | ExtrasError | MalformedExtrasState | PlatformError,
   FileSystem.FileSystem | Path.Path
-> =>
-  Effect.gen(function* () {
-    const recorded = yield* readExtrasState(options.migrationsDir);
-    const plan = planExtras(recorded.state, toExtrasState(options.extras));
-    if (Arr.isReadonlyArrayNonEmpty(plan.issues)) {
-      return yield* new ExtrasError({ issues: plan.issues });
-    }
-    if (Arr.isReadonlyArrayNonEmpty(plan.statements)) {
-      return yield* new ExtrasDriftError({
-        recordedIn: recorded.dir,
-        statements: plan.statements,
-      });
-    }
-    return recorded.dir;
-  });
+> {
+  const recorded = yield* readExtrasState(options.migrationsDir);
+  const plan = planExtras(recorded.state, toExtrasState(options.extras));
+  if (Arr.isReadonlyArrayNonEmpty(plan.issues)) {
+    return yield* new ExtrasError({ issues: plan.issues });
+  }
+  if (Arr.isReadonlyArrayNonEmpty(plan.statements)) {
+    return yield* new ExtrasDriftError({
+      recordedIn: recorded.dir,
+      statements: plan.statements,
+    });
+  }
+  return recorded.dir;
+});
