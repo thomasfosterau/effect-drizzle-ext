@@ -6,12 +6,10 @@
  * @module packages/pg/tests/integration/view-oracle
  */
 
-import * as NodeServices from "@effect/platform-node/NodeServices";
 import { executeRows } from "@thomasfosterau/effect-drizzle-ext/query";
 import { sql, type SQL } from "drizzle-orm";
 import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
-import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
 import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
@@ -27,24 +25,30 @@ const FIXTURE_MIGRATIONS = `${import.meta.dirname}/../fixtures/migrations`;
  * `CREATE VIEW` in the fixture chain before that migration, as the `(select
  * …)` body, keyed by view name.
  */
-export const viewsBefore = async (migration: string): Promise<Readonly<Record<string, string>>> => {
-  const files = ManagedRuntime.make(NodeServices.layer);
-  const migrations = await files.runPromise(readMigrations(FIXTURE_MIGRATIONS));
-  await files.dispose();
-  const before = Arr.takeWhile(migrations, (entry) => entry.name !== migration);
-  return R.fromEntries(
-    Arr.flatMap(before, (entry) =>
-      Arr.flatMap(entry.statements, (statement) =>
-        Arr.fromOption(
-          Option.map(
-            Option.fromNullishOr(/^CREATE VIEW "ontology"\."(\w+)" AS (.*);$/s.exec(statement)),
-            (match): [string, string] => [match[1] ?? "", match[2] ?? ""],
+export type ViewDefinitions = Readonly<Record<string, string>>;
+
+export const viewsBefore = (migration: string) =>
+  readMigrations(FIXTURE_MIGRATIONS).pipe(
+    Effect.map((migrations): ViewDefinitions => {
+      const before = Arr.takeWhile(migrations, (entry) => entry.name !== migration);
+      return R.fromEntries(
+        Arr.flatMap(before, (entry) =>
+          Arr.flatMap(entry.statements, (statement) =>
+            Arr.fromOption(
+              Option.map(
+                Option.fromNullishOr(/^CREATE VIEW "ontology"\."(\w+)" AS (.*);$/s.exec(statement)),
+                (match): [string, string] => [match[1] ?? "", match[2] ?? ""],
+              ),
+            ),
           ),
         ),
-      ),
-    ),
+      );
+    }),
   );
-};
+
+/** `name`'s definition in `views`; empty for a view the chain never defined. */
+export const viewOf = (views: ViewDefinitions, name: string): string =>
+  Option.getOrElse(R.get(views, name), () => "");
 
 /** One node of `EXPLAIN (FORMAT JSON)`'s plan tree: the fields the plan specs read. */
 export interface PlanNode {

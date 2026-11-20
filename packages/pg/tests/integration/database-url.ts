@@ -1,11 +1,13 @@
 /**
  * The integration specs' one read of the database URL the global setup
  * provisioned (`DATABASE_URL_TEST`, else an explicit `DATABASE_URL`), through
- * Effect `Config` rather than `process.env`, so the specs' runtimes own it.
+ * Effect `Config` rather than `process.env`, and the `@effect/vitest` block
+ * every spec's `it.effect` runs in.
  *
  * @module packages/pg/tests/integration/database-url
  */
 
+import { layer } from "@effect/vitest";
 import type { AnyRelations } from "drizzle-orm/relations";
 import * as Config from "effect/Config";
 import * as Effect from "effect/Effect";
@@ -29,3 +31,40 @@ export const integrationDatabaseLayer = <Relations extends AnyRelations, Key ext
   database: Pick<PgDatabase<Relations, Key>, "layer">,
 ): Layer.Layer<Key, SqlError> =>
   Layer.unwrap(Effect.map(testDatabaseUrl, (url) => testDatabaseLayer(database, { url })));
+
+/**
+ * An `@effect/vitest` `layer` block over {@link integrationDatabaseLayer}: one
+ * pool for the block's specs, built before the first and closed after the
+ * last, with `setup` (committed DDL a block needs before its first spec, or
+ * services its specs read) built once against it. A live database runs on the
+ * live clock, so the test services are left out.
+ */
+export const integrationLayerWith = <Relations extends AnyRelations, Key extends string, ROut, E>(
+  database: Pick<PgDatabase<Relations, Key>, "layer">,
+  setup: Layer.Layer<ROut, E, Key>,
+) =>
+  layer(Layer.provideMerge(setup, integrationDatabaseLayer(database)), {
+    excludeTestServices: true,
+  });
+
+/** {@link integrationLayerWith} with nothing to set up. */
+export const integrationLayer = <Relations extends AnyRelations, Key extends string>(
+  database: Pick<PgDatabase<Relations, Key>, "layer">,
+) => integrationLayerWith(database, Layer.empty);
+
+/**
+ * A second pool on the provisioned database, open for the spec's scope: a
+ * connection of its own, for specs that race two committing transactions.
+ * Built in a fresh memo map, since a block's would hand back its own pool.
+ */
+export const separateDatabase = <Relations extends AnyRelations, Key extends string>(
+  database: Pick<PgDatabase<Relations, Key>, "layer">,
+) =>
+  Effect.gen(function* () {
+    const memoMap = yield* Layer.makeMemoMap;
+    return yield* Layer.buildWithMemoMap(
+      integrationDatabaseLayer(database),
+      memoMap,
+      yield* Effect.scope,
+    );
+  });

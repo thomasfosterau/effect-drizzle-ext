@@ -27,17 +27,21 @@
  * @module packages/pg/tests/integration/tree-view-heads
  */
 
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { sql } from "drizzle-orm";
 import * as Arr from "effect/Array";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
-import * as ManagedRuntime from "effect/ManagedRuntime";
-import * as Option from "effect/Option";
-import * as R from "effect/Record";
 import * as Str from "effect/String";
-import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
-import { integrationDatabaseLayer } from "./database-url.ts";
-import { aggregates, viewOracle, viewsBefore } from "./view-oracle.ts";
+import { describe, expect } from "vite-plus/test";
+import { integrationLayerWith } from "./database-url.ts";
+import {
+  aggregates,
+  type ViewDefinitions,
+  viewOf,
+  viewOracle,
+  viewsBefore,
+} from "./view-oracle.ts";
 import { makePgDatabase } from "../../src/index.ts";
 import { makeTestTransaction } from "../../src/testing.ts";
 import { ontologyViews } from "../fixtures/schema.ts";
@@ -46,8 +50,7 @@ const database = makePgDatabase({ relations: {}, key: "Database" });
 const { CurrentTransaction } = database;
 const { difference, execAll, explain } = viewOracle(database);
 
-const runtime = ManagedRuntime.make(integrationDatabaseLayer(database));
-const { runInTestTransaction } = makeTestTransaction(database);
+const { inTestTransaction } = makeTestTransaction(database);
 
 /** The migration that replaced the `max` head with the anti-join. */
 const ANTI_JOIN_MIGRATION = "20261112160706_view-head-antijoin";
@@ -58,25 +61,14 @@ const MAX_HEAD = `from "ontology"."node_version" group by "ontology"."node_versi
 /**
  * Each fixture view's definition as it stood before the anti-join: its last
  * `CREATE VIEW` in the chain before {@link ANTI_JOIN_MIGRATION}, as the
- * `(select …)` body. Read once from the committed migrations.
+ * `(select …)` body, read from the committed migrations.
  */
-let trunkViews: Readonly<Record<string, string>> = {};
-
-beforeAll(async () => {
-  trunkViews = await viewsBefore(ANTI_JOIN_MIGRATION);
-});
-
-afterAll(() => runtime.dispose());
-
-/**
- * A view's pre-anti-join definition; empty for a view the chain never defined, which
- * the specs' `toContain` on the old `max` head then reports.
- */
-const trunkView = (name: string): string => Option.getOrElse(R.get(trunkViews, name), () => "");
+const trunkViews = viewsBefore(ANTI_JOIN_MIGRATION);
 
 /** The pre-anti-join `asOf`: the trunk leaf view with its `max` head bounded by `where`. */
-const trunkAsOf = (leaf: string, where: string): string => {
-  const view = trunkView(`${leaf}_view`);
+const trunkAsOf = (views: ViewDefinitions, leaf: string, where: string): string => {
+  // Empty for a view the chain never defined, which the `toContain` then reports.
+  const view = viewOf(views, `${leaf}_view`);
   expect(view).toContain(MAX_HEAD);
   return Str.replace(
     MAX_HEAD,
@@ -281,81 +273,6 @@ const TIME_POINTS: ReadonlyArray<{ readonly iso: string; readonly nonEmpty: Read
 
 const date = (iso: string) => DateTime.toDateUtc(DateTime.makeUnsafe(iso));
 
-describe("view heads: the anti-join returns exactly the max head's rows", () => {
-  it("for every view kind at the head", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seedHistories;
-        const results = yield* Effect.forEach(
-          VIEWS,
-          (view) =>
-            Effect.map(
-              difference(sql.raw(`select * from ontology.${view}`), trunkView(view)),
-              (result) => [view, result] as const,
-            ),
-          { concurrency: 1 },
-        );
-        Arr.forEach(results, ([view, { rows, missing, extra }]) => {
-          // The oracle really is the old, grouped-max form; the view is not.
-          expect(trunkView(view)).toContain(`max("version") as "head_version"`);
-          expect({ view, missing, extra }).toEqual({ view, missing: 0, extra: 0 });
-          expect(rows, `${view} is non-empty, so the check is not vacuous`).toBeGreaterThan(0);
-        });
-      }),
-    );
-  });
-
-  it("for asOf at several versions and times", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seedHistories;
-        const byVersion = Arr.flatMap(LEAVES, (leaf) =>
-          Arr.map(VERSION_POINTS, ({ version, nonEmpty }) => ({
-            expectNonEmpty: Arr.contains(nonEmpty, leaf),
-            label: `${leaf} at version ${version}`,
-            query: sql`select * from ${ontologyViews.asOf(leaf, { version })}`,
-            oracle: trunkAsOf(leaf, `"ontology"."node_version"."version" <= ${version}`),
-          })),
-        );
-        const byTime = Arr.flatMap(LEAVES, (leaf) =>
-          Arr.map(TIME_POINTS, ({ iso, nonEmpty }) => ({
-            expectNonEmpty: Arr.contains(nonEmpty, leaf),
-            label: `${leaf} at ${iso}`,
-            query: sql`select * from ${ontologyViews.asOf(leaf, { at: date(iso) })}`,
-            oracle: trunkAsOf(leaf, `"ontology"."node_version"."timestamp" <= '${iso}'`),
-          })),
-        );
-        const results = yield* Effect.forEach(
-          [...byVersion, ...byTime],
-          ({ label, query, oracle, expectNonEmpty }) =>
-            Effect.map(difference(query, oracle), (result) => ({
-              label,
-              expectNonEmpty,
-              ...result,
-            })),
-          { concurrency: 1 },
-        );
-        Arr.forEach(results, ({ label, rows, missing, extra, expectNonEmpty }) => {
-          expect({ label, missing, extra }).toEqual({ label, missing: 0, extra: 0 });
-          // Per point, so an empty == empty comparison cannot pass silently.
-          expect({ label, nonEmpty: (rows ?? 0) > 0 }).toEqual({ label, nonEmpty: expectNonEmpty });
-        });
-        // Tied versions: both are at the point, the higher is the head.
-        expect(yield* asOfHeads("book", { at: date(TIE) }, B6)).toEqual([[2, "update"]]);
-        // Backdated: v1 alone is visible, then both, and v1 is the head either way.
-        expect(yield* asOfHeads("book", { at: date("2026-01-15T00:00:00Z") }, B7)).toEqual([
-          [1, "update"],
-        ]);
-        expect(yield* asOfHeads("book", { at: date("2026-02-25T00:00:00Z") }, B7)).toEqual([
-          [1, "update"],
-        ]);
-      }),
-    );
-  });
-});
-
 /** `view`'s `(id, version, action)` rows for `id`, ordered. */
 const headsOf = Effect.fn("viewHeads.headsOf")(function* (view: string, id: string) {
   const tx = yield* CurrentTransaction;
@@ -380,74 +297,7 @@ const asOfHeads = Effect.fn("viewHeads.asOfHeads")(function* (
   return Arr.map(result.rows, (r) => [Number(r.version), r.action] as const);
 });
 
-describe("view heads: behaviour", () => {
-  it("drops a node whose head moved to another leaf from the old leaf's view, and shows it in the new", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seedHistories;
-        // Old leaf rows surviving at v0: a newer root version supersedes them.
-        expect(yield* headsOf("person_view", P2)).toEqual([]);
-        expect(yield* headsOf("organisation_view", P2)).toEqual([[1, "update"]]);
-        // A refine through the schema.
-        expect(yield* headsOf("person_view", P1)).toEqual([]);
-        expect(yield* headsOf("organisation_view", P1)).toEqual([[1, "update"]]);
-        // asOf before the move returns the old leaf's row.
-        expect(yield* asOfHeads("person", { version: 0n }, P2)).toEqual([[0, "create"]]);
-        expect(yield* asOfHeads("person", { at: date("2026-01-15T00:00:00Z") }, P2)).toEqual([
-          [0, "create"],
-        ]);
-        expect(yield* asOfHeads("organisation", { version: 0n }, P2)).toEqual([]);
-      }),
-    );
-  });
-
-  it("shows a deleted head with action 'delete' on the leaf, branch, keyed and pointer views", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seedHistories;
-        expect(yield* headsOf("book_view", B2)).toEqual([[1, "delete"]]);
-        expect(yield* headsOf("work_view", B2)).toEqual([[1, "delete"]]);
-        expect(yield* headsOf("work_view", E3)).toEqual([[1, "delete"]]);
-        expect(yield* headsOf("essay_locale_view", E3)).toEqual([[1, "delete"]]);
-        // The pointer names v0; `action` is the head's, so the tombstone shows.
-        expect(yield* headsOf("book_live_view", B2)).toEqual([[0, "delete"]]);
-        expect(yield* headsOf("essay_live_view", E3)).toEqual([[0, "delete"]]);
-        expect(yield* headsOf("essay_locale_live_view", E3)).toEqual([[0, "delete"]]);
-        // Restored after the delete: the head is an update again.
-        expect(yield* headsOf("book_view", B3)).toEqual([[2, "update"]]);
-        expect(yield* headsOf("book_live_view", B3)).toEqual([[2, "update"]]);
-        // asOf before the delete returns the live row.
-        expect(yield* asOfHeads("book", { version: 0n }, B2)).toEqual([[0, "create"]]);
-        expect(yield* asOfHeads("book", { at: date("2026-01-15T00:00:00Z") }, B2)).toEqual([
-          [0, "create"],
-        ]);
-        expect(yield* asOfHeads("book", { version: 1n }, B3)).toEqual([[1, "delete"]]);
-      }),
-    );
-  });
-
-  it("fails closed on a head that skipped a level, and resolves the version before it with asOf", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seedHistories;
-        expect(yield* headsOf("book_view", B4)).toEqual([]);
-        expect(yield* headsOf("book_view", B5)).toEqual([]);
-        expect(yield* headsOf("work_view", B5)).toEqual([]);
-        // B4's v1 reached the work spine, but each arm joins its leaf too.
-        expect(yield* headsOf("work_view", B4)).toEqual([]);
-        // The pointer at v0 still resolves, `action` read off the gapped head.
-        expect(yield* headsOf("book_live_view", B4)).toEqual([[0, "update"]]);
-        expect(yield* asOfHeads("book", { version: 0n }, B4)).toEqual([[0, "create"]]);
-      }),
-    );
-  });
-});
-
 // ── Plans ────────────────────────────────────────────────────────────────
-
 const PROBE_INDEX = "work_version_title_probe";
 
 /**
@@ -470,50 +320,204 @@ const seedVolume = execAll([
   `ANALYZE ontology.node, ontology.node_version, ontology.work, ontology.work_version, ontology.book, ontology.book_version, ontology.essay, ontology.essay_version, ontology.essay_locale`,
 ]);
 
-describe("view heads: plans", () => {
-  // The integration suite runs in CI's single `ci` job, against its
-  // `pgvector/pgvector:pg17` service container (`.github/workflows/ci.yml`).
-  it("pages a leaf view through the leaf's index, with no aggregate over the root version table", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seedVolume;
-        const nodes = yield* explain(
-          "SELECT * FROM ontology.book_view ORDER BY title, id LIMIT 20",
-        );
-        expect(aggregates(nodes)).toEqual([]);
-        expect(Arr.some(nodes, (n) => n["Index Name"] === PROBE_INDEX)).toBe(true);
-        // Nothing sorts: the index supplies the order, so the LIMIT stops early.
-        expect(Arr.some(nodes, (n) => n["Node Type"] === "Sort")).toBe(false);
-      }),
+integrationLayerWith(
+  database,
+  NodeServices.layer,
+)((it) => {
+  describe("view heads: the anti-join returns exactly the max head's rows", () => {
+    it.effect("for every view kind at the head", () =>
+      inTestTransaction(
+        Effect.gen(function* () {
+          const views = yield* trunkViews;
+          yield* seedHistories;
+          const results = yield* Effect.forEach(
+            VIEWS,
+            (view) =>
+              Effect.map(
+                difference(sql.raw(`select * from ontology.${view}`), viewOf(views, view)),
+                (result) => [view, result] as const,
+              ),
+            { concurrency: 1 },
+          );
+          Arr.forEach(results, ([view, { rows, missing, extra }]) => {
+            // The oracle really is the old, grouped-max form; the view is not.
+            expect(viewOf(views, view)).toContain(`max("version") as "head_version"`);
+            expect({ view, missing, extra }).toEqual({ view, missing: 0, extra: 0 });
+            expect(rows, `${view} is non-empty, so the check is not vacuous`).toBeGreaterThan(0);
+          });
+        }),
+      ),
+    );
+
+    it.effect("for asOf at several versions and times", () =>
+      inTestTransaction(
+        Effect.gen(function* () {
+          const views = yield* trunkViews;
+          yield* seedHistories;
+          const byVersion = Arr.flatMap(LEAVES, (leaf) =>
+            Arr.map(VERSION_POINTS, ({ version, nonEmpty }) => ({
+              expectNonEmpty: Arr.contains(nonEmpty, leaf),
+              label: `${leaf} at version ${version}`,
+              query: sql`select * from ${ontologyViews.asOf(leaf, { version })}`,
+              oracle: trunkAsOf(views, leaf, `"ontology"."node_version"."version" <= ${version}`),
+            })),
+          );
+          const byTime = Arr.flatMap(LEAVES, (leaf) =>
+            Arr.map(TIME_POINTS, ({ iso, nonEmpty }) => ({
+              expectNonEmpty: Arr.contains(nonEmpty, leaf),
+              label: `${leaf} at ${iso}`,
+              query: sql`select * from ${ontologyViews.asOf(leaf, { at: date(iso) })}`,
+              oracle: trunkAsOf(views, leaf, `"ontology"."node_version"."timestamp" <= '${iso}'`),
+            })),
+          );
+          const results = yield* Effect.forEach(
+            [...byVersion, ...byTime],
+            ({ label, query, oracle, expectNonEmpty }) =>
+              Effect.map(difference(query, oracle), (result) => ({
+                label,
+                expectNonEmpty,
+                ...result,
+              })),
+            { concurrency: 1 },
+          );
+          Arr.forEach(results, ({ label, rows, missing, extra, expectNonEmpty }) => {
+            expect({ label, missing, extra }).toEqual({ label, missing: 0, extra: 0 });
+            // Per point, so an empty == empty comparison cannot pass silently.
+            expect({ label, nonEmpty: (rows ?? 0) > 0 }).toEqual({
+              label,
+              nonEmpty: expectNonEmpty,
+            });
+          });
+          // Tied versions: both are at the point, the higher is the head.
+          expect(yield* asOfHeads("book", { at: date(TIE) }, B6)).toEqual([[2, "update"]]);
+          // Backdated: v1 alone is visible, then both, and v1 is the head either way.
+          expect(yield* asOfHeads("book", { at: date("2026-01-15T00:00:00Z") }, B7)).toEqual([
+            [1, "update"],
+          ]);
+          expect(yield* asOfHeads("book", { at: date("2026-02-25T00:00:00Z") }, B7)).toEqual([
+            [1, "update"],
+          ]);
+        }),
+      ),
     );
   });
 
-  it("pages a branch view through the branch level's index, and looks up a keyed view, with no aggregate", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seedVolume;
-        // One SELECT driven from `work_version`, so
-        // the index on the branch level supplies the order and the LIMIT
-        // stops early; the UNION ALL of per-leaf arms sorted every row.
-        const branch = yield* explain(
-          "SELECT * FROM ontology.work_view ORDER BY title, id LIMIT 20",
-        );
-        expect(aggregates(branch)).toEqual([]);
-        expect(Arr.some(branch, (n) => n["Index Name"] === PROBE_INDEX)).toBe(true);
-        expect(Arr.some(branch, (n) => n["Node Type"] === "Sort")).toBe(false);
-        const keyed = yield* explain(
-          "SELECT * FROM ontology.essay_locale_view WHERE id = '00000000-0000-4000-9000-000000003100'",
-        );
-        expect(aggregates(keyed)).toEqual([]);
-        expect(
-          Arr.some(
-            keyed,
-            (n) => n["Node Type"] === "Seq Scan" && n["Relation Name"] === "node_version",
-          ),
-        ).toBe(false);
-      }),
+  describe("view heads: behaviour", () => {
+    it.effect(
+      "drops a node whose head moved to another leaf from the old leaf's view, and shows it in the new",
+      () =>
+        inTestTransaction(
+          Effect.gen(function* () {
+            yield* seedHistories;
+            // Old leaf rows surviving at v0: a newer root version supersedes them.
+            expect(yield* headsOf("person_view", P2)).toEqual([]);
+            expect(yield* headsOf("organisation_view", P2)).toEqual([[1, "update"]]);
+            // A refine through the schema.
+            expect(yield* headsOf("person_view", P1)).toEqual([]);
+            expect(yield* headsOf("organisation_view", P1)).toEqual([[1, "update"]]);
+            // asOf before the move returns the old leaf's row.
+            expect(yield* asOfHeads("person", { version: 0n }, P2)).toEqual([[0, "create"]]);
+            expect(yield* asOfHeads("person", { at: date("2026-01-15T00:00:00Z") }, P2)).toEqual([
+              [0, "create"],
+            ]);
+            expect(yield* asOfHeads("organisation", { version: 0n }, P2)).toEqual([]);
+          }),
+        ),
+    );
+
+    it.effect(
+      "shows a deleted head with action 'delete' on the leaf, branch, keyed and pointer views",
+      () =>
+        inTestTransaction(
+          Effect.gen(function* () {
+            yield* seedHistories;
+            expect(yield* headsOf("book_view", B2)).toEqual([[1, "delete"]]);
+            expect(yield* headsOf("work_view", B2)).toEqual([[1, "delete"]]);
+            expect(yield* headsOf("work_view", E3)).toEqual([[1, "delete"]]);
+            expect(yield* headsOf("essay_locale_view", E3)).toEqual([[1, "delete"]]);
+            // The pointer names v0; `action` is the head's, so the tombstone shows.
+            expect(yield* headsOf("book_live_view", B2)).toEqual([[0, "delete"]]);
+            expect(yield* headsOf("essay_live_view", E3)).toEqual([[0, "delete"]]);
+            expect(yield* headsOf("essay_locale_live_view", E3)).toEqual([[0, "delete"]]);
+            // Restored after the delete: the head is an update again.
+            expect(yield* headsOf("book_view", B3)).toEqual([[2, "update"]]);
+            expect(yield* headsOf("book_live_view", B3)).toEqual([[2, "update"]]);
+            // asOf before the delete returns the live row.
+            expect(yield* asOfHeads("book", { version: 0n }, B2)).toEqual([[0, "create"]]);
+            expect(yield* asOfHeads("book", { at: date("2026-01-15T00:00:00Z") }, B2)).toEqual([
+              [0, "create"],
+            ]);
+            expect(yield* asOfHeads("book", { version: 1n }, B3)).toEqual([[1, "delete"]]);
+          }),
+        ),
+    );
+
+    it.effect(
+      "fails closed on a head that skipped a level, and resolves the version before it with asOf",
+      () =>
+        inTestTransaction(
+          Effect.gen(function* () {
+            yield* seedHistories;
+            expect(yield* headsOf("book_view", B4)).toEqual([]);
+            expect(yield* headsOf("book_view", B5)).toEqual([]);
+            expect(yield* headsOf("work_view", B5)).toEqual([]);
+            // B4's v1 reached the work spine, but each arm joins its leaf too.
+            expect(yield* headsOf("work_view", B4)).toEqual([]);
+            // The pointer at v0 still resolves, `action` read off the gapped head.
+            expect(yield* headsOf("book_live_view", B4)).toEqual([[0, "update"]]);
+            expect(yield* asOfHeads("book", { version: 0n }, B4)).toEqual([[0, "create"]]);
+          }),
+        ),
+    );
+  });
+
+  describe("view heads: plans", () => {
+    // The integration suite runs in CI's single `ci` job, against its
+    // `pgvector/pgvector:pg17` service container (`.github/workflows/ci.yml`).
+    it.effect(
+      "pages a leaf view through the leaf's index, with no aggregate over the root version table",
+      () =>
+        inTestTransaction(
+          Effect.gen(function* () {
+            yield* seedVolume;
+            const nodes = yield* explain(
+              "SELECT * FROM ontology.book_view ORDER BY title, id LIMIT 20",
+            );
+            expect(aggregates(nodes)).toEqual([]);
+            expect(Arr.some(nodes, (n) => n["Index Name"] === PROBE_INDEX)).toBe(true);
+            // Nothing sorts: the index supplies the order, so the LIMIT stops early.
+            expect(Arr.some(nodes, (n) => n["Node Type"] === "Sort")).toBe(false);
+          }),
+        ),
+    );
+
+    it.effect(
+      "pages a branch view through the branch level's index, and looks up a keyed view, with no aggregate",
+      () =>
+        inTestTransaction(
+          Effect.gen(function* () {
+            yield* seedVolume;
+            // One SELECT driven from `work_version`, so
+            // the index on the branch level supplies the order and the LIMIT
+            // stops early; the UNION ALL of per-leaf arms sorted every row.
+            const branch = yield* explain(
+              "SELECT * FROM ontology.work_view ORDER BY title, id LIMIT 20",
+            );
+            expect(aggregates(branch)).toEqual([]);
+            expect(Arr.some(branch, (n) => n["Index Name"] === PROBE_INDEX)).toBe(true);
+            expect(Arr.some(branch, (n) => n["Node Type"] === "Sort")).toBe(false);
+            const keyed = yield* explain(
+              "SELECT * FROM ontology.essay_locale_view WHERE id = '00000000-0000-4000-9000-000000003100'",
+            );
+            expect(aggregates(keyed)).toEqual([]);
+            expect(
+              Arr.some(
+                keyed,
+                (n) => n["Node Type"] === "Seq Scan" && n["Relation Name"] === "node_version",
+              ),
+            ).toBe(false);
+          }),
+        ),
     );
   });
 });

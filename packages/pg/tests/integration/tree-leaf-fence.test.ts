@@ -32,6 +32,7 @@
  * @module packages/pg/tests/integration/tree-leaf-fence
  */
 
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext";
 import {
   makeTreeTables,
@@ -44,14 +45,20 @@ import { integer, pgSchema, text, type PgSchema } from "drizzle-orm/pg-core";
 import * as Arr from "effect/Array";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
-import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
 import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
 import * as Str from "effect/String";
-import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
-import { integrationDatabaseLayer } from "./database-url.ts";
-import { joinedNodes, viewOracle, viewsBefore, type PlanNode } from "./view-oracle.ts";
+import { describe, expect } from "vite-plus/test";
+import { integrationLayerWith } from "./database-url.ts";
+import {
+  joinedNodes,
+  type PlanNode,
+  type ViewDefinitions,
+  viewOf,
+  viewOracle,
+  viewsBefore,
+} from "./view-oracle.ts";
 import { makePgDatabase } from "../../src/index.ts";
 import { makeTestTransaction } from "../../src/testing.ts";
 import { ontologyViews } from "../fixtures/schema.ts";
@@ -60,24 +67,13 @@ const database = makePgDatabase({ relations: {}, key: "Database" });
 const { CurrentTransaction } = database;
 const { difference, execAll, explain, explainRoot } = viewOracle(database);
 
-const runtime = ManagedRuntime.make(integrationDatabaseLayer(database));
-const { runInTestTransaction } = makeTestTransaction(database);
+const { inTestTransaction } = makeTestTransaction(database);
 
 /** The migration that fenced the leaf views' tails. */
 const FENCE_MIGRATION = "20261112222142_leaf-view-fenced-tail";
 
 /** Each fixture view's 0.4.0 definition: its last `CREATE VIEW` before {@link FENCE_MIGRATION}. */
-let releasedViews: Readonly<Record<string, string>> = {};
-
-beforeAll(async () => {
-  releasedViews = await viewsBefore(FENCE_MIGRATION);
-});
-
-afterAll(() => runtime.dispose());
-
-/** A view's 0.4.0 definition; empty for one the chain never defined. */
-const releasedView = (name: string): string =>
-  Option.getOrElse(R.get(releasedViews, name), () => "");
+const releasedViews = viewsBefore(FENCE_MIGRATION);
 
 /** One row of a raw query here: every column these specs read is a scalar. */
 type Row = Readonly<Record<string, string | number>>;
@@ -295,8 +291,12 @@ const releasedHead = (leaf: string) =>
   `where not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."${leaf}_version"."id") and ("newer"."version" > "ontology"."${leaf}_version"."version")))`;
 
 /** The 0.4.0 `asOf`: its leaf view with the head bounded by `within` on the root row and on `newer`. */
-const releasedAsOf = (leaf: string, within: (table: string) => string): string => {
-  const view = releasedView(`${leaf}_view`);
+const releasedAsOf = (
+  views: ViewDefinitions,
+  leaf: string,
+  within: (table: string) => string,
+): string => {
+  const view = viewOf(views, `${leaf}_view`);
   const head = releasedHead(leaf);
   expect(view).toContain(head);
   return Str.replace(
@@ -305,115 +305,16 @@ const releasedAsOf = (leaf: string, within: (table: string) => string): string =
   )(view);
 };
 
-describe("fenced leaf views: the fixture returns exactly the 0.4.0 rows and columns", () => {
-  it("for every rewritten leaf, keyed and pointer view at the head", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seedFixture;
-        const results = yield* Effect.forEach(
-          FENCED_VIEWS,
-          (view) =>
-            Effect.gen(function* () {
-              const oracle = releasedView(view);
-              return {
-                view,
-                oracle,
-                columns: yield* columnsOf("ontology", view),
-                oracleColumns: yield* oracleColumnsOf(view, oracle),
-                gapped: yield* countOf(
-                  `select * from ontology.${view} where id in (${GAPPED.map((id) => `'${id}'`).join(", ")}) and version = 1`,
-                ),
-                ...(yield* difference(sql.raw(`select * from ontology.${view}`), oracle)),
-              };
-            }),
-          { concurrency: 1 },
-        );
-        Arr.forEach(results, (result) => {
-          const { view, rows, missing, extra } = result;
-          // The oracle is the plain-join form; the view is the fenced one.
-          expect(result.oracle, `${view}: the oracle`).not.toContain("lateral");
-          expect({ view, missing, extra }).toEqual({ view, missing: 0, extra: 0 });
-          expect(rows, `${view} is non-empty, so the check is not vacuous`).toBeGreaterThan(0);
-          expect(result.columns, `${view}: the columns`).toEqual(result.oracleColumns);
-          expect(result.gapped, `${view}: no gapped head shows`).toBe(0);
-        });
-      }),
-    );
-  });
-
-  it("for asOf at several versions and times", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seedFixture;
-        const points = [
-          ...Arr.map([0n, 1n, 2n], (version) => ({
-            label: `version ${version}`,
-            point: { version },
-            within: (table: string) => `(${table}."version" <= ${version})`,
-          })),
-          ...Arr.map(["2026-01-15T00:00:00Z", "2026-02-15T00:00:00Z"], (iso) => ({
-            label: iso,
-            point: { at: date(iso) },
-            within: (table: string) => `(${table}."timestamp" <= '${iso}')`,
-          })),
-        ];
-        const results = yield* Effect.forEach(
-          Arr.flatMap(FIXTURE_LEAVES, (leaf) =>
-            Arr.map(points, ({ label, point, within }) => ({
-              label: `${leaf} at ${label}`,
-              query: sql`select * from ${ontologyViews.asOf(leaf, point)}`,
-              oracle: releasedAsOf(leaf, within),
-            })),
-          ),
-          ({ label, query, oracle }) =>
-            Effect.map(difference(query, oracle), (result) => ({ label, ...result })),
-          { concurrency: 1 },
-        );
-        Arr.forEach(results, ({ label, missing, extra }) => {
-          expect({ label, missing, extra }).toEqual({ label, missing: 0, extra: 0 });
-        });
-        const rows = Arr.reduce(results, 0, (total, result) => total + (result.rows ?? 0));
-        expect(rows, "asOf returns rows, so the check is not vacuous").toBeGreaterThan(0);
-      }),
-    );
-  });
-});
-
-describe("fenced leaf views: fail closed", () => {
-  it("drops, never NULLs, a head missing a marker, a leaf's spine row or a stable row", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seedFixture;
-        // Each gapped node has a complete version before the gap, so the
-        // asOf just before it is a row and the head is none.
-        expect(yield* countOf(`select * from ontology.book_view where id = '${B3}'`)).toBe(0);
-        expect(yield* countOf(`select * from ontology.essay_view where id = '${E2}'`)).toBe(0);
-        expect(yield* countOf(`select * from ontology.edition_view where id = '${ED2}'`)).toBe(0);
-        expect(yield* countOf(`select * from ontology.person_view where id = '${P2}'`)).toBe(0);
-        expect(yield* countOf(`select * from ontology.volume_view where id = '${V2}'`)).toBe(0);
-        // The pointer at the gapped version shows nothing; at the version before, the row.
-        expect(yield* countOf(`select * from ontology.book_live_view where id = '${B3}'`)).toBe(0);
-        expect(yield* countOf(`select * from ontology.essay_live_view where id = '${E2}'`)).toBe(1);
-        const [before] = yield* rowsOf(
-          sql`select count(*)::int as n from ${ontologyViews.asOf("book", { version: 0n })} where id = ${B3}`,
-        );
-        expect(Number(before?.["n"])).toBe(1);
-      }),
-    );
-  });
-});
-
 // ── Generated trees: one and three marker levels ─────────────────────────
-
 const builders = { text: (column: string) => text(column) };
+
 const optionalText = (column: string) =>
   dbColumn(Schema.String, { column, pg: "text", notNull: false });
+
 const leafColumns = {
   title: dbColumn(Schema.String, { column: "title", pg: "text", notNull: true }),
 };
+
 const keyed = { name: "locale", columns: { abstract: optionalText("abstract") } };
 
 /** Pure markers: no columns of their own, so every level is fenced by default. */
@@ -485,8 +386,14 @@ const fencedTree = (
 const rootConfig = { identityColumns: { scope: integer("scope") }, pointers: ["live"] } as const;
 
 const k1Schema = pgSchema("fence_k1");
+
 const k1Tables = makeTreeTables(k1Tree, { schema: k1Schema, builders, root: rootConfig });
-const k1Views = makeTreeViews(k1Tree, k1Tables, { schema: k1Schema, pointers: { live: ["item"] } });
+
+const k1Views = makeTreeViews(k1Tree, k1Tables, {
+  schema: k1Schema,
+  pointers: { live: ["item"] },
+});
+
 const K1 = fencedTree(
   k1Schema,
   { markers: ["m1"], columns: false, tail: ["m1"] },
@@ -501,8 +408,14 @@ const K1 = fencedTree(
 );
 
 const k3Schema = pgSchema("fence_k3");
+
 const k3Tables = makeTreeTables(k3Tree, { schema: k3Schema, builders, root: rootConfig });
-const k3Views = makeTreeViews(k3Tree, k3Tables, { schema: k3Schema, pointers: { live: ["item"] } });
+
+const k3Views = makeTreeViews(k3Tree, k3Tables, {
+  schema: k3Schema,
+  pointers: { live: ["item"] },
+});
+
 const K3 = fencedTree(
   k3Schema,
   { markers: ["m1", "m2", "m3"], columns: false, tail: ["m1", "m2", "m3"] },
@@ -517,12 +430,19 @@ const K3 = fencedTree(
 );
 
 const k3cSchema = pgSchema("fence_k3c");
-const k3cTables = makeTreeTables(k3ColumnsTree, { schema: k3cSchema, builders, root: rootConfig });
+
+const k3cTables = makeTreeTables(k3ColumnsTree, {
+  schema: k3cSchema,
+  builders,
+  root: rootConfig,
+});
+
 const k3cViews = makeTreeViews(k3ColumnsTree, k3cTables, {
   schema: k3cSchema,
   pointers: { live: ["item"] },
   fenced: ["m2", "m3"],
 });
+
 const K3C = fencedTree(
   k3cSchema,
   { markers: ["m1", "m2", "m3"], columns: true, tail: ["m2", "m3"] },
@@ -583,12 +503,17 @@ const fencedId = (g: string) => `('00000000-0000-4000-b000-' || lpad((${g})::tex
 
 /** `n`th of a generated tree's irregular nodes, clear of the generated ones. */
 const oddId = (n: number) => `00000000-0000-4000-b000-1000000000${String(n).padStart(2, "0")}`;
+
 const NO_MARKER = oddId(1); // v1 skips the bottom marker (the top one at K = 1)
+
 const NO_LEAF = oddId(3); // v1 skips the leaf
 
 const TITLE_INDEX = "fence_item_title";
+
 const CREATED_INDEX = "fence_node_version_timestamp";
+
 const SCOPE_INDEX = "fence_node_scope";
+
 const MARKER_INDEX = "fence_m1_c1";
 
 /**
@@ -656,89 +581,10 @@ const seedTree = Effect.fn("leafFence.seedTree")(function* (tree: FencedTree, no
 });
 
 const TREES = [K1, K3, K3C] as const;
+
 const ODD = [NO_MARKER, NO_LEAF] as const;
 
-describe("fenced leaf views: generated trees return exactly the 0.4.0 shape's rows and columns", () => {
-  it.each(TREES)("$schema: leaf, keyed and pointer views at the head, and asOf", async (tree) => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seedTree(tree, 300);
-        const s = tree.schema;
-        const odd = ODD.map((id) => `'${id}'`).join(", ");
-        const cases = [
-          { view: "item_view", oracle: releasedForm(tree, {}) },
-          { view: "item_locale_view", oracle: releasedForm(tree, { keyed: true }) },
-          { view: "item_live_view", oracle: releasedForm(tree, { pointer: true }) },
-          {
-            view: "item_locale_live_view",
-            oracle: releasedForm(tree, { keyed: true, pointer: true }),
-          },
-        ];
-        const results = yield* Effect.forEach(
-          cases,
-          ({ view, oracle }) =>
-            Effect.gen(function* () {
-              return {
-                view,
-                columns: yield* columnsOf(s, view),
-                oracleColumns: yield* oracleColumnsOf(`${s}_${view}`, oracle),
-                odd: yield* countOf(`select * from ${s}.${view} where id in (${odd})`),
-                oracleOdd: yield* countOf(`select * from (${oracle}) o where id in (${odd})`),
-                ...(yield* difference(sql.raw(`select * from ${s}.${view}`), oracle)),
-              };
-            }),
-          { concurrency: 1 },
-        );
-        Arr.forEach(results, (result) => {
-          const { view, rows, missing, extra } = result;
-          expect({ view, missing, extra }).toEqual({ view, missing: 0, extra: 0 });
-          expect(rows, `${view} is non-empty`).toBeGreaterThan(0);
-          expect(result.columns, `${view}: the columns`).toEqual(result.oracleColumns);
-          // Fail closed: the gapped heads show in neither form.
-          expect({ view, odd: result.odd, oracleOdd: result.oracleOdd }).toEqual({
-            view,
-            odd: 0,
-            oracleOdd: 0,
-          });
-        });
-        const points = [
-          {
-            label: "version 0",
-            point: { version: 0n },
-            within: (t: string) => `${t}.version <= 0`,
-          },
-          {
-            label: "version 1",
-            point: { version: 1n },
-            within: (t: string) => `${t}.version <= 1`,
-          },
-          {
-            label: "a time between versions",
-            point: { at: date("2026-01-01T00:05:00Z") },
-            within: (t: string) => `${t}."timestamp" <= '2026-01-01T00:05:00Z'`,
-          },
-        ];
-        const asOf = yield* Effect.forEach(
-          points,
-          ({ label, point, within }) =>
-            Effect.map(difference(tree.asOf(point), releasedForm(tree, { within })), (result) => ({
-              label,
-              ...result,
-            })),
-          { concurrency: 1 },
-        );
-        Arr.forEach(asOf, ({ label, rows, missing, extra }) => {
-          expect({ label, missing, extra }).toEqual({ label, missing: 0, extra: 0 });
-          expect(rows, `asOf ${label} is non-empty`).toBeGreaterThan(0);
-        });
-      }),
-    );
-  });
-});
-
 // ── Plans ────────────────────────────────────────────────────────────────
-
 const PLAN_NODES = 50000;
 
 /** Every relation a plan node scans, by alias, in its subtree outside subplans. */
@@ -782,65 +628,267 @@ const outsideTail = Effect.fn("leafFence.outsideTail")(function* (tree: FencedTr
   };
 });
 
-describe("fenced leaf views: plans at three marker levels and 50,000 rows", () => {
-  it("are index-driven for a page, a created_at sort, an identity filter and a join on id, with the tail joined as one unit", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seedTree(K3, PLAN_NODES);
-        const view = `${K3.schema}.item_view`;
-        // A page walks the leaf's own index: no Sort.
-        const pageQuery = `SELECT * FROM ${view} ORDER BY title, id LIMIT 20`;
-        const page = yield* explain(pageQuery);
-        expect(uses(page, TITLE_INDEX)).toBe(true);
-        expect(sorts(page)).toEqual([]);
+integrationLayerWith(
+  database,
+  NodeServices.layer,
+)((it) => {
+  describe("fenced leaf views: the fixture returns exactly the 0.4.0 rows and columns", () => {
+    it.effect("for every rewritten leaf, keyed and pointer view at the head", () =>
+      inTestTransaction(
+        Effect.gen(function* () {
+          const views = yield* releasedViews;
+          yield* seedFixture;
+          const results = yield* Effect.forEach(
+            FENCED_VIEWS,
+            (view) =>
+              Effect.gen(function* () {
+                const oracle = viewOf(views, view);
+                return {
+                  view,
+                  oracle,
+                  columns: yield* columnsOf("ontology", view),
+                  oracleColumns: yield* oracleColumnsOf(view, oracle),
+                  gapped: yield* countOf(
+                    `select * from ontology.${view} where id in (${GAPPED.map((id) => `'${id}'`).join(", ")}) and version = 1`,
+                  ),
+                  ...(yield* difference(sql.raw(`select * from ontology.${view}`), oracle)),
+                };
+              }),
+            { concurrency: 1 },
+          );
+          Arr.forEach(results, (result) => {
+            const { view, rows, missing, extra } = result;
+            // The oracle is the plain-join form; the view is the fenced one.
+            expect(result.oracle, `${view}: the oracle`).not.toContain("lateral");
+            expect({ view, missing, extra }).toEqual({ view, missing: 0, extra: 0 });
+            expect(rows, `${view} is non-empty, so the check is not vacuous`).toBeGreaterThan(0);
+            expect(result.columns, `${view}: the columns`).toEqual(result.oracleColumns);
+            expect(result.gapped, `${view}: no gapped head shows`).toBe(0);
+          });
+        }),
+      ),
+    );
 
-        // created_at is the birth row's: version_zero stays a plain join, so
-        // the root version's timestamp index drives the sort.
-        const created = yield* explain(
-          `SELECT * FROM ${view} ORDER BY created_at DESC, id LIMIT 20`,
-        );
-        expect(uses(created, CREATED_INDEX)).toBe(true);
-        expect(sorts(created)).toEqual([]);
-
-        // An identity column filter and a join from another table on id: no sequential scan.
-        expect(
-          seqScans(
-            yield* explain(`SELECT * FROM ${view} WHERE scope = 42 ORDER BY title, id LIMIT 20`),
-          ),
-        ).toEqual([]);
-        const join = yield* explain(
-          `SELECT p.id AS parent, v.* FROM fence_parent p JOIN ${view} v ON v.id = p.item_id WHERE p.id BETWEEN 1 AND 20`,
-        );
-        expect(Arr.filter(seqScans(join), (n) => n["Relation Name"] !== "fence_parent")).toEqual(
-          [],
-        );
-
-        // The structural pin that keeps planning flat: the tail's tables
-        // form one subtree holding nothing else, and outside it the planner
-        // joins at most the driver, the root version, the identity, the
-        // birth row and the anti-join's `newer`.
-        const pin = yield* outsideTail(K3, pageQuery);
-        expect(pin.unit, `the tail is one subtree; outside: ${pin.outside.join(", ")}`).toBe(true);
-        expect(pin.outside.length).toBeLessThanOrEqual(5);
-      }),
+    it.effect("for asOf at several versions and times", () =>
+      inTestTransaction(
+        Effect.gen(function* () {
+          const views = yield* releasedViews;
+          yield* seedFixture;
+          const points = [
+            ...Arr.map([0n, 1n, 2n], (version) => ({
+              label: `version ${version}`,
+              point: { version },
+              within: (table: string) => `(${table}."version" <= ${version})`,
+            })),
+            ...Arr.map(["2026-01-15T00:00:00Z", "2026-02-15T00:00:00Z"], (iso) => ({
+              label: iso,
+              point: { at: date(iso) },
+              within: (table: string) => `(${table}."timestamp" <= '${iso}')`,
+            })),
+          ];
+          const results = yield* Effect.forEach(
+            Arr.flatMap(FIXTURE_LEAVES, (leaf) =>
+              Arr.map(points, ({ label, point, within }) => ({
+                label: `${leaf} at ${label}`,
+                query: sql`select * from ${ontologyViews.asOf(leaf, point)}`,
+                oracle: releasedAsOf(views, leaf, within),
+              })),
+            ),
+            ({ label, query, oracle }) =>
+              Effect.map(difference(query, oracle), (result) => ({ label, ...result })),
+            { concurrency: 1 },
+          );
+          Arr.forEach(results, ({ label, missing, extra }) => {
+            expect({ label, missing, extra }).toEqual({ label, missing: 0, extra: 0 });
+          });
+          const rows = Arr.reduce(results, 0, (total, result) => total + (result.rows ?? 0));
+          expect(rows, "asOf returns rows, so the check is not vacuous").toBeGreaterThan(0);
+        }),
+      ),
     );
   });
 
-  it("keep a column-bearing marker a plain join that drives a page, and fence only the levels `fenced` names", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seedTree(K3C, PLAN_NODES);
-        const query = `SELECT * FROM ${K3C.schema}.item_view ORDER BY c1, id LIMIT 20`;
-        const page = yield* explain(query);
-        expect(uses(page, MARKER_INDEX)).toBe(true);
-        expect(sorts(page)).toEqual([]);
-        // The driver, root version, identity, birth row, newer and m1.
-        const pin = yield* outsideTail(K3C, query);
-        expect(pin.unit, `the tail is one subtree; outside: ${pin.outside.join(", ")}`).toBe(true);
-        expect(pin.outside.length).toBeLessThanOrEqual(6);
-      }),
+  describe("fenced leaf views: fail closed", () => {
+    it.effect(
+      "drops, never NULLs, a head missing a marker, a leaf's spine row or a stable row",
+      () =>
+        inTestTransaction(
+          Effect.gen(function* () {
+            yield* seedFixture;
+            // Each gapped node has a complete version before the gap, so the
+            // asOf just before it is a row and the head is none.
+            expect(yield* countOf(`select * from ontology.book_view where id = '${B3}'`)).toBe(0);
+            expect(yield* countOf(`select * from ontology.essay_view where id = '${E2}'`)).toBe(0);
+            expect(yield* countOf(`select * from ontology.edition_view where id = '${ED2}'`)).toBe(
+              0,
+            );
+            expect(yield* countOf(`select * from ontology.person_view where id = '${P2}'`)).toBe(0);
+            expect(yield* countOf(`select * from ontology.volume_view where id = '${V2}'`)).toBe(0);
+            // The pointer at the gapped version shows nothing; at the version before, the row.
+            expect(yield* countOf(`select * from ontology.book_live_view where id = '${B3}'`)).toBe(
+              0,
+            );
+            expect(
+              yield* countOf(`select * from ontology.essay_live_view where id = '${E2}'`),
+            ).toBe(1);
+            const [before] = yield* rowsOf(
+              sql`select count(*)::int as n from ${ontologyViews.asOf("book", { version: 0n })} where id = ${B3}`,
+            );
+            expect(Number(before?.["n"])).toBe(1);
+          }),
+        ),
+    );
+  });
+
+  describe("fenced leaf views: generated trees return exactly the 0.4.0 shape's rows and columns", () => {
+    it.effect.each(TREES)("$schema: leaf, keyed and pointer views at the head, and asOf", (tree) =>
+      inTestTransaction(
+        Effect.gen(function* () {
+          yield* seedTree(tree, 300);
+          const s = tree.schema;
+          const odd = ODD.map((id) => `'${id}'`).join(", ");
+          const cases = [
+            { view: "item_view", oracle: releasedForm(tree, {}) },
+            { view: "item_locale_view", oracle: releasedForm(tree, { keyed: true }) },
+            { view: "item_live_view", oracle: releasedForm(tree, { pointer: true }) },
+            {
+              view: "item_locale_live_view",
+              oracle: releasedForm(tree, { keyed: true, pointer: true }),
+            },
+          ];
+          const results = yield* Effect.forEach(
+            cases,
+            ({ view, oracle }) =>
+              Effect.gen(function* () {
+                return {
+                  view,
+                  columns: yield* columnsOf(s, view),
+                  oracleColumns: yield* oracleColumnsOf(`${s}_${view}`, oracle),
+                  odd: yield* countOf(`select * from ${s}.${view} where id in (${odd})`),
+                  oracleOdd: yield* countOf(`select * from (${oracle}) o where id in (${odd})`),
+                  ...(yield* difference(sql.raw(`select * from ${s}.${view}`), oracle)),
+                };
+              }),
+            { concurrency: 1 },
+          );
+          Arr.forEach(results, (result) => {
+            const { view, rows, missing, extra } = result;
+            expect({ view, missing, extra }).toEqual({ view, missing: 0, extra: 0 });
+            expect(rows, `${view} is non-empty`).toBeGreaterThan(0);
+            expect(result.columns, `${view}: the columns`).toEqual(result.oracleColumns);
+            // Fail closed: the gapped heads show in neither form.
+            expect({ view, odd: result.odd, oracleOdd: result.oracleOdd }).toEqual({
+              view,
+              odd: 0,
+              oracleOdd: 0,
+            });
+          });
+          const points = [
+            {
+              label: "version 0",
+              point: { version: 0n },
+              within: (t: string) => `${t}.version <= 0`,
+            },
+            {
+              label: "version 1",
+              point: { version: 1n },
+              within: (t: string) => `${t}.version <= 1`,
+            },
+            {
+              label: "a time between versions",
+              point: { at: date("2026-01-01T00:05:00Z") },
+              within: (t: string) => `${t}."timestamp" <= '2026-01-01T00:05:00Z'`,
+            },
+          ];
+          const asOf = yield* Effect.forEach(
+            points,
+            ({ label, point, within }) =>
+              Effect.map(
+                difference(tree.asOf(point), releasedForm(tree, { within })),
+                (result) => ({
+                  label,
+                  ...result,
+                }),
+              ),
+            { concurrency: 1 },
+          );
+          Arr.forEach(asOf, ({ label, rows, missing, extra }) => {
+            expect({ label, missing, extra }).toEqual({ label, missing: 0, extra: 0 });
+            expect(rows, `asOf ${label} is non-empty`).toBeGreaterThan(0);
+          });
+        }),
+      ),
+    );
+  });
+
+  describe("fenced leaf views: plans at three marker levels and 50,000 rows", () => {
+    it.effect(
+      "are index-driven for a page, a created_at sort, an identity filter and a join on id, with the tail joined as one unit",
+      () =>
+        inTestTransaction(
+          Effect.gen(function* () {
+            yield* seedTree(K3, PLAN_NODES);
+            const view = `${K3.schema}.item_view`;
+            // A page walks the leaf's own index: no Sort.
+            const pageQuery = `SELECT * FROM ${view} ORDER BY title, id LIMIT 20`;
+            const page = yield* explain(pageQuery);
+            expect(uses(page, TITLE_INDEX)).toBe(true);
+            expect(sorts(page)).toEqual([]);
+
+            // created_at is the birth row's: version_zero stays a plain join, so
+            // the root version's timestamp index drives the sort.
+            const created = yield* explain(
+              `SELECT * FROM ${view} ORDER BY created_at DESC, id LIMIT 20`,
+            );
+            expect(uses(created, CREATED_INDEX)).toBe(true);
+            expect(sorts(created)).toEqual([]);
+
+            // An identity column filter and a join from another table on id: no sequential scan.
+            expect(
+              seqScans(
+                yield* explain(
+                  `SELECT * FROM ${view} WHERE scope = 42 ORDER BY title, id LIMIT 20`,
+                ),
+              ),
+            ).toEqual([]);
+            const join = yield* explain(
+              `SELECT p.id AS parent, v.* FROM fence_parent p JOIN ${view} v ON v.id = p.item_id WHERE p.id BETWEEN 1 AND 20`,
+            );
+            expect(
+              Arr.filter(seqScans(join), (n) => n["Relation Name"] !== "fence_parent"),
+            ).toEqual([]);
+
+            // The structural pin that keeps planning flat: the tail's tables
+            // form one subtree holding nothing else, and outside it the planner
+            // joins at most the driver, the root version, the identity, the
+            // birth row and the anti-join's `newer`.
+            const pin = yield* outsideTail(K3, pageQuery);
+            expect(pin.unit, `the tail is one subtree; outside: ${pin.outside.join(", ")}`).toBe(
+              true,
+            );
+            expect(pin.outside.length).toBeLessThanOrEqual(5);
+          }),
+        ),
+    );
+
+    it.effect(
+      "keep a column-bearing marker a plain join that drives a page, and fence only the levels `fenced` names",
+      () =>
+        inTestTransaction(
+          Effect.gen(function* () {
+            yield* seedTree(K3C, PLAN_NODES);
+            const query = `SELECT * FROM ${K3C.schema}.item_view ORDER BY c1, id LIMIT 20`;
+            const page = yield* explain(query);
+            expect(uses(page, MARKER_INDEX)).toBe(true);
+            expect(sorts(page)).toEqual([]);
+            // The driver, root version, identity, birth row, newer and m1.
+            const pin = yield* outsideTail(K3C, query);
+            expect(pin.unit, `the tail is one subtree; outside: ${pin.outside.join(", ")}`).toBe(
+              true,
+            );
+            expect(pin.outside.length).toBeLessThanOrEqual(6);
+          }),
+        ),
     );
   });
 });
