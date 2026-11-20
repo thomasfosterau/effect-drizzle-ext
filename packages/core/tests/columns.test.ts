@@ -10,10 +10,12 @@ import { describe, expect, it } from "vite-plus/test";
 import { getTableConfig, pgTable } from "drizzle-orm/pg-core";
 import type { PgTable } from "drizzle-orm/pg-core";
 import * as Arr from "effect/Array";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import {
   bytea,
   byteaToHex,
+  decodeHexBytea,
   hexToBytea,
   jsonbSchema,
   timestamps,
@@ -179,5 +181,20 @@ describe("byteaToHex / hexToBytea", () => {
   it("throws TypeError on non-hex characters, where Buffer.from would silently truncate", () => {
     expect(() => hexToBytea("zz")).toThrow(TypeError);
     expect(() => hexToBytea("12gg")).toThrow(TypeError);
+  });
+
+  it("decodes either case", () => {
+    expect(hexToBytea("aB09")).toEqual(Uint8Array.from([171, 9]));
+  });
+});
+
+describe("decodeHexBytea", () => {
+  it("succeeds with the bytes", () => {
+    expect(decodeHexBytea("00ff")).toEqual(Result.succeed(Uint8Array.from([0, 255])));
+  });
+
+  it("fails with an EncodingError instead of throwing", () => {
+    const decoded = decodeHexBytea("0x00");
+    expect(Result.isFailure(decoded) && decoded.failure._tag).toBe("EncodingError");
   });
 });
