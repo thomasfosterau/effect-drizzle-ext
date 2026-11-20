@@ -269,19 +269,26 @@ const qualified = (object: { readonly schema: string; readonly name: string }): 
 const label = (object: { readonly schema: string; readonly name: string }): string =>
   `${object.schema}.${object.name}`;
 
+/** The keys that occur more than once, each reported once. */
+const repeatedKeys = <A>(
+  items: ReadonlyArray<A>,
+  key: (item: A) => string,
+): ReadonlyArray<string> =>
+  R.keys(
+    R.filter(
+      Arr.reduce(items, R.empty<string, number>(), (acc, item) =>
+        R.set(acc, key(item), (acc[key(item)] ?? 0) + 1),
+      ),
+      (count) => count > 1,
+    ),
+  );
+
 const duplicates = <A>(
   kind: string,
   items: ReadonlyArray<A>,
   key: (item: A) => string,
-): ReadonlyArray<string> => {
-  const counts = Arr.reduce(items, R.empty<string, number>(), (acc, item) =>
-    R.set(acc, key(item), (acc[key(item)] ?? 0) + 1),
-  );
-  return Arr.map(
-    R.keys(R.filter(counts, (count) => count > 1)),
-    (name) => `${kind} '${name}' is declared more than once.`,
-  );
-};
+): ReadonlyArray<string> =>
+  Arr.map(repeatedKeys(items, key), (name) => `${kind} '${name}' is declared more than once.`);
 
 const extensionKey = (each: Extension): string => each.name;
 
@@ -319,7 +326,8 @@ const alterDomain = (prev: Domain, next: Domain): ExtrasPlan => {
       statements: [],
       issues: [
         `domain '${label(next)}' changes its base type from \`${prev.type}\` to \`${next.type}\`, ` +
-          "which Postgres can't ALTER. Declare a new domain, move the columns to it, then remove the old one.",
+          "which Postgres can't ALTER. Declare a new domain, move the columns to it, then remove the old one; " +
+          "or write the change by hand in a recordOnly migration.",
       ],
     };
   }
@@ -409,18 +417,226 @@ const statementsOnly =
   <A>(alter: (prev: A, next: A) => ReadonlyArray<string>) =>
   (prev: A, next: A): ExtrasPlan => ({ statements: alter(prev, next), issues: [] });
 
+// ── Rename hints ────────────────────────────────────────────────────────
+
 /**
- * The SQL that moves the database from `prev` to `next`: creates and alters
- * of extensions, then domains, then composite types, then the drops in the
- * reverse order. Pure; a non-empty `issues` blocks the plan.
+ * A rename the generator can't infer, the way drizzle-kit's prompt resolves
+ * rename-or-recreate. A domain or composite type is named `schema.name`, or
+ * bare `name` for `public`; an attribute hint names its type by its new name.
  */
-export const planExtras = (prev: ExtrasState, next: ExtrasState): ExtrasPlan => {
+export type ExtrasRename =
+  | readonly [kind: "domain" | "compositeType", from: string, to: string]
+  | readonly [kind: "attribute", type: string, from: string, to: string];
+
+interface Named {
+  readonly schema: string;
+  readonly name: string;
+}
+
+/** A hint's object name as a {@link label}: bare names are in `public`. */
+const labelOf = (name: string): string => (name.includes(".") ? name : `public.${name}`);
+
+/** The recorded objects of one kind renamed to their declared names, and the SQL that renames them. */
+interface Renamed<A> {
+  readonly items: ReadonlyArray<A>;
+  readonly statements: ReadonlyArray<string>;
+  readonly issues: ReadonlyArray<string>;
+}
+
+/** The reports of the checks that failed, each given as `[failed, report]`. */
+const failing = (checks: ReadonlyArray<readonly [boolean, string]>): ReadonlyArray<string> =>
+  Arr.map(
+    Arr.filter(checks, ([failed]) => failed),
+    ([, report]) => report,
+  );
+
+const renameObjects = <A extends Named>(
+  kind: "domain" | "composite type",
+  keyword: "DOMAIN" | "TYPE",
+  prev: ReadonlyArray<A>,
+  next: ReadonlyArray<A>,
+  hints: ReadonlyArray<readonly [from: string, to: string]>,
+): Renamed<A> => {
+  const recorded = R.fromEntries(Arr.map(prev, (item) => [label(item), item]));
+  const declared = R.fromEntries(Arr.map(next, (item) => [label(item), item]));
+  const pairs = Arr.map(hints, ([from, to]) => [labelOf(from), labelOf(to)] as const);
   const issues = [
+    ...Arr.map(
+      repeatedKeys(pairs, ([from]) => from),
+      (from) => `${kind} '${from}' has more than one rename hint.`,
+    ),
+    ...Arr.map(
+      repeatedKeys(pairs, ([, to]) => to),
+      (to) => `more than one rename hint targets ${kind} '${to}'.`,
+    ),
+    ...pairs.flatMap(([from, to]) =>
+      failing([
+        [!R.has(recorded, from), `rename hint ${from} → ${to}: no ${kind} '${from}' is recorded.`],
+        [!R.has(declared, to), `rename hint ${from} → ${to}: no ${kind} '${to}' is declared.`],
+        [
+          R.has(declared, from),
+          `rename hint ${from} → ${to}: ${kind} '${from}' is still declared.`,
+        ],
+        [R.has(recorded, to), `rename hint ${from} → ${to}: ${kind} '${to}' is already recorded.`],
+      ]),
+    ),
+  ];
+  if (Arr.isReadonlyArrayNonEmpty(issues)) return { items: prev, statements: [], issues };
+  const resolved = pairs.flatMap(([from, to]) =>
+    Arr.fromOption(Option.all([R.get(recorded, from), R.get(declared, to)] as const)),
+  );
+  return {
+    items: Arr.map(prev, (item) =>
+      Option.match(
+        Arr.findFirst(resolved, ([before]) => before === item),
+        {
+          onNone: () => item,
+          onSome: ([, after]) => ({ ...item, schema: after.schema, name: after.name }),
+        },
+      ),
+    ),
+    statements: resolved.flatMap(([before, after]) =>
+      Arr.filter(
+        [
+          before.name === after.name
+            ? ""
+            : `ALTER ${keyword} ${qualified(before)} RENAME TO ${ident(after.name)};`,
+          before.schema === after.schema
+            ? ""
+            : `ALTER ${keyword} ${qualified({ schema: before.schema, name: after.name })} SET SCHEMA ${ident(after.schema)};`,
+        ],
+        Str.isNonEmpty,
+      ),
+    ),
+    issues: [],
+  };
+};
+
+const renameAttributes = (
+  prev: ReadonlyArray<CompositeType>,
+  next: ReadonlyArray<CompositeType>,
+  hints: ReadonlyArray<readonly [type: string, from: string, to: string]>,
+): Renamed<CompositeType> => {
+  const recorded = R.fromEntries(Arr.map(prev, (item) => [label(item), item]));
+  const declared = R.fromEntries(Arr.map(next, (item) => [label(item), item]));
+  const triples = Arr.map(hints, ([type, from, to]) => [labelOf(type), from, to] as const);
+  const has = (
+    types: Readonly<Record<string, CompositeType>>,
+    type: string,
+    attribute: string,
+  ): boolean =>
+    Option.match(R.get(types, type), {
+      onNone: () => false,
+      onSome: (each) => Arr.some(each.attributes, (a) => a.name === attribute),
+    });
+  const issues = [
+    ...Arr.map(
+      repeatedKeys(triples, ([type, from]) => `${type}.${from}`),
+      (attribute) => `attribute '${attribute}' has more than one rename hint.`,
+    ),
+    ...triples.flatMap(([type, from, to]) => {
+      const hint = `rename hint ${type}.${from} → ${to}`;
+      if (!R.has(recorded, type) || !R.has(declared, type)) {
+        return [`${hint}: composite type '${type}' must be both recorded and declared.`];
+      }
+      return failing([
+        [!has(recorded, type, from), `${hint}: no attribute '${from}' is recorded.`],
+        [!has(declared, type, to), `${hint}: no attribute '${to}' is declared.`],
+        [has(declared, type, from), `${hint}: attribute '${from}' is still declared.`],
+        [has(recorded, type, to), `${hint}: attribute '${to}' is already recorded.`],
+      ]);
+    }),
+  ];
+  if (Arr.isReadonlyArrayNonEmpty(issues)) return { items: prev, statements: [], issues };
+  const renamed = (type: string, attribute: string): string =>
+    Option.match(
+      Arr.findFirst(triples, ([t, from]) => t === type && from === attribute),
+      { onNone: () => attribute, onSome: ([, , to]) => to },
+    );
+  return {
+    items: Arr.map(prev, (item) => ({
+      ...item,
+      attributes: Arr.map(item.attributes, (a) => ({ ...a, name: renamed(label(item), a.name) })),
+    })),
+    statements: triples.flatMap(([type, from, to]) =>
+      Arr.fromOption(
+        Option.map(
+          R.get(recorded, type),
+          (each) =>
+            `ALTER TYPE ${qualified(each)} RENAME ATTRIBUTE ${ident(from)} TO ${ident(to)};`,
+        ),
+      ),
+    ),
+    issues: [],
+  };
+};
+
+/** The `[from, to]` of each domain or composite type hint. */
+const objectHints = (
+  renames: ReadonlyArray<ExtrasRename>,
+  kind: "domain" | "compositeType",
+): ReadonlyArray<readonly [string, string]> =>
+  renames.flatMap((hint) => (hint[0] === kind ? [[hint[1], hint[2]] as const] : []));
+
+/** The `[type, from, to]` of each attribute hint. */
+const attributeHints = (
+  renames: ReadonlyArray<ExtrasRename>,
+): ReadonlyArray<readonly [string, string, string]> =>
+  renames.flatMap((hint) =>
+    hint[0] === "attribute" ? [[hint[1], hint[2], hint[3]] as const] : [],
+  );
+
+// ── The plan ────────────────────────────────────────────────────────────
+
+/** A plan whose `issues` are split by whether a hand-written migration can resolve them. */
+interface SplitPlan {
+  readonly statements: ReadonlyArray<string>;
+  /** Duplicate declarations and bad rename hints: nothing can be recorded. */
+  readonly blocking: ReadonlyArray<string>;
+  /** Changes Postgres can't `ALTER`: a recordOnly migration can carry them. */
+  readonly refused: ReadonlyArray<string>;
+}
+
+const planSplit = (
+  prev: ExtrasState,
+  next: ExtrasState,
+  renames: ReadonlyArray<ExtrasRename>,
+): SplitPlan => {
+  const declarationIssues = [
     ...duplicates("extension", next.extensions, extensionKey),
     ...duplicates("domain", next.domains, label),
     ...duplicates("composite type", next.compositeTypes, label),
   ];
-  if (Arr.isReadonlyArrayNonEmpty(issues)) return { statements: [], issues };
+  if (Arr.isReadonlyArrayNonEmpty(declarationIssues)) {
+    return { statements: [], blocking: declarationIssues, refused: [] };
+  }
+  const domainRenames = renameObjects(
+    "domain",
+    "DOMAIN",
+    prev.domains,
+    next.domains,
+    objectHints(renames, "domain"),
+  );
+  const typeRenames = renameObjects(
+    "composite type",
+    "TYPE",
+    prev.compositeTypes,
+    next.compositeTypes,
+    objectHints(renames, "compositeType"),
+  );
+  const attributeRenames = renameAttributes(
+    typeRenames.items,
+    next.compositeTypes,
+    attributeHints(renames),
+  );
+  const hintIssues = [
+    ...domainRenames.issues,
+    ...typeRenames.issues,
+    ...(Arr.isReadonlyArrayNonEmpty(typeRenames.issues) ? [] : attributeRenames.issues),
+  ];
+  if (Arr.isReadonlyArrayNonEmpty(hintIssues)) {
+    return { statements: [], blocking: hintIssues, refused: [] };
+  }
   const extensions = planKind(
     prev.extensions,
     next.extensions,
@@ -430,7 +646,7 @@ export const planExtras = (prev: ExtrasState, next: ExtrasState): ExtrasPlan => 
     (each) => `DROP EXTENSION IF EXISTS ${ident(each.name)};`,
   );
   const domains = planKind(
-    prev.domains,
+    domainRenames.items,
     next.domains,
     label,
     createDomain,
@@ -438,7 +654,7 @@ export const planExtras = (prev: ExtrasState, next: ExtrasState): ExtrasPlan => 
     (each) => `DROP DOMAIN ${qualified(each)};`,
   );
   const types = planKind(
-    prev.compositeTypes,
+    attributeRenames.items,
     next.compositeTypes,
     label,
     createCompositeType,
@@ -448,13 +664,47 @@ export const planExtras = (prev: ExtrasState, next: ExtrasState): ExtrasPlan => 
   return {
     statements: [
       ...extensions.upserts.statements,
+      ...domainRenames.statements,
       ...domains.upserts.statements,
+      ...typeRenames.statements,
+      ...attributeRenames.statements,
       ...types.upserts.statements,
       ...types.drops,
       ...domains.drops,
       ...extensions.drops,
     ],
-    issues: [...extensions.upserts.issues, ...domains.upserts.issues, ...types.upserts.issues],
+    blocking: [],
+    refused: [...extensions.upserts.issues, ...domains.upserts.issues, ...types.upserts.issues],
+  };
+};
+
+/**
+ * The SQL that moves the database from `prev` to `next`: creates and alters
+ * of extensions, then domains, then composite types, then the drops in the
+ * reverse order. A recorded domain or composite type (or an attribute) that
+ * `renames` names is renamed in place before its kind's alters, instead of
+ * dropped and re-created. Pure; a non-empty `issues` blocks the plan.
+ *
+ * @example
+ * ```ts
+ * import { domain, emptyExtrasState, planExtras, toExtrasState } from "@thomasfosterau/effect-drizzle-ext-pg/tooling";
+ *
+ * const prev = toExtrasState({ domains: [domain("mail", "text")] });
+ * const next = toExtrasState({ domains: [domain("email", "text")] });
+ * const plan = planExtras(prev, next, [["domain", "mail", "email"]]);
+ * // plan.statements: ['ALTER DOMAIN "public"."mail" RENAME TO "email";']
+ * console.log(plan.statements, planExtras(emptyExtrasState, next).statements);
+ * ```
+ */
+export const planExtras = (
+  prev: ExtrasState,
+  next: ExtrasState,
+  renames: ReadonlyArray<ExtrasRename> = [],
+): ExtrasPlan => {
+  const plan = planSplit(prev, next, renames);
+  return {
+    statements: Arr.isReadonlyArrayNonEmpty(plan.blocking) ? [] : plan.statements,
+    issues: [...plan.blocking, ...plan.refused],
   };
 };
 
@@ -501,14 +751,55 @@ export interface GenerateExtrasOptions {
   readonly command?: Arr.NonEmptyReadonlyArray<string>;
   /** The directory drizzle-kit runs in; the process's own when absent. */
   readonly cwd?: string;
+  /**
+   * Renames to apply in place of a drop and a create, e.g.
+   * `[["domain", "old", "new"], ["attribute", "money", "currency", "code"]]`.
+   * They are used once, for this migration: leave them out afterwards.
+   */
+  readonly renames?: ReadonlyArray<ExtrasRename>;
+  /**
+   * Record the declared state without generating SQL: the migration's
+   * `migration.sql` is left for you to write, for a change the generator
+   * refuses (a domain's base type). It still fails on duplicate declarations
+   * and bad rename hints.
+   */
+  readonly recordOnly?: boolean;
 }
 
 /** The migration {@link generateExtrasMigration} wrote. */
 export interface GeneratedExtrasMigration {
   /** The migration directory drizzle-kit created. */
   readonly dir: string;
+  /** The generated statements; empty for a `recordOnly` migration, whose SQL is hand-written. */
   readonly statements: ReadonlyArray<string>;
+  /** Whether `migration.sql` awaits hand-written SQL. */
+  readonly recordOnly: boolean;
 }
+
+/** A comment block, one `-- ` line per line of `text`. */
+const commented = (text: string): string =>
+  text
+    .split("\n")
+    .map((line) => `-- ${line}`.trimEnd())
+    .join("\n");
+
+/**
+ * The placeholder `migration.sql` of a `recordOnly` migration: what to write,
+ * and, as comments, what the generator refused and what it would have run.
+ */
+export const renderRecordOnlyMigration = (plan: ExtrasPlan): string =>
+  [
+    `-- Hand-written extras migration. ${EXTRAS_STATE_FILE} beside it records the declared state;`,
+    "-- write the SQL that moves the database there below, with `--> statement-breakpoint`",
+    "-- between statements.",
+    ...(Arr.isReadonlyArrayNonEmpty(plan.issues)
+      ? ["--", "-- The generator refused:", ...plan.issues.map(commented)]
+      : []),
+    ...(Arr.isReadonlyArrayNonEmpty(plan.statements)
+      ? ["--", "-- What it would have generated otherwise:", ...plan.statements.map(commented)]
+      : []),
+    "",
+  ].join("\n");
 
 const runDrizzleKit = Effect.fn("Tooling.runDrizzleKit")(function* (
   options: GenerateExtrasOptions,
@@ -558,6 +849,8 @@ const runDrizzleKit = Effect.fn("Tooling.runDrizzleKit")(function* (
  * nothing to migrate (and writes nothing); fails with {@link ExtrasError}
  * when the plan has issues, or {@link DrizzleKitError} when drizzle-kit
  * doesn't create the directory (or creates it outside `migrationsDir`).
+ * `renames` turns a drop plus a create into a rename; `recordOnly` writes the
+ * state with a `migration.sql` for you to fill in, for a change it refuses.
  *
  * @example
  * ```ts
@@ -588,11 +881,13 @@ export const generateExtrasMigration = Effect.fn("Tooling.generateExtrasMigratio
   const path = yield* Path.Path;
   const { state } = yield* readExtrasState(options.migrationsDir);
   const next = toExtrasState(options.extras);
-  const plan = planExtras(state, next);
-  if (Arr.isReadonlyArrayNonEmpty(plan.issues)) {
-    return yield* new ExtrasError({ issues: plan.issues });
+  const recordOnly = options.recordOnly ?? false;
+  const plan = planSplit(state, next, options.renames ?? []);
+  const issues = recordOnly ? plan.blocking : [...plan.blocking, ...plan.refused];
+  if (Arr.isReadonlyArrayNonEmpty(issues)) return yield* new ExtrasError({ issues });
+  if (!Arr.isReadonlyArrayNonEmpty(plan.statements) && !Arr.isReadonlyArrayNonEmpty(plan.refused)) {
+    return Option.none();
   }
-  if (!Arr.isReadonlyArrayNonEmpty(plan.statements)) return Option.none();
   const migrationPath = yield* runDrizzleKit(options);
   const base = options.cwd ?? path.resolve(".");
   const dir = path.dirname(path.resolve(base, migrationPath));
@@ -603,13 +898,15 @@ export const generateExtrasMigration = Effect.fn("Tooling.generateExtrasMigratio
   }
   yield* fs.writeFileString(
     path.join(dir, "migration.sql"),
-    renderExtrasMigration(plan.statements),
+    recordOnly
+      ? renderRecordOnlyMigration({ statements: plan.statements, issues: plan.refused })
+      : renderExtrasMigration(plan.statements),
   );
   yield* fs.writeFileString(
     path.join(dir, EXTRAS_STATE_FILE),
     `${yield* Schema.encodeEffect(Schema.fromJsonString(ExtrasState, { space: 2 }))(next).pipe(Effect.orDie)}\n`,
   );
-  return Option.some({ dir, statements: plan.statements });
+  return Option.some({ dir, statements: recordOnly ? [] : plan.statements, recordOnly });
 });
 
 // ── The gate ────────────────────────────────────────────────────────────
@@ -628,7 +925,8 @@ export class ExtrasDriftError extends Schema.TaggedError<ExtrasDriftError>()("Ex
       `Extras drift detected against the recorded state (${where}): ` +
       `${this.statements.length} statement(s) would be generated:\n\n` +
       this.statements.map((statement) => `  ${statement}`).join("\n") +
-      "\n\nFix: run generateExtrasMigration and commit the migration it writes."
+      "\n\nFix: run generateExtrasMigration and commit the migration it writes " +
+      "(with renames for a renamed domain, type or attribute, or recordOnly for a change it refuses)."
     );
   }
 }

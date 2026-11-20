@@ -15,4 +15,12 @@ export {
   type LoadedConfig,
   loadConfig,
 } from "./config.ts";
-export { check, type CheckReport, cli, generate, version } from "./commands.ts";
+export {
+  check,
+  type CheckReport,
+  cli,
+  generate,
+  type GenerateOptions,
+  parseRename,
+  version,
+} from "./commands.ts";

@@ -11,6 +11,7 @@
 import {
   checkExtrasDrift,
   checkMigrationDrift,
+  type ExtrasRename,
   generateExtrasMigration,
   type GitBase,
   resolveBaseRef,
@@ -21,6 +22,7 @@ import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
+import * as Str from "effect/String";
 import { CliError, Command, Flag } from "effect/cli";
 import { ChildProcess } from "effect/process";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
@@ -41,6 +43,14 @@ const asUserError = <A, E extends { readonly message: string }, R>(
 const migrationsDirOf = (loaded: LoadedConfig, path: Path.Path): string =>
   path.resolve(loaded.dir, loaded.config.migrationsDir);
 
+/** The one-off choices a `generate` run takes beside its config. */
+export interface GenerateOptions {
+  /** Renames to apply in place of a drop and a create, as `generateExtrasMigration` takes them. */
+  readonly renames?: ReadonlyArray<ExtrasRename>;
+  /** Record the declared state with a `migration.sql` to write by hand. */
+  readonly recordOnly?: boolean;
+}
+
 /**
  * Write the extras migration a config's declarations need, as
  * `generateExtrasMigration` does, with drizzle-kit run in the config's
@@ -50,6 +60,7 @@ const migrationsDirOf = (loaded: LoadedConfig, path: Path.Path): string =>
 export const generate = Effect.fn("Commands.generate")(function* (
   loaded: LoadedConfig,
   name: string,
+  options: GenerateOptions = {},
 ) {
   const path = yield* Path.Path;
   const written = yield* generateExtrasMigration({
@@ -59,9 +70,29 @@ export const generate = Effect.fn("Commands.generate")(function* (
     drizzleKit: loaded.config.drizzleKit,
     cwd: loaded.dir,
     command: loaded.config.command ?? ["drizzle-kit"],
+    renames: options.renames ?? [],
+    recordOnly: options.recordOnly ?? false,
   });
   return Option.map(written, (migration) => migration.dir);
 });
+
+/**
+ * A `--rename` value as a rename hint: `domain:<from>:<to>`,
+ * `compositeType:<from>:<to>` or `attribute:<type>:<from>:<to>`, each name
+ * non-empty. `none` for anything else.
+ */
+export const parseRename = (text: string): Option.Option<ExtrasRename> => {
+  const parts = text.split(":");
+  if (!Arr.every(parts, Str.isNonEmpty)) return Option.none();
+  const [kind, first, second, third] = parts;
+  if (parts.length === 3 && (kind === "domain" || kind === "compositeType")) {
+    return Option.some([kind, first, second] as const);
+  }
+  if (parts.length === 4 && kind === "attribute") {
+    return Option.some([kind, first, second, third] as const);
+  }
+  return Option.none();
+};
 
 /**
  * The base branch a pull request's ancestry check runs against
@@ -146,14 +177,33 @@ const generateCommand = Command.make(
       Flag.withDescription("The migration's slug, drizzle-kit's --name"),
       Flag.withDefault("extras"),
     ),
+    renames: Flag.String("rename").pipe(
+      Flag.withDescription(
+        "Rename instead of drop and create: domain:<from>:<to>, compositeType:<from>:<to> or attribute:<type>:<from>:<to> (repeatable)",
+      ),
+      Flag.filterMap(
+        parseRename,
+        () => "domain:<from>:<to>, compositeType:<from>:<to> or attribute:<type>:<from>:<to>",
+      ),
+      Flag.atLeast(0),
+    ),
+    recordOnly: Flag.Boolean("record-only").pipe(
+      Flag.withDefault(false),
+      Flag.withDescription(
+        "Record the declared state and leave migration.sql to write by hand, for a change the generator refuses",
+      ),
+    ),
   },
-  Effect.fn("effect-drizzle-kit generate")(function* ({ config, name }) {
+  Effect.fn("effect-drizzle-kit generate")(function* ({ config, name, renames, recordOnly }) {
     const written = yield* asUserError(
-      Effect.flatMap(loadConfig(config), (loaded) => generate(loaded, name)),
+      Effect.flatMap(loadConfig(config), (loaded) =>
+        generate(loaded, name, { renames, recordOnly }),
+      ),
     );
     yield* Option.match(written, {
       onNone: () => Console.log("No extras changes: nothing to migrate."),
-      onSome: (dir) => Console.log(`Wrote ${dir}`),
+      onSome: (dir) =>
+        Console.log(recordOnly ? `Wrote ${dir}: write its migration.sql by hand.` : `Wrote ${dir}`),
     });
   }),
 ).pipe(

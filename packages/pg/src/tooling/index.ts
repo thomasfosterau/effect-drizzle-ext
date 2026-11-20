@@ -26,6 +26,7 @@ export {
   ExtrasError,
   type Extras,
   type ExtrasPlan,
+  type ExtrasRename,
   ExtrasState,
   type GeneratedExtrasMigration,
   type GenerateExtrasOptions,
@@ -35,6 +36,7 @@ export {
   readExtrasState,
   type RecordedExtras,
   renderExtrasMigration,
+  renderRecordOnlyMigration,
   toExtrasState,
 } from "./extras.ts";
 export {

@@ -27,11 +27,14 @@ import {
   EXTRAS_STATE_FILE,
   ExtrasDriftError,
   ExtrasError,
+  type Extras,
+  type ExtrasRename,
   generateExtrasMigration,
   MalformedExtrasState,
   planExtras,
   readExtrasState,
   renderExtrasMigration,
+  renderRecordOnlyMigration,
   toExtrasState,
 } from "../src/tooling/index.ts";
 import * as fixtureSchema from "./fixtures/schema.ts";
@@ -206,11 +209,120 @@ describe("planExtras", () => {
   });
 });
 
+describe("planExtras with rename hints", () => {
+  it("reads a renamed domain without a hint as a drop plus a create", () => {
+    expect(
+      planExtras(
+        toExtrasState({ domains: [email] }),
+        toExtrasState({ domains: [{ ...email, name: "mail" }] }),
+      ).statements,
+    ).toEqual([
+      `CREATE DOMAIN "public"."mail" AS text NOT NULL CONSTRAINT "email_has_at" CHECK (position('@' in VALUE) > 1);`,
+      `DROP DOMAIN "public"."email";`,
+    ]);
+  });
+
+  it("renames a domain in place, then alters it under its new name", () => {
+    const next = domain("mail", "text", { checks: { email_has_at: "position('@' in VALUE) > 1" } });
+    expect(
+      planExtras(toExtrasState({ domains: [email] }), toExtrasState({ domains: [next] }), [
+        ["domain", "email", "public.mail"],
+      ]).statements,
+    ).toEqual([
+      `ALTER DOMAIN "public"."email" RENAME TO "mail";`,
+      `ALTER DOMAIN "public"."mail" DROP NOT NULL;`,
+    ]);
+  });
+
+  it("renames a composite type across schemas and its attribute, then alters it", () => {
+    const next = compositeType("price", { value: "numeric(14, 2)", currency: "char(3)" });
+    expect(
+      planExtras(
+        toExtrasState({ domains: [email], compositeTypes: [money] }),
+        toExtrasState({ domains: [email], compositeTypes: [next] }),
+        [
+          ["compositeType", "fixture.money_amount", "price"],
+          ["attribute", "price", "amount", "value"],
+        ],
+      ).statements,
+    ).toEqual([
+      `ALTER TYPE "fixture"."money_amount" RENAME TO "price";`,
+      `ALTER TYPE "fixture"."price" SET SCHEMA "public";`,
+      `ALTER TYPE "public"."price" RENAME ATTRIBUTE "amount" TO "value";`,
+      `ALTER TYPE "public"."price" ALTER ATTRIBUTE "value" TYPE numeric(14, 2);`,
+    ]);
+  });
+
+  it("orders renames after extensions and before their kind's alters and the drops", () => {
+    const plan = planExtras(
+      toExtrasState({ domains: [email, domain("slug", "text")] }),
+      toExtrasState({ extensions: [vector], domains: [{ ...email, name: "mail" }] }),
+      [["domain", "email", "mail"]],
+    );
+    expect(plan.statements).toEqual([
+      `CREATE EXTENSION IF NOT EXISTS "vector" WITH SCHEMA "public" VERSION '0.8.0';`,
+      `ALTER DOMAIN "public"."email" RENAME TO "mail";`,
+      `DROP DOMAIN "public"."slug";`,
+    ]);
+  });
+
+  it("reports hints that don't match the recorded and declared objects", () => {
+    const prev = toExtrasState({ domains: [email], compositeTypes: [money] });
+    const plan = planExtras(prev, toExtrasState({ domains: [email], compositeTypes: [money] }), [
+      ["domain", "email", "mail"],
+      ["domain", "nope", "email"],
+      ["compositeType", "fixture.money_amount", "x"],
+      ["compositeType", "fixture.money_amount", "y"],
+    ]);
+    expect(plan.statements).toEqual([]);
+    expect(plan.issues).toEqual([
+      "rename hint public.email → public.mail: no domain 'public.mail' is declared.",
+      "rename hint public.email → public.mail: domain 'public.email' is still declared.",
+      "rename hint public.nope → public.email: no domain 'public.nope' is recorded.",
+      "rename hint public.nope → public.email: domain 'public.email' is already recorded.",
+      "composite type 'fixture.money_amount' has more than one rename hint.",
+      "rename hint fixture.money_amount → public.x: no composite type 'public.x' is declared.",
+      "rename hint fixture.money_amount → public.x: composite type 'fixture.money_amount' is still declared.",
+      "rename hint fixture.money_amount → public.y: no composite type 'public.y' is declared.",
+      "rename hint fixture.money_amount → public.y: composite type 'fixture.money_amount' is still declared.",
+    ]);
+  });
+
+  it("reports attribute hints that don't match", () => {
+    const plan = planExtras(
+      toExtrasState({ compositeTypes: [money] }),
+      toExtrasState({ compositeTypes: [money] }),
+      [
+        ["attribute", "fixture.money_amount", "amount", "currency"],
+        ["attribute", "missing", "a", "b"],
+      ],
+    );
+    expect(plan.issues).toEqual([
+      "rename hint fixture.money_amount.amount → currency: attribute 'amount' is still declared.",
+      "rename hint fixture.money_amount.amount → currency: attribute 'currency' is already recorded.",
+      "rename hint public.missing.a → b: composite type 'public.missing' must be both recorded and declared.",
+    ]);
+  });
+});
+
 describe("renderExtrasMigration", () => {
   it("separates statements with drizzle-kit's breakpoint, which the runner splits on", async () => {
     const sql = renderExtrasMigration(["SELECT 1;", "SELECT 2;"]);
     expect(sql).toMatch(/^-- Generated by generateExtrasMigration/);
     expect(sql).toContain("SELECT 1;\n--> statement-breakpoint\nSELECT 2;\n");
+  });
+});
+
+describe("renderRecordOnlyMigration", () => {
+  it("is only comments: what to write, what was refused and what would have run", () => {
+    const sql = renderRecordOnlyMigration({
+      statements: ["SELECT 1;"],
+      issues: ["first line\nsecond line"],
+    });
+    expect(sql.split("\n").filter((line) => line !== "" && !line.startsWith("--"))).toEqual([]);
+    expect(sql).toMatch(/^-- Hand-written extras migration/);
+    expect(sql).toContain("-- The generator refused:\n-- first line\n-- second line\n");
+    expect(sql).toContain("-- What it would have generated otherwise:\n-- SELECT 1;\n");
   });
 });
 
@@ -334,6 +446,114 @@ describe("generateExtrasMigration", () => {
     );
     expect(result.error).toBeInstanceOf(ExtrasError);
     expect(result.same).toBe(true);
+  });
+
+  it("renames with hints, so a recorded domain isn't dropped and re-created", async () => {
+    const result = await run(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const path = yield* Path.Path;
+          const dir = yield* scratchChain();
+          const generate = (
+            extras: Extras,
+            name: string,
+            renames: ReadonlyArray<ExtrasRename> = [],
+          ) =>
+            generateExtrasMigration({
+              extras,
+              migrationsDir: dir,
+              name,
+              drizzleKit: { schema: "tests/fixtures/schema.ts" },
+              command: DRIZZLE_KIT,
+              cwd: PACKAGE_DIR,
+              renames,
+            });
+          yield* generate({ domains: [email] }, "email");
+          const renamedExtras = { domains: [{ ...email, name: "mail" }] };
+          const written = yield* generate(renamedExtras, "rename", [["domain", "email", "mail"]]);
+          return {
+            written,
+            dirName: Option.map(written, (migration) => path.basename(migration.dir)),
+            after: yield* checkExtrasDrift({ extras: renamedExtras, migrationsDir: dir }),
+          };
+        }),
+      ),
+    );
+    assert(Option.isSome(result.written));
+    expect(result.written.value.statements).toEqual([
+      `ALTER DOMAIN "public"."email" RENAME TO "mail";`,
+    ]);
+    expect(result.after).toEqual(result.dirName);
+  });
+
+  it("records a change it refuses with recordOnly, leaving the SQL to write by hand", async () => {
+    const result = await run(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const dir = yield* scratchChain();
+          const options = {
+            migrationsDir: dir,
+            drizzleKit: { schema: "tests/fixtures/schema.ts" },
+            command: DRIZZLE_KIT,
+            cwd: PACKAGE_DIR,
+          } as const;
+          yield* generateExtrasMigration({
+            ...options,
+            extras: { domains: [email] },
+            name: "email",
+          });
+          const retyped = { domains: [domain("email", "citext", { notNull: true })] };
+          const refused = yield* Effect.flip(
+            generateExtrasMigration({ ...options, extras: retyped, name: "retype" }),
+          );
+          const duplicate = yield* Effect.flip(
+            generateExtrasMigration({
+              ...options,
+              extras: { domains: [email, email] },
+              name: "dupe",
+              recordOnly: true,
+            }),
+          );
+          const written = yield* generateExtrasMigration({
+            ...options,
+            extras: retyped,
+            name: "retype",
+            recordOnly: true,
+          });
+          assert(Option.isSome(written));
+          return {
+            refused,
+            duplicate,
+            written: written.value,
+            sql: yield* fs.readFileString(path.join(written.value.dir, "migration.sql")),
+            recorded: yield* readExtrasState(dir),
+            after: yield* checkExtrasDrift({ extras: retyped, migrationsDir: dir }),
+            nothing: yield* generateExtrasMigration({
+              ...options,
+              extras: retyped,
+              name: "nothing",
+              recordOnly: true,
+            }),
+          };
+        }),
+      ),
+    );
+    expect(result.refused).toBeInstanceOf(ExtrasError);
+    expect(result.refused.message).toMatch(/recordOnly/);
+    expect(result.duplicate).toBeInstanceOf(ExtrasError);
+    expect(result.written.recordOnly).toBe(true);
+    expect(result.written.statements).toEqual([]);
+    expect(result.sql).toMatch(/^-- Hand-written extras migration/);
+    expect(result.sql).toMatch(
+      /-- The generator refused:\n-- domain 'public\.email' changes its base type/,
+    );
+    expect(result.recorded.state).toEqual(
+      toExtrasState({ domains: [domain("email", "citext", { notNull: true })] }),
+    );
+    expect(Option.isSome(result.after)).toBe(true);
+    expect(Option.isNone(result.nothing)).toBe(true);
   });
 
   it("fails with DrizzleKitError when drizzle-kit doesn't report ok", async () => {
