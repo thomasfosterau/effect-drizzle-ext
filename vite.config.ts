@@ -77,7 +77,7 @@ export default defineConfig({
         { additionalTestBlockFunctions: ["it.effect", "it.effect.each", "it.live", "it.layer"] },
       ],
 
-      // ---- type-aware rules (oxlint-tsgolint) -------------------------------
+      // ---- type-aware rules (tsrs) ------------------------------------------
       // At `error` everywhere but the type-erasure seams (the first override below).
       "typescript/no-unsafe-type-assertion": "error",
       "effecttsgo/unsafe-effect-type-assertion": "error",
@@ -224,11 +224,14 @@ export default defineConfig({
         },
       },
     ],
-    // `typeCheck` overlaps the `check` tasks but also covers the root
-    // configs no tsconfig includes.
+    // `typeCheck` stays off: vite-plus 1.7.0's tsrs (TypeScript 7.1 beta)
+    // reports every Effect language-service warning as an error, which
+    // `ignoreEffectWarningsInTscExitCode` can't relax and no override can
+    // scope, and it flags a cast in `versioned-chain.ts` that the pinned
+    // `tsc` accepts. `vp run check` is the type gate.
     options: {
       typeAware: true,
-      typeCheck: true,
+      typeCheck: false,
     },
     jsPlugins: [
       {
