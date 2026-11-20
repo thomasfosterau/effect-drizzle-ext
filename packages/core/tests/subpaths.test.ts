@@ -23,7 +23,10 @@ describe("subpaths", () => {
       import("@thomasfosterau/effect-drizzle-ext/postgis"),
       import("@thomasfosterau/effect-drizzle-ext/jsonapi"),
       import("@thomasfosterau/effect-drizzle-ext/jsonapi/derive"),
+      import("@thomasfosterau/effect-drizzle-ext/Predicate"),
+      import("@thomasfosterau/effect-drizzle-ext/Where"),
+      import("@thomasfosterau/effect-drizzle-ext/Search"),
     ]);
-    expect(modules).toHaveLength(15);
+    expect(modules).toHaveLength(18);
   });
 });

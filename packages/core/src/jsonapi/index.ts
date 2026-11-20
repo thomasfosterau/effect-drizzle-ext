@@ -8,7 +8,10 @@
  */
 
 import * as Ast from "@thomasfosterau/effect-ext/Ast";
-import { Resource } from "@thomasfosterau/effect-jsonapi";
+import { Filter, Resource } from "@thomasfosterau/effect-jsonapi";
+import * as DateTime from "effect/DateTime";
+import * as Match from "effect/Match";
+import * as P from "effect/Predicate";
 import * as Arr from "effect/Array";
 import * as Option from "effect/Option";
 import * as R from "effect/Record";
@@ -30,6 +33,7 @@ import {
   type FieldColumnsMetaOf,
   fieldColumns,
 } from "../index.ts";
+import * as Predicate from "../Predicate.ts";
 import { buildTree, treeError, type LevelSpec, type Tree } from "../tree.ts";
 
 export type { DbTable, TableMeta };
@@ -318,3 +322,94 @@ import { Resource } from "@thomasfosterau/effect-jsonapi";
 export const defineResourceTree: <const S extends CheckedResourceTreeSpec<S, Record<never, never>>>(
   spec: S,
 ) => Tree<S, ResourceTreeMeta<S>> = defineResourceTreeFor<Record<never, never>>();
+
+// ── Filter → Predicate ─────────────────────────
+
+/**
+ * A decoded filter literal as a `./Predicate` value: a string, number,
+ * bigint, boolean or `Date` as itself, an Effect `DateTime` as its `Date`,
+ * anything else none (the node it sits in becomes unknown, so it matches no
+ * row).
+ */
+export const filterLiteral = <A>(value: A): Option.Option<Predicate.Value> => {
+  if (
+    P.isString(value) ||
+    P.isNumber(value) ||
+    P.isBigInt(value) ||
+    P.isBoolean(value) ||
+    P.isDate(value)
+  ) {
+    return Option.some(value);
+  }
+  return DateTime.isDateTime(value) ? Option.some(DateTime.toDateUtc(value)) : Option.none();
+};
+
+/** How {@link predicateFromFilter} reads a filter. */
+export interface PredicateFromFilterOptions {
+  /** A literal as a predicate value; defaults to {@link filterLiteral}. */
+  readonly literal?: <A>(field: string, value: A) => Option.Option<Predicate.Value>;
+}
+
+/**
+ * Compile a decoded JSON:API `Filter.Ast` to a `./Predicate` over the same
+ * field names, which `./Where` renders over a view's columns. The filter
+ * profile's three-valued logic carries over node for node: a negated null
+ * test is `not(isNull)`, and a literal the `literal` option can't read makes its node
+ * unknown, so it admits no row, negated or not.
+ *
+ * @example
+ * ```ts
+ * import { deepStrictEqual } from "node:assert";
+ * import { Filter } from "@thomasfosterau/effect-jsonapi";
+ * import { predicateFromFilter } from "@thomasfosterau/effect-drizzle-ext/jsonapi";
+ * import * as Predicate from "@thomasfosterau/effect-drizzle-ext/Predicate";
+ *
+ * deepStrictEqual(
+ *   predicateFromFilter(Filter.and(Filter.eq("status", "open"), Filter.isNull("closedAt", true))),
+ *   Predicate.and(Predicate.eq("status", "open"), Predicate.not(Predicate.isNull("closedAt"))),
+ * );
+ * ```
+ */
+export const predicateFromFilter = (
+  filter: Filter.Ast,
+  options: PredicateFromFilterOptions = {},
+): Predicate.Predicate => {
+  const literal = options.literal ?? (<A>(_field: string, value: A) => filterLiteral(value));
+  const values = <A>(field: string, list: ReadonlyArray<A>) =>
+    Option.all(Arr.map(list, (value) => literal(field, value)));
+  const go = (node: Filter.Ast): Predicate.Predicate =>
+    Match.value(node).pipe(
+      Match.tagsExhaustive({
+        Compare: ({ op, field, value }) =>
+          Option.match(literal(field, value), {
+            onNone: () => Predicate.unknown,
+            onSome: (v) => compareBy[op](field, v),
+          }),
+        In: ({ field, values: list }) =>
+          Option.match(values(field, list), {
+            onNone: () => Predicate.unknown,
+            onSome: (vs) => Predicate.isIn(field, vs),
+          }),
+        NotIn: ({ field, values: list }) =>
+          Option.match(values(field, list), {
+            onNone: () => Predicate.unknown,
+            onSome: (vs) => Predicate.notIn(field, vs),
+          }),
+        IsNull: ({ field, negated }) =>
+          negated ? Predicate.not(Predicate.isNull(field)) : Predicate.isNull(field),
+        And: ({ members }) => Predicate.and(...Arr.map(members, go)),
+        Or: ({ members }) => Predicate.or(...Arr.map(members, go)),
+        Not: ({ member }) => Predicate.not(go(member)),
+      }),
+    );
+  return go(filter);
+};
+
+const compareBy = {
+  eq: Predicate.eq,
+  ne: Predicate.ne,
+  lt: Predicate.lt,
+  lte: Predicate.lte,
+  gt: Predicate.gt,
+  gte: Predicate.gte,
+} as const;
