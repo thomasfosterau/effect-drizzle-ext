@@ -8,10 +8,12 @@
  */
 
 import * as Arr from "effect/Array";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as P from "effect/Predicate";
 import * as R from "effect/Record";
+import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
 
 // ── SQLSTATE vocabulary ────────────────────────────────────────────
@@ -513,3 +515,49 @@ export const catchUniqueViolation =
         onSome: f,
       }),
     );
+
+/** Tuning for {@link retryTransaction}. */
+export interface RetryTransactionOptions {
+  /** Retries after the first attempt. Default 3. */
+  readonly times?: number;
+  /** The first backoff delay, doubled (with jitter) on each retry. Default 50 ms. */
+  readonly base?: Duration.Input;
+}
+
+/**
+ * Re-runs a transaction that failed with a serialization failure (`40001`) or
+ * a deadlock (`40P01`), the documented remedy for both, on a jittered
+ * exponential backoff; every other failure, a {@link ConstraintViolation}
+ * included, passes through on the first attempt.
+ *
+ * Pipe it onto the whole `transact(…)`, never onto a statement inside one:
+ * Postgres aborts the transaction on either failure, so only a re-run from
+ * `BEGIN` can commit. A savepoint (a nested `transact`) is no exception.
+ *
+ * Data-last only: `transact(work).pipe(retryTransaction({ times: 5 }))`.
+ *
+ * @example
+ * ```ts
+ * import { retryTransaction } from "@thomasfosterau/effect-drizzle-ext/errors";
+ * import * as Effect from "effect/Effect";
+ *
+ * let attempts = 0;
+ * // A stand-in for a transaction that loses one serialization conflict.
+ * const transfer = Effect.suspend(() =>
+ *   ++attempts === 1 ? Effect.fail({ code: "40001" }) : Effect.succeed("committed"),
+ * );
+ *
+ * const program = transfer.pipe(retryTransaction({ base: "1 millis" }));
+ * Effect.runPromise(program).then(console.log); // "committed", on the second attempt
+ * ```
+ */
+export const retryTransaction =
+  (options?: RetryTransactionOptions) =>
+  <A, E, R>(self: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+    Effect.retry(self, {
+      while: isRetryableTransactionFailure,
+      schedule: Schedule.max([
+        Schedule.exponential(options?.base ?? Duration.millis(50)),
+        Schedule.recurs(options?.times ?? 3),
+      ]).pipe(Schedule.jittered),
+    });

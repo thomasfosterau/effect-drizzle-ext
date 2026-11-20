@@ -47,52 +47,54 @@ const migrationsDirOf = (loaded: LoadedConfig, path: Path.Path): string =>
  * directory. Succeeds with the directory written, or `Option.none()` when
  * there was nothing to migrate.
  */
-export const generate = (loaded: LoadedConfig, name: string) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    const written = yield* generateExtrasMigration({
-      extras: loaded.config.extras ?? {},
-      migrationsDir: migrationsDirOf(loaded, path),
-      name,
-      drizzleKit: loaded.config.drizzleKit,
-      cwd: loaded.dir,
-      command: loaded.config.command ?? ["drizzle-kit"],
-    });
-    return Option.map(written, (migration) => migration.dir);
+export const generate = Effect.fn("Commands.generate")(function* (
+  loaded: LoadedConfig,
+  name: string,
+) {
+  const path = yield* Path.Path;
+  const written = yield* generateExtrasMigration({
+    extras: loaded.config.extras ?? {},
+    migrationsDir: migrationsDirOf(loaded, path),
+    name,
+    drizzleKit: loaded.config.drizzleKit,
+    cwd: loaded.dir,
+    command: loaded.config.command ?? ["drizzle-kit"],
   });
+  return Option.map(written, (migration) => migration.dir);
+});
 
 /**
  * The base branch a pull request's ancestry check runs against
  * (`resolveBaseRef` over `MIGRATION_BASE_REF` / `GITHUB_BASE_REF`), with the
  * migrations path made relative to the repository root `git` reports.
  */
-const pullRequestBase = (migrationsDir: string, cwd: string) =>
-  Effect.gen(function* () {
-    const ref = resolveBaseRef({
-      MIGRATION_BASE_REF: Option.getOrUndefined(
-        yield* Config.option(Config.String("MIGRATION_BASE_REF")),
-      ),
-      GITHUB_BASE_REF: Option.getOrUndefined(
-        yield* Config.option(Config.String("GITHUB_BASE_REF")),
-      ),
-    });
-    if (Option.isNone(ref)) return Option.none<GitBase>();
-    const path = yield* Path.Path;
-    const spawner = yield* ChildProcessSpawner;
-    const root = (yield* spawner.string(
-      ChildProcess.make("git", ["rev-parse", "--show-toplevel"], {
-        cwd,
-        // A git hook exports these; cleared, `cwd` alone picks the repository.
-        env: { GIT_DIR: undefined, GIT_INDEX_FILE: undefined, GIT_WORK_TREE: undefined },
-        extendEnv: true,
-      }),
-    )).trim();
-    return Option.some<GitBase>({
-      ref: ref.value,
-      migrationsPath: path.relative(root, migrationsDir),
-      cwd: root,
-    });
+const pullRequestBase = Effect.fn("Commands.pullRequestBase")(function* (
+  migrationsDir: string,
+  cwd: string,
+) {
+  const ref = resolveBaseRef({
+    MIGRATION_BASE_REF: Option.getOrUndefined(
+      yield* Config.option(Config.String("MIGRATION_BASE_REF")),
+    ),
+    GITHUB_BASE_REF: Option.getOrUndefined(yield* Config.option(Config.String("GITHUB_BASE_REF"))),
   });
+  if (Option.isNone(ref)) return Option.none<GitBase>();
+  const path = yield* Path.Path;
+  const spawner = yield* ChildProcessSpawner;
+  const root = (yield* spawner.string(
+    ChildProcess.make("git", ["rev-parse", "--show-toplevel"], {
+      cwd,
+      // A git hook exports these; cleared, `cwd` alone picks the repository.
+      env: { GIT_DIR: undefined, GIT_INDEX_FILE: undefined, GIT_WORK_TREE: undefined },
+      extendEnv: true,
+    }),
+  )).trim();
+  return Option.some<GitBase>({
+    ref: ref.value,
+    migrationsPath: path.relative(root, migrationsDir),
+    cwd: root,
+  });
+});
 
 /** What a passing {@link check} looked at. */
 export interface CheckReport {
@@ -108,25 +110,24 @@ export interface CheckReport {
  * `checkMigrationDrift` over the same directory (with base ancestry in a pull
  * request). Needs no database.
  */
-export const check = (loaded: LoadedConfig) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    const migrationsDir = migrationsDirOf(loaded, path);
-    const extrasRecordedIn = yield* checkExtrasDrift({
-      extras: loaded.config.extras ?? {},
-      migrationsDir,
-    });
-    const schema = loaded.config.schema;
-    if (schema === undefined) {
-      return { extrasRecordedIn, snapshots: Option.none() } satisfies CheckReport;
-    }
-    const report = yield* checkMigrationDrift({
-      schema,
-      migrationsDir,
-      base: yield* pullRequestBase(migrationsDir, loaded.dir),
-    });
-    return { extrasRecordedIn, snapshots: Option.some(report.snapshots) } satisfies CheckReport;
+export const check = Effect.fn("Commands.check")(function* (loaded: LoadedConfig) {
+  const path = yield* Path.Path;
+  const migrationsDir = migrationsDirOf(loaded, path);
+  const extrasRecordedIn = yield* checkExtrasDrift({
+    extras: loaded.config.extras ?? {},
+    migrationsDir,
   });
+  const schema = loaded.config.schema;
+  if (schema === undefined) {
+    return { extrasRecordedIn, snapshots: Option.none() } satisfies CheckReport;
+  }
+  const report = yield* checkMigrationDrift({
+    schema,
+    migrationsDir,
+    base: yield* pullRequestBase(migrationsDir, loaded.dir),
+  });
+  return { extrasRecordedIn, snapshots: Option.some(report.snapshots) } satisfies CheckReport;
+});
 
 const configFlag = Flag.String("config").pipe(
   Flag.withAlias("c"),

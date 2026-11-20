@@ -7,8 +7,11 @@
  *
  * @module columns
  */
+import type { EncodingError } from "effect/encoding";
+import { Hex } from "effect/encoding";
 import * as Option from "effect/Option";
 import * as P from "effect/Predicate";
+import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import { customType, timestamp } from "drizzle-orm/pg-core";
 import type {
@@ -147,38 +150,35 @@ export const timestamps = (): TimestampColumns => ({
 
 /**
  * Renders a `bytea` value (typically a content hash) as its lowercase hex
- * string.
- *
- * Written against `Uint8Array` rather than `Buffer.prototype.toString("hex")`
- * on purpose: a runtime that declares the Node `Buffer` global alongside
- * `@types/node` (Cloudflare Workers' `nodejs_compat` types are one example)
- * can strip the Node-only methods off the global `Buffer` interface, or
- * degrade the `Buffer` *value* to `any`, so every `Buffer.*` call goes
- * unchecked with no signal at all. `Uint8Array` is what a `bytea` row value
- * structurally is on every runtime, so this encodes identically everywhere
- * without depending on that global.
+ * string, through `effect/encoding`'s `Hex` rather than the Node `Buffer`
+ * global, which some runtimes' types degrade to `any` (Cloudflare Workers'
+ * `nodejs_compat` is one), leaving every `Buffer.*` call unchecked.
  */
-export const byteaToHex = (bytes: Uint8Array): string =>
-  Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+export const byteaToHex = (bytes: Uint8Array): string => Hex.encode(bytes);
 
 /**
- * Decodes a hex string into the `Uint8Array` a `bytea` column binds — the
- * inverse of {@link byteaToHex}, replacing `Buffer.from(hex, "hex")`.
+ * Decodes a hex string into the `Uint8Array` a `bytea` column binds, the
+ * inverse of {@link byteaToHex}, as a `Result`: `Failure` with an
+ * `EncodingError` unless `hex` is an even-length run of hex digits (either
+ * case).
  *
- * Strict where `Buffer.from` is silent: `Buffer.from` decodes the leading
+ * Strict where `Buffer.from(hex, "hex")` is silent: that decodes the leading
  * valid pairs and drops the rest, so a malformed hash quietly becomes a
- * short-but-plausible key that matches no row. This throws instead — a
- * caller that takes a hash from outside the trust boundary is expected to
- * validate its shape before calling this, and gets a loud failure instead
- * of a silently truncated key when it doesn't.
+ * short-but-plausible key that matches no row.
+ */
+export const decodeHexBytea = (
+  hex: string,
+): Result.Result<Uint8Array, EncodingError.EncodingError> => Hex.decode(hex);
+
+/**
+ * {@link decodeHexBytea} for a hash already validated at the trust boundary:
+ * returns the bytes, or throws on a malformed string instead of yielding a
+ * silently truncated key.
  *
  * @throws TypeError if `hex` is not an even-length run of hex digits.
  */
-export const hexToBytea = (hex: string): Uint8Array => {
-  if (hex.length % 2 !== 0 || !/^[0-9a-fA-F]*$/.test(hex)) {
-    throw new TypeError(`Expected an even-length hex string, received ${encodeJsonText(hex)}`);
-  }
-  return Uint8Array.from({ length: hex.length / 2 }, (_unused, index) =>
-    Number.parseInt(hex.slice(index * 2, index * 2 + 2), 16),
+export const hexToBytea = (hex: string): Uint8Array =>
+  Result.getOrThrowWith(
+    decodeHexBytea(hex),
+    () => new TypeError(`Expected an even-length hex string, received ${encodeJsonText(hex)}`),
   );
-};

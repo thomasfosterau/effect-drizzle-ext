@@ -8,6 +8,7 @@
  */
 
 import * as PgClient from "@effect/sql-pg/PgClient";
+import { Digest } from "effect/crypto";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import type * as FileSystem from "effect/FileSystem";
@@ -78,24 +79,20 @@ export class InvalidDatabasePrefix extends Schema.TaggedError<InvalidDatabasePre
  * `<prefix>_test_<sha256(migrationsDir)[:8]>`: concurrent runs from different
  * worktrees never collide, and a stale database self-heals on the next run.
  */
-export const testDatabaseName = (options: {
+export const testDatabaseName = Effect.fn("Testing.testDatabaseName")(function* (options: {
   readonly prefix: string;
   readonly migrationsDir: string;
-}): Effect.Effect<string, InvalidDatabasePrefix> =>
-  Effect.gen(function* () {
-    if (!DATABASE_PREFIX.test(options.prefix)) {
-      return yield* new InvalidDatabasePrefix({ prefix: options.prefix });
-    }
-    // SHA-256 over a byte array can't reject: a rejection is a platform defect.
-    const digest = yield* Effect.tryPromise({
-      try: () => crypto.subtle.digest("SHA-256", new TextEncoder().encode(options.migrationsDir)),
-      catch: (cause) => new PlatformDefect({ operation: "SHA-256 digest", cause }),
-    }).pipe(Effect.orDie);
-    const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0"))
-      .join("")
-      .slice(0, 8);
-    return `${options.prefix}_test_${hex}`;
-  });
+}): Effect.fn.Return<string, InvalidDatabasePrefix, Digest.Digest> {
+  if (!DATABASE_PREFIX.test(options.prefix)) {
+    return yield* new InvalidDatabasePrefix({ prefix: options.prefix });
+  }
+  const digest = yield* Digest.Digest;
+  const hex = yield* digest.digestHex(
+    Digest.sha256,
+    new TextEncoder().encode(options.migrationsDir),
+  );
+  return `${options.prefix}_test_${hex.slice(0, 8)}`;
+}, Effect.provide(Digest.layerWebCrypto));
 
 /** One connection attempt against a server's admin database failed. */
 export class ServerUnreachable extends Schema.TaggedError<ServerUnreachable>()(
@@ -113,16 +110,19 @@ export type ServerProbe = (
 ) => Effect.Effect<void, ServerUnreachable>;
 
 /** A `SELECT 1` over one short-lived connection. */
-export const probeServer: ServerProbe = (adminUrl) =>
-  Effect.gen(function* () {
+export const probeServer: ServerProbe = Effect.fn("Testing.probeServer")(
+  function* (_adminUrl: Redacted.Redacted<string>) {
     const sql = yield* PgClient.PgClient;
     yield* sql`SELECT 1`;
-  }).pipe(
-    Effect.provide(
-      PgClient.layer({ url: adminUrl, maxConnections: 1, connectTimeout: CONNECT_TIMEOUT }),
+  },
+  (effect, adminUrl) =>
+    effect.pipe(
+      Effect.provide(
+        PgClient.layer({ url: adminUrl, maxConnections: 1, connectTimeout: CONNECT_TIMEOUT }),
+      ),
+      Effect.mapError((cause) => new ServerUnreachable({ cause })),
     ),
-    Effect.mapError((cause) => new ServerUnreachable({ cause })),
-  );
+);
 
 /** An explicit but unreachable `PG*` target: this run will not fall back to a container. */
 export class DatabaseUnreachable extends Schema.TaggedError<DatabaseUnreachable>()(
@@ -174,40 +174,39 @@ export interface DatabaseSourceOptions {
  * Testcontainers fallback. Pure apart from the one probe, which only runs
  * when no explicit URL is set.
  */
-export const resolveDatabaseSource = (
+export const resolveDatabaseSource = Effect.fn("Testing.resolveDatabaseSource")(function* (
   options: DatabaseSourceOptions,
-): Effect.Effect<DatabaseSource, DatabaseUnreachable | InvalidDatabasePrefix> =>
-  Effect.gen(function* () {
-    const { env } = options;
-    const explicit = env.DATABASE_URL_TEST ?? env.DATABASE_URL ?? "";
-    if (explicit !== "") return { _tag: "Explicit", url: Redacted.make(explicit) } as const;
+): Effect.fn.Return<DatabaseSource, DatabaseUnreachable | InvalidDatabasePrefix> {
+  const { env } = options;
+  const explicit = env.DATABASE_URL_TEST ?? env.DATABASE_URL ?? "";
+  if (explicit !== "") return { _tag: "Explicit", url: Redacted.make(explicit) } as const;
 
-    const database = yield* testDatabaseName({
-      prefix: options.dbNamePrefix,
-      migrationsDir: options.migrationsDir,
-    });
-    const adminUrl = connectionUrl(env, "postgres");
-    const probe = options.probe ?? probeServer;
-    const reachable = yield* probe(adminUrl).pipe(
-      Effect.as(true),
-      Effect.catchTag("ServerUnreachable", (unreachable) =>
-        serverExplicitlyConfigured(env)
-          ? Effect.fail(
-              new DatabaseUnreachable({ server: serverLabel(env), cause: unreachable.cause }),
-            )
-          : Effect.succeed(false),
-      ),
-    );
-    if (reachable) {
-      return {
-        _tag: "LocalServer",
-        adminUrl,
-        database,
-        url: connectionUrl(env, database),
-      } as const;
-    }
-    return { _tag: "Container", image: options.image } as const;
+  const database = yield* testDatabaseName({
+    prefix: options.dbNamePrefix,
+    migrationsDir: options.migrationsDir,
   });
+  const adminUrl = connectionUrl(env, "postgres");
+  const probe = options.probe ?? probeServer;
+  const reachable = yield* probe(adminUrl).pipe(
+    Effect.as(true),
+    Effect.catchTag("ServerUnreachable", (unreachable) =>
+      serverExplicitlyConfigured(env)
+        ? Effect.fail(
+            new DatabaseUnreachable({ server: serverLabel(env), cause: unreachable.cause }),
+          )
+        : Effect.succeed(false),
+    ),
+  );
+  if (reachable) {
+    return {
+      _tag: "LocalServer",
+      adminUrl,
+      database,
+      url: connectionUrl(env, database),
+    } as const;
+  }
+  return { _tag: "Container", image: options.image } as const;
+});
 
 /**
  * A platform call that can't fail in a working environment failed anyway.
@@ -271,20 +270,22 @@ const defaultRunner =
     applyMigrations(migrationsDir).pipe(Effect.provide(PgClient.layer({ url, maxConnections: 1 })));
 
 /** Drop and recreate this checkout's database on the reachable server. */
-const recreateDatabase = (
-  source: Extract<DatabaseSource, { readonly _tag: "LocalServer" }>,
-): Effect.Effect<void, SqlError> =>
-  Effect.gen(function* () {
+const recreateDatabase = Effect.fn("Testing.recreateDatabase")(
+  function* (
+    source: Extract<DatabaseSource, { readonly _tag: "LocalServer" }>,
+  ): Effect.fn.Return<void, SqlError, PgClient.PgClient> {
     const admin = yield* PgClient.PgClient;
     // Quoted identifiers; `database` is `<prefix>_test_<hex>` with the prefix
     // restricted to an identifier, so nothing here can close the quote.
     yield* admin.unsafe(`DROP DATABASE IF EXISTS "${source.database}" WITH (FORCE)`);
     yield* admin.unsafe(`CREATE DATABASE "${source.database}"`);
-  }).pipe(
+  },
+  (effect, source) =>
     Effect.provide(
+      effect,
       PgClient.layer({ url: source.adminUrl, maxConnections: 1, connectTimeout: CONNECT_TIMEOUT }),
     ),
-  );
+);
 
 /**
  * Start a fresh server via Testcontainers, stopped when the scope closes. The
@@ -348,12 +349,12 @@ const startContainer = (
  * }
  * ```
  */
-export const provisionTestDatabase = <
+export const provisionTestDatabase = Effect.fn("Testing.provisionTestDatabase")(function* <
   E = MigrationError | PlatformError | SqlError,
   R = FileSystem.FileSystem | Path.Path,
 >(
   options: ProvisionOptions<E, R>,
-): Effect.Effect<
+): Effect.fn.Return<
   ProvisionedDatabase,
   | E
   | DatabaseUnreachable
@@ -363,21 +364,20 @@ export const provisionTestDatabase = <
   | MigrationError
   | PlatformError,
   R | FileSystem.FileSystem | Path.Path | Scope.Scope
-> =>
-  Effect.gen(function* () {
-    const source = yield* resolveDatabaseSource(options);
-    if (P.isTagged(source, "Explicit")) return { url: source.url, source };
+> {
+  const source = yield* resolveDatabaseSource(options);
+  if (P.isTagged(source, "Explicit")) return { url: source.url, source };
 
-    const url = P.isTagged(source, "LocalServer")
-      ? yield* recreateDatabase(source).pipe(Effect.as(source.url))
-      : yield* startContainer(source.image, serverLabel(options.env));
+  const url = P.isTagged(source, "LocalServer")
+    ? yield* recreateDatabase(source).pipe(Effect.as(source.url))
+    : yield* startContainer(source.image, serverLabel(options.env));
 
-    const migrate = options.applyMigrations ?? defaultRunner(options.migrationsDir);
-    const applied = yield* migrate(url);
-    yield* Effect.logInfo(
-      `provisioned ${
-        P.isTagged(source, "LocalServer") ? `'${source.database}'` : `a ${source.image} container`
-      } (${applied} migrations)`,
-    );
-    return { url, source };
-  }).pipe(Effect.withLogSpan("provisionTestDatabase"));
+  const migrate = options.applyMigrations ?? defaultRunner(options.migrationsDir);
+  const applied = yield* migrate(url);
+  yield* Effect.logInfo(
+    `provisioned ${
+      P.isTagged(source, "LocalServer") ? `'${source.database}'` : `a ${source.image} container`
+    } (${applied} migrations)`,
+  );
+  return { url, source };
+}, Effect.withLogSpan("provisionTestDatabase"));

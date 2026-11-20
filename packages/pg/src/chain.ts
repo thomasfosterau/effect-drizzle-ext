@@ -8,7 +8,7 @@
  */
 
 import { DerivationError } from "@thomasfosterau/effect-drizzle-ext/derive";
-import { catchUniqueViolation } from "@thomasfosterau/effect-drizzle-ext/errors";
+import { classifyError } from "@thomasfosterau/effect-drizzle-ext/errors";
 import type {
   VersionAction,
   VersionChainEntry,
@@ -30,6 +30,7 @@ import * as Arr from "effect/Array";
 import type * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import * as P from "effect/Predicate";
 import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
 import type { PgTransaction } from "./index.ts";
@@ -623,14 +624,24 @@ const checkPrecondition = (
         new StaleVersion({ type, id, expected: expectedVersion, current: previous.version }),
       );
 
-/** Whether a (deep) Drizzle failure is the unique violation of constraint `name`. */
+/**
+ * Recovers the unique violation of constraint `name` with `recover`; every
+ * other failure, a consumer's own unique constraint included, stays the
+ * driver's error in the typed channel.
+ */
 const onUniqueViolation =
   <A2, E2>(name: string, recover: () => Effect.Effect<A2, E2>) =>
   <A, E, Rq>(self: Effect.Effect<A, E, Rq>): Effect.Effect<A | A2, E | E2, Rq> =>
-    self.pipe(
-      catchUniqueViolation((violation) =>
-        Option.contains(violation.constraint, name) ? recover() : Effect.die(violation),
-      ),
+    Effect.catchIf(
+      self,
+      (error: E) =>
+        Option.exists(
+          classifyError(error),
+          (classified) =>
+            P.isTagged(classified, "UniqueViolation") &&
+            Option.contains(classified.constraint, name),
+        ),
+      recover,
     );
 
 /**

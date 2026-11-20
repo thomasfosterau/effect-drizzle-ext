@@ -130,10 +130,10 @@ export class ViewDependencyError extends Schema.TaggedError<ViewDependencyError>
  * console.log(viewCount); // 1
  * ```
  */
-export const checkViewDependencies = (options: {
-  readonly schema: SchemaModule;
-}): Effect.Effect<{ readonly viewCount: number }, ViewDependencyError | SchemaDiffError> =>
-  Effect.gen(function* () {
+export const checkViewDependencies = Effect.fn("Tooling.checkViewDependencies")(
+  function* (options: {
+    readonly schema: SchemaModule;
+  }): Effect.fn.Return<{ readonly viewCount: number }, ViewDependencyError | SchemaDiffError> {
     const cur = yield* drizzleKit(() => generateDrizzleJson(options.schema));
     const empty = yield* drizzleKit(() => generateDrizzleJson({}));
     const views = parseViewDefinitions(yield* drizzleKit(() => generateMigration(empty, cur)));
@@ -144,4 +144,5 @@ export const checkViewDependencies = (options: {
       });
     }
     return { viewCount: views.length };
-  });
+  },
+);

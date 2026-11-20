@@ -727,6 +727,8 @@ integrationLayer(database)((it) => {
             }),
           );
           assert(Exit.isFailure(attempt), "unreachable: a duplicate key should have been refused");
+          // A typed failure the caller can recover, not a defect.
+          expect(Cause.hasDies(attempt.cause)).toBe(false);
           const violation = classifyError(attempt.cause);
           expect(Option.map(violation, (error) => error._tag)).toEqual(
             Option.some("UniqueViolation"),
