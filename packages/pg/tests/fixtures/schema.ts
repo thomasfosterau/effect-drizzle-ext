@@ -4,7 +4,8 @@
  * Postgres schema so nothing collides with the `TEMPORARY` tables the other
  * integration specs create; and an ontology tree's derived tables
  * (`makeTreeTables`) and read views (`makeTreeViews`) in an `ontology`
- * schema, which the tree integration specs exercise.
+ * schema, which the tree integration specs exercise; and `./Outbox`'s table
+ * in the `fixture` schema.
  *
  * `migrations/` beside this file is drizzle-kit's output for it, generated
  * with `drizzle.config.ts` (`vp exec drizzle-kit generate --config
@@ -33,6 +34,7 @@ import {
 import * as Arr from "effect/Array";
 import * as P from "effect/Predicate";
 import * as Schema from "effect/Schema";
+import { outboxColumns, outboxConstraints } from "../../src/Outbox.ts";
 
 export const fixture = pgSchema("fixture");
 
@@ -62,6 +64,11 @@ export const widgetView = fixture.view("widget_view").as((qb) =>
     .from(widget)
     .innerJoin(widgetVersion, eq(widget.id, widgetVersion.id)),
 );
+
+// ── A transactional outbox ─────────────────────────
+
+/** `./Outbox`'s table, built from its columns as an application would. */
+export const outbox = fixture.table("outbox", outboxColumns(), outboxConstraints("outbox"));
 
 // ── An ontology tree ─────────────────────────
 

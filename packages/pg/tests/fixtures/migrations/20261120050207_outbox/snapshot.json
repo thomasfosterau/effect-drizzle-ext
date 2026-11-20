@@ -1,0 +1,252 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "e56b0139-3d2f-4aed-92f2-0c1194821405",
+  "prevIds": [
+    "975292b4-9c56-4a37-b75f-c3d7ad5c5d6d"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "fixture",
+        "outbox"
+      ],
+      "writes": [
+        "s|tbl|fixture.outbox",
+        "n|tbl|fixture.outbox",
+        "e|tbl|fixture.outbox",
+        "n|rel|fixture.outbox",
+        "n|type|fixture.outbox",
+        "n|rel|fixture.outbox_pkey",
+        "n|rel|fixture.outbox_stream_event_unique"
+      ],
+      "reads": [
+        "n|sch|fixture"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "fixture",
+        "outbox",
+        "outbox_pending_idx"
+      ],
+      "writes": [
+        "s|idx|fixture.outbox_pending_idx",
+        "n|idx|fixture.outbox_pending_idx",
+        "e|idx|fixture.outbox_pending_idx",
+        "n|rel|fixture.outbox_pending_idx"
+      ],
+      "reads": [
+        "n|tbl|fixture.outbox",
+        "n|sch|fixture",
+        "n|col|fixture.outbox.seq"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "fixture",
+        "name": "outbox",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "fixture",
+        "table": "outbox",
+        "name": "seq",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": {
+          "type": "always",
+          "name": "outbox_seq_seq",
+          "increment": "1",
+          "startWith": "1",
+          "minValue": "1",
+          "maxValue": "9223372036854775807",
+          "cache": 1,
+          "cycle": false
+        },
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "fixture",
+        "table": "outbox",
+        "name": "stream",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "fixture",
+        "table": "outbox",
+        "name": "stream_version",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "fixture",
+        "table": "outbox",
+        "name": "event_index",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "fixture",
+        "table": "outbox",
+        "name": "type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "fixture",
+        "table": "outbox",
+        "name": "payload",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "fixture",
+        "table": "outbox",
+        "name": "recorded_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "fixture",
+        "table": "outbox",
+        "name": "published_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "fixture",
+        "table": "outbox",
+        "name": "outbox_pending_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "seq",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": "\"published_at\" IS NULL",
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "fixture",
+        "table": "outbox",
+        "name": "outbox_pkey",
+        "columns": [
+          "seq"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "fixture",
+        "table": "outbox",
+        "name": "outbox_stream_event_unique",
+        "nameExplicit": true,
+        "columns": [
+          "stream",
+          "stream_version",
+          "event_index"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    }
+  ]
+}
