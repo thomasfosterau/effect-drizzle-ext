@@ -478,6 +478,49 @@ describe("makeTreeViews: branch views", () => {
   });
 });
 
+describe("makeTreeViews: a leaf with children", () => {
+  const tree = defineTree({
+    realm: {},
+    party: {
+      parent: "realm",
+      columns: { handle: dbColumn(Schema.String, { column: "handle", pg: "text", notNull: true }) },
+      leaf: {},
+    },
+    member: {
+      parent: "party",
+      leaf: { rank: dbColumn(Schema.Finite, { column: "rank", pg: "integer", notNull: false }) },
+    },
+  });
+  const tables = makeTreeTables(tree, { schema, builders });
+
+  it("gets a leaf view, and an arm in the branch view above it", () => {
+    const views = makeTreeViews(tree, tables, { schema, branches: { realm: true } });
+    expect(R.keys(views.leaves)).toEqual(["party", "member"]);
+    expect(keysOf(views.leaves.party)).toEqual([
+      "id",
+      "version",
+      "action",
+      "handle",
+      "timestamp",
+      "createdAt",
+    ]);
+    const query = sqlOf(views.branches.realm);
+    expect(query).toContain(
+      `case "ontology"."node"."type" when 'party' then exists (select 1 from "ontology"."party_version"`,
+    );
+    expect(query.indexOf("when 'party'")).toBeLessThan(query.indexOf("when 'member'"));
+  });
+
+  it("can't take a branch view, whose name its leaf view holds", () => {
+    expect(() =>
+      makeTreeViews(tree, tables, {
+        schema,
+        branches: { party: true },
+      }),
+    ).toThrow(/"party", a leaf with children: its leaf view already takes "party_view"/);
+  });
+});
+
 describe("makeTreeViews: as-of reads", () => {
   it("bounds the head by version", () => {
     const query = dialect.sqlToQuery(sql`select * from ${frbrViews.asOf("book", { version: 2n })}`);

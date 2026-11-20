@@ -32,7 +32,7 @@ The chain writes stable columns once, at `create`; no later write touches them. 
 
 `makeTreeViews(tree, tables, { schema, branches?, pointers? })` derives the read views:
 
-- **Per leaf, a fail-closed current-version view** (`${leaf}_view`). It drives from the leaf's version table, keeps the head row (see [Head resolution](#head-resolution)) and INNER JOINs every other level's version table at it, so ancestor level columns appear with no per-anchor factory. Each level's stable columns come before its version columns. A node whose head advanced past any level yields **no row**.
+- **Per leaf, a fail-closed current-version view** (`${leaf}_view`). It drives from the leaf's version table, keeps the head row (see [Head resolution](#head-resolution)) and INNER JOINs every other level's version table at it, so ancestor level columns appear with no per-anchor factory. Each level's stable columns come before its version columns. A node whose head advanced past any level yields **no row**. A leaf with children has a view like any leaf; since its descendants' nodes have a row at its level too, the view shows them as well, read at its own path.
 - **Per marker named in `branches`, a branch view** (`${level}_view`): one row per node of the marker's subtree leaves, with the marker's path and the leaf `type` (see [Branch views](#branch-views)). An optional per-leaf `project` adds columns such as a search text.
 - **Per keyed leaf, a keyed view** (one row per key, and one `NULL`-key row for a head with none).
 - **Per pointer and leaf named in `pointers`, the leaf view at the pointer's effective fact.** It projects the head's `action` and `${pointer}At`, and composes with the keyed view.

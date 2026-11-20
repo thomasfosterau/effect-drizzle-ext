@@ -146,7 +146,7 @@ type PathOf<S, K> = K extends keyof S
 
 /** The leaf names of declaration `S`. */
 type LeafOf<S> = {
-  readonly [K in keyof S]: S[K] extends { readonly leaf?: infer L }
+  readonly [K in keyof S]: S[K] extends { readonly leaf: infer L }
     ? [Exclude<L, undefined>] extends [never]
       ? never
       : K
@@ -206,6 +206,34 @@ export type ChainState<S, T extends ChainTables, K> = Simplify<PathState<T, Path
 /** A tri-state patch over a {@link ChainState}: a value sets, `null` clears, an absent key carries forward. */
 export type ChainPatch<S, T extends ChainTables, K> = {
   readonly [F in keyof ChainState<S, T, K>]?: ChainState<S, T, K>[F] | undefined;
+};
+
+/** The levels of path `P` past its prefix `Q`. */
+type DropPrefix<P, Q> = Q extends readonly [infer H, ...infer QRest]
+  ? P extends readonly [H, ...infer PRest]
+    ? DropPrefix<PRest, QRest>
+    : P
+  : P;
+
+/** The levels leaf `K`'s path adds below leaf `F`'s, root-most first. */
+type AddedPath<S, K, F> = DropPrefix<PathOf<S, K>, PathOf<S, F>>;
+
+/** The leaves leaf `K` can be refined from: every leaf above it on its path. */
+type RefineSourceOf<S, K> = Exclude<PathOf<S, K>[number], K> & LeafOf<S>;
+
+/**
+ * Refining a node of leaf `F` to leaf `K`: the `patch` over `F`'s state, which
+ * must supply every required column of the levels `K` adds, and the `stable`
+ * extras of those levels.
+ */
+export interface ChainRefinement<S, T extends ChainTables, K, F> {
+  readonly patch: Simplify<PathCreate<T, AddedPath<S, K, F>> & ChainPatch<S, T, F>>;
+  readonly stable: Simplify<PathStable<T, AddedPath<S, K, F>>>;
+}
+
+/** Leaf `K`'s {@link ChainRefinement} from each leaf above it, keyed by that leaf's name. */
+export type ChainRefinements<S, T extends ChainTables, K> = {
+  readonly [F in RefineSourceOf<S, K>]: ChainRefinement<S, T, K, F>;
 };
 
 /** Leaf `K`'s state at version 0: every required column, the rest optional. */
@@ -325,6 +353,24 @@ export interface ChainUpdateInput<Patch, VE, KP = never> extends ChainActor<VE>,
   readonly keyed?: KP | undefined;
 }
 
+/** The input to {@link LeafChain.refine}. */
+export interface ChainRefineInput<F, Patch, VE, KL = never, ST = Record<never, never>>
+  extends ChainActor<VE>, ChainPrecondition {
+  /** The node to refine. */
+  readonly id: string;
+  /** The leaf the node is of now: a leaf above the target on its path. */
+  readonly from: F;
+  /**
+   * The tri-state patch over `from`'s head state, supplying every required
+   * column of the levels the target adds.
+   */
+  readonly patch: Patch;
+  /** The target's keyed level at the refined version (every key it carries); absent, none. */
+  readonly keyed?: KL | undefined;
+  /** The stable-table extras of the levels the target adds, keyed by field. */
+  readonly stable?: ST | undefined;
+}
+
 /** The options {@link LeafChain.delete} and {@link LeafChain.restoreVersion} take. */
 export interface ChainWriteOptions<VE> extends ChainActor<VE>, ChainPrecondition {}
 
@@ -353,6 +399,7 @@ export interface LeafChain<
   KL = Record<never, never>,
   KP = never,
   ST = Record<never, never>,
+  RF = Record<never, never>,
 > {
   /**
    * Insert the node, every level's stable row (with its `stable` extras) and
@@ -406,6 +453,31 @@ export interface LeafChain<
    * failure. A tombstone's head is its `delete` entry.
    */
   readonly head: (id: string) => Effect.Effect<Option.Option<VersionChainEntry>, E, I>;
+  /**
+   * Refine a node of leaf `from`, a leaf above this one on its path, to this
+   * leaf: in one go, read `from`'s head and check `expectedVersion` against it,
+   * set the identity row's `type` to this leaf (the `(id, type)` arcs cascade
+   * it down every stable row), insert the stable rows of the levels this leaf
+   * adds (with their `stable` extras), and append an `update` version at every
+   * level of this leaf's path carrying `from`'s state with `patch` applied.
+   *
+   * The one chain write that changes a stable row. The arcs must cascade, so
+   * declare a level at or above `from` `refinable` in `makeTreeTables`;
+   * otherwise the identity update fails with the driver's foreign-key
+   * violation. Versions before the refinement have no row at the added
+   * levels, so this leaf reads none of them (`getVersion` fails
+   * {@link VersionNotFound}, and its views show none), while `from`'s view
+   * keeps showing the node, now with this leaf's `type`. A keyed level of
+   * `from`'s does not carry over; `keyed` is this leaf's own.
+   *
+   * Fails {@link NodeNotFound} (typed as `from`) for an unknown or tombstoned
+   * node, or one not of `from`; {@link StaleVersion} when `expectedVersion`
+   * is not `from`'s head; and {@link VersionConflict} when another writer
+   * moved or refined the node first.
+   */
+  readonly refine: <F extends keyof RF & string>(
+    input: ChainRefineInput<F, MemberOf<RF[F], "patch">, VE, KL, MemberOf<RF[F], "stable">>,
+  ) => Effect.Effect<ChainWrite, E | NodeNotFound | StaleVersion | VersionConflict, I>;
   /** The reconstructed state at `(id, version)`. Fails {@link VersionNotFound} when any level has no row there. */
   readonly getVersion: (
     id: string,
@@ -434,7 +506,8 @@ export type VersionChain<S, T extends ChainTables, E, I> = {
     I,
     ChainKeyedLevel<S, T, K>,
     ChainKeyedPatch<S, T, K>,
-    ChainStableExtras<S, T, K>
+    ChainStableExtras<S, T, K>,
+    ChainRefinements<S, T, K>
   >;
 };
 
@@ -537,6 +610,19 @@ const isNodeId = (id: string): boolean => PG_UUID.test(id);
 
 const present = (patch: Row): Row => R.filter(patch, (value) => value !== undefined);
 
+/** Fail {@link StaleVersion} unless `expectedVersion` is absent or is `previous`'s version. */
+const checkPrecondition = (
+  type: string,
+  id: string,
+  previous: VersionChainEntry,
+  { expectedVersion }: ChainPrecondition,
+): Effect.Effect<void, StaleVersion> =>
+  expectedVersion === undefined || expectedVersion === previous.version
+    ? Effect.void
+    : Effect.fail(
+        new StaleVersion({ type, id, expected: expectedVersion, current: previous.version }),
+      );
+
 /** Whether a (deep) Drizzle failure is the unique violation of constraint `name`. */
 const onUniqueViolation =
   <A2, E2>(name: string, recover: () => Effect.Effect<A2, E2>) =>
@@ -558,7 +644,7 @@ const onUniqueViolation =
  * path order, then each non-null fact. A create first writes the identity
  * row and every level's stable row, `type` set to the leaf and its
  * `stableColumns` from `stable` (keyed by field across the path, like
- * `identity`); no later write touches a stable row. State is keyed by
+ * `identity`); only `refine` touches a stable row after that. State is keyed by
  * field across the whole path (the tree rejects a key two levels of one path
  * share).
  *
@@ -636,14 +722,27 @@ export const makeVersionChain = <
     );
   const factTables = (name: string) => Option.getOrElse(R.get(tables.facts, name), () => ({}));
 
-  const leafChain = (leaf: string) => {
-    const ancestors = Option.match(
-      Arr.findFirst(tree.levels, (level) => level.name === leaf),
+  const ancestorsOf = (name: string) =>
+    Option.match(
+      Arr.findFirst(tree.levels, (level) => level.name === name),
       {
-        onNone: () => tablesError(`"${leaf}" is not a level of this tree`),
+        onNone: () => tablesError(`"${name}" is not a level of this tree`),
         onSome: (level) => level.ancestors,
       },
     );
+  /** One leaf's head snapshot, as a refinement from that leaf reads it. */
+  interface Source {
+    readonly current: (
+      id: string,
+    ) => Effect.Effect<
+      Option.Option<ChainSnapshot<Row, KeyedRows>>,
+      QueryError<PgTransaction<Relations>>,
+      I
+    >;
+  }
+
+  const leafChain = (leaf: string) => {
+    const ancestors = ancestorsOf(leaf);
     const path = [...ancestors, leaf];
     // A keyed leaf's key name, table and keyed columns.
     const keyed = Option.flatMap(
@@ -826,22 +925,16 @@ export const makeVersionChain = <
       content: Content,
       options: ChainWriteOptions<Row>,
     ) =>
-      options.expectedVersion !== undefined && options.expectedVersion !== previous.version
-        ? Effect.fail(
-            new StaleVersion({
-              type: leaf,
-              id,
-              expected: options.expectedVersion,
-              current: previous.version,
-            }),
-          )
-        : Effect.as(
-            writeVersion(id, previous.version + 1n, action, content.state, content.keyed, options),
-            {
-              id,
-              version: previous.version + 1n,
-            },
-          );
+      Effect.andThen(
+        checkPrecondition(leaf, id, previous, options),
+        Effect.as(
+          writeVersion(id, previous.version + 1n, action, content.state, content.keyed, options),
+          {
+            id,
+            version: previous.version + 1n,
+          },
+        ),
+      );
 
     const mintId = Effect.fn(`${leaf}.mintId`)(function* () {
       const tx = yield* CurrentTransaction;
@@ -859,11 +952,12 @@ export const makeVersionChain = <
     const writeStable = Effect.fn(`${leaf}.writeStable`)(function* (
       id: string,
       extras: Row | undefined,
+      targets: ReadonlyArray<(typeof levels)[number]>,
     ) {
       const tx = yield* CurrentTransaction;
       const stable = present(extras ?? {});
       yield* Effect.forEach(
-        levels,
+        targets,
         (level) =>
           tx.insert(level.stable).values({
             ...R.filter(stable, (_, key) => Arr.contains(level.stableKeys, key)),
@@ -891,7 +985,7 @@ export const makeVersionChain = <
             Effect.fail(new NodeAlreadyExists({ type: leaf, id })),
           ),
         );
-      yield* writeStable(id, input.stable);
+      yield* writeStable(id, input.stable, levels);
       yield* writeVersion(
         id,
         0n,
@@ -993,19 +1087,77 @@ export const makeVersionChain = <
       });
     });
 
+    /**
+     * Refine a node of `from` to this leaf, reading `from`'s head through
+     * `sources` (every leaf's head snapshot).
+     */
+    const refineWith = (sources: Readonly<Record<string, Source>>) =>
+      Effect.fn(`${leaf}.refine`)(function* (
+        input: ChainRefineInput<string, Row, Row, KeyedRows, Row>,
+      ) {
+        const { id, from } = input;
+        const found = yield* Option.match(
+          Option.filter(R.get(sources, from), () => Arr.contains(ancestors, from)),
+          {
+            onNone: () =>
+              Effect.die(
+                new DerivationError({
+                  message: `${leaf}.refine: "${from}" is not a leaf above "${leaf}"`,
+                }),
+              ),
+            onSome: (source) => source.current(id),
+          },
+        );
+        const live = Option.filter(found, (entry) => entry.action !== "delete");
+        if (Option.isNone(live)) return yield* new NodeNotFound({ type: from, id });
+        const previous = live.value;
+        yield* checkPrecondition(from, id, previous, input);
+        const version = previous.version + 1n;
+        const tx = yield* CurrentTransaction;
+        // The arcs cascade the new `type` down every stable row on `from`'s
+        // path. No row: another writer refined or moved the node first.
+        const flipped = yield* tx
+          .update(identity)
+          .set({ type: leaf })
+          .where(and(eq(identityId, id), eq(identityType, from)))
+          .returning({ id: identityId });
+        if (Arr.isReadonlyArrayEmpty(flipped)) return yield* new VersionConflict({ id, version });
+        // Only the levels below `from` are new; the rest already have their row.
+        const added = Arr.drop(levels, Arr.length(ancestorsOf(from)) + 1);
+        yield* writeStable(id, input.stable, added);
+        yield* writeVersion(
+          id,
+          version,
+          "update",
+          { ...previous.state, ...present(input.patch) },
+          initialKeyed(Option.fromUndefinedOr(input.keyed)),
+          input,
+        );
+        return { id, version };
+      });
+
     return {
-      head,
-      create,
-      update,
-      restore,
-      delete: softDelete,
-      restoreVersion,
-      getVersion,
-      history,
+      operations: {
+        head,
+        create,
+        update,
+        restore,
+        delete: softDelete,
+        restoreVersion,
+        getVersion,
+        history,
+      },
+      source: { current },
+      refineWith,
     };
   };
 
-  const chains = R.fromEntries(Arr.map(tree.leaves, (leaf) => [leaf, leafChain(leaf)]));
+  const built = R.fromEntries(Arr.map(tree.leaves, (leaf) => [leaf, leafChain(leaf)] as const));
+  const sources = R.map(built, ({ source }) => source);
+  const chains = R.map(built, ({ operations, refineWith }) => ({
+    ...operations,
+    refine: refineWith(sources),
+  }));
   // SAFETY: the type-erasure seam, as in core's makeTreeTables. Every leaf's
   // operations were built above over the same tables `T` types, reading and
   // writing exactly the fields `ChainState` / `ChainCreateState` name; only the

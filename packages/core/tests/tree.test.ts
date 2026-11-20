@@ -139,13 +139,21 @@ describe("defineTree: construction-time checks", () => {
     ).toThrow(/cycle: a → b → a$/);
   });
 
-  it("rejects a leaf with children", () => {
-    expect(() =>
-      defineTree({
-        book: { leaf: {} },
-        chapter: { parent: "book", leaf: {} },
-      }),
-    ).toThrow(/leaf "book" has children \(chapter\)/);
+  it("lets a leaf have children, its name joining its own subtree leaves", () => {
+    const tree = defineTree({
+      party: { leaf: {} },
+      member: { parent: "party", leaf: {} },
+      guild: { parent: "party" },
+      band: { parent: "guild", leaf: {} },
+    });
+    expect(tree.leaves).toEqual(["party", "member", "band"]);
+    const party = tree.level("party");
+    expect([party.isLeaf, party.children, party.subtreeLeaves]).toEqual([
+      true,
+      ["member", "guild"],
+      ["party", "member", "band"],
+    ]);
+    expect(tree.level("guild").subtreeLeaves).toEqual(["band"]);
   });
 
   it("rejects a marker with no leaf below it", () => {

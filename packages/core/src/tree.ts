@@ -49,7 +49,12 @@ export interface LevelSpec<Parent extends string = string, Leaf = unknown> {
    * `dbColumn` annotation.
    */
   readonly columns?: Schema.Struct.Fields;
-  /** The leaf payload. Present: a concrete leaf; absent: a marker level. */
+  /**
+   * The leaf payload. Present: a concrete leaf; absent: a marker level. A
+   * level with children may carry one too: its name then joins its own
+   * subtree leaves, so a node can be of it and later refined to a descendant
+   * leaf.
+   */
   readonly leaf?: Leaf;
   /** A leaf's keyed fact level (see {@link KeyedSpec}); a marker can't carry one. */
   readonly keyed?: KeyedSpec;
@@ -71,7 +76,7 @@ export type LevelName<S> = keyof S & string;
 
 /** The names of the leaf levels of declaration `S`: the discriminator values. */
 export type LeafName<S> = {
-  readonly [K in keyof S]: S[K] extends { readonly leaf?: infer L }
+  readonly [K in keyof S]: S[K] extends { readonly leaf: infer L }
     ? [Exclude<L, undefined>] extends [never]
       ? never
       : K
@@ -92,7 +97,7 @@ export interface TreeLevel<S> {
   readonly parent: Option.Option<LevelName<S>>;
   /** The level kind, `"plain"` when the entry names none. */
   readonly kind: LevelKind;
-  /** Whether the level is a concrete leaf. */
+  /** Whether the level is a concrete leaf (it may still have children). */
   readonly isLeaf: boolean;
   /** Every ancestor, root-most first, the level itself excluded. */
   readonly ancestors: ReadonlyArray<LevelName<S>>;
@@ -213,7 +218,7 @@ const firstClash = (
  * Check a tree declaration and derive every level's facts. Throws
  * {@link DerivationError} at module load for an empty tree, a level name a JS
  * object would reorder (an array index) or that is empty, a parent naming no
- * level, a parent cycle, a leaf with children, a marker with no leaf below it,
+ * level, a parent cycle, a marker with no leaf below it,
  * a level column without a `dbColumn` annotation, a column taking a reserved
  * name (`id`, `version`, `action`, `type`), or two columns on one root-to-leaf
  * path sharing a field key or a column name. The entries' own payload checks
@@ -276,11 +281,6 @@ export const buildTree = <
     Arr.filter(leaves, (leaf) => leaf === name || Arr.contains(ancestorsFor(leaf), name));
 
   Arr.forEach(names, (name) => {
-    if (isLeafName(name) && Arr.isReadonlyArrayNonEmpty(childrenOf(name))) {
-      treeError(
-        `leaf "${name}" has children (${childrenOf(name).join(", ")}); only a marker level can be a parent`,
-      );
-    }
     if (!isLeafName(name) && !Arr.isReadonlyArrayNonEmpty(subtreeLeavesOf(name))) {
       treeError(
         `marker level "${name}" has no leaf below it, so its discriminator CHECK would admit nothing`,

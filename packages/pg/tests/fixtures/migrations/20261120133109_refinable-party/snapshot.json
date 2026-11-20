@@ -1,0 +1,1986 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "f2a148b0-f889-4529-89f6-3f38d937fe1f",
+  "prevIds": [
+    "e56b0139-3d2f-4aed-92f2-0c1194821405"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "band"
+      ],
+      "writes": [
+        "s|tbl|ontology.band",
+        "n|tbl|ontology.band",
+        "e|tbl|ontology.band",
+        "n|rel|ontology.band",
+        "n|type|ontology.band",
+        "n|rel|ontology.band_pkey",
+        "n|rel|ontology.band_id_type_unique"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "band_version"
+      ],
+      "writes": [
+        "s|tbl|ontology.band_version",
+        "n|tbl|ontology.band_version",
+        "e|tbl|ontology.band_version",
+        "n|rel|ontology.band_version",
+        "n|type|ontology.band_version",
+        "n|rel|ontology.band_version_pkey"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "guild"
+      ],
+      "writes": [
+        "s|tbl|ontology.guild",
+        "n|tbl|ontology.guild",
+        "e|tbl|ontology.guild",
+        "n|rel|ontology.guild",
+        "n|type|ontology.guild",
+        "n|rel|ontology.guild_pkey",
+        "n|rel|ontology.guild_id_type_unique"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "guild_version"
+      ],
+      "writes": [
+        "s|tbl|ontology.guild_version",
+        "n|tbl|ontology.guild_version",
+        "e|tbl|ontology.guild_version",
+        "n|rel|ontology.guild_version",
+        "n|type|ontology.guild_version",
+        "n|rel|ontology.guild_version_pkey"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "member"
+      ],
+      "writes": [
+        "s|tbl|ontology.member",
+        "n|tbl|ontology.member",
+        "e|tbl|ontology.member",
+        "n|rel|ontology.member",
+        "n|type|ontology.member",
+        "n|rel|ontology.member_pkey",
+        "n|rel|ontology.member_id_type_unique"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "member_version"
+      ],
+      "writes": [
+        "s|tbl|ontology.member_version",
+        "n|tbl|ontology.member_version",
+        "e|tbl|ontology.member_version",
+        "n|rel|ontology.member_version",
+        "n|type|ontology.member_version",
+        "n|rel|ontology.member_version_pkey"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "party"
+      ],
+      "writes": [
+        "s|tbl|ontology.party",
+        "n|tbl|ontology.party",
+        "e|tbl|ontology.party",
+        "n|rel|ontology.party",
+        "n|type|ontology.party",
+        "n|rel|ontology.party_pkey",
+        "n|rel|ontology.party_id_type_unique"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "party_version"
+      ],
+      "writes": [
+        "s|tbl|ontology.party_version",
+        "n|tbl|ontology.party_version",
+        "e|tbl|ontology.party_version",
+        "n|rel|ontology.party_version",
+        "n|type|ontology.party_version",
+        "n|rel|ontology.party_version_pkey"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "realm"
+      ],
+      "writes": [
+        "s|tbl|ontology.realm",
+        "n|tbl|ontology.realm",
+        "e|tbl|ontology.realm",
+        "n|rel|ontology.realm",
+        "n|type|ontology.realm",
+        "n|rel|ontology.realm_pkey",
+        "n|rel|ontology.realm_id_type_unique"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "realm_version"
+      ],
+      "writes": [
+        "s|tbl|ontology.realm_version",
+        "n|tbl|ontology.realm_version",
+        "e|tbl|ontology.realm_version",
+        "n|rel|ontology.realm_version",
+        "n|type|ontology.realm_version",
+        "n|rel|ontology.realm_version_pkey"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "band"
+      ],
+      "writes": [
+        "s|fk|ontology.band.band_id_guild_id_fkey",
+        "n|fk|ontology.band.band_id_guild_id_fkey",
+        "e|fk|ontology.band.band_id_guild_id_fkey",
+        "n|con|ontology.band.band_id_guild_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.band",
+        "n|sch|ontology",
+        "n|tbl|ontology.guild",
+        "n|sch|ontology",
+        "n|col|ontology.band.id",
+        "n|col|ontology.guild.id",
+        "e|uniqueness|ontology.guild.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "band"
+      ],
+      "writes": [
+        "s|fk|ontology.band.band_id_type_fk",
+        "n|fk|ontology.band.band_id_type_fk",
+        "e|fk|ontology.band.band_id_type_fk",
+        "n|con|ontology.band.band_id_type_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.band",
+        "n|sch|ontology",
+        "n|tbl|ontology.guild",
+        "n|sch|ontology",
+        "n|col|ontology.band.id",
+        "n|col|ontology.band.type",
+        "n|col|ontology.guild.id",
+        "n|col|ontology.guild.type",
+        "e|uniqueness|ontology.guild.id.type"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "band_version"
+      ],
+      "writes": [
+        "s|fk|ontology.band_version.band_version_id_band_id_fkey",
+        "n|fk|ontology.band_version.band_version_id_band_id_fkey",
+        "e|fk|ontology.band_version.band_version_id_band_id_fkey",
+        "n|con|ontology.band_version.band_version_id_band_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.band_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.band",
+        "n|sch|ontology",
+        "n|col|ontology.band_version.id",
+        "n|col|ontology.band.id",
+        "e|uniqueness|ontology.band.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "band_version"
+      ],
+      "writes": [
+        "s|fk|ontology.band_version.band_version_guild_version_fk",
+        "n|fk|ontology.band_version.band_version_guild_version_fk",
+        "e|fk|ontology.band_version.band_version_guild_version_fk",
+        "n|con|ontology.band_version.band_version_guild_version_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.band_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.guild_version",
+        "n|sch|ontology",
+        "n|col|ontology.band_version.id",
+        "n|col|ontology.band_version.version",
+        "n|col|ontology.guild_version.id",
+        "n|col|ontology.guild_version.version",
+        "e|uniqueness|ontology.guild_version.id.version"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "guild"
+      ],
+      "writes": [
+        "s|fk|ontology.guild.guild_id_party_id_fkey",
+        "n|fk|ontology.guild.guild_id_party_id_fkey",
+        "e|fk|ontology.guild.guild_id_party_id_fkey",
+        "n|con|ontology.guild.guild_id_party_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.guild",
+        "n|sch|ontology",
+        "n|tbl|ontology.party",
+        "n|sch|ontology",
+        "n|col|ontology.guild.id",
+        "n|col|ontology.party.id",
+        "e|uniqueness|ontology.party.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "guild"
+      ],
+      "writes": [
+        "s|fk|ontology.guild.guild_id_type_fk",
+        "n|fk|ontology.guild.guild_id_type_fk",
+        "e|fk|ontology.guild.guild_id_type_fk",
+        "n|con|ontology.guild.guild_id_type_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.guild",
+        "n|sch|ontology",
+        "n|tbl|ontology.party",
+        "n|sch|ontology",
+        "n|col|ontology.guild.id",
+        "n|col|ontology.guild.type",
+        "n|col|ontology.party.id",
+        "n|col|ontology.party.type",
+        "e|uniqueness|ontology.party.id.type"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "guild_version"
+      ],
+      "writes": [
+        "s|fk|ontology.guild_version.guild_version_id_guild_id_fkey",
+        "n|fk|ontology.guild_version.guild_version_id_guild_id_fkey",
+        "e|fk|ontology.guild_version.guild_version_id_guild_id_fkey",
+        "n|con|ontology.guild_version.guild_version_id_guild_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.guild_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.guild",
+        "n|sch|ontology",
+        "n|col|ontology.guild_version.id",
+        "n|col|ontology.guild.id",
+        "e|uniqueness|ontology.guild.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "guild_version"
+      ],
+      "writes": [
+        "s|fk|ontology.guild_version.guild_version_party_version_fk",
+        "n|fk|ontology.guild_version.guild_version_party_version_fk",
+        "e|fk|ontology.guild_version.guild_version_party_version_fk",
+        "n|con|ontology.guild_version.guild_version_party_version_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.guild_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.party_version",
+        "n|sch|ontology",
+        "n|col|ontology.guild_version.id",
+        "n|col|ontology.guild_version.version",
+        "n|col|ontology.party_version.id",
+        "n|col|ontology.party_version.version",
+        "e|uniqueness|ontology.party_version.id.version"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "member"
+      ],
+      "writes": [
+        "s|fk|ontology.member.member_id_party_id_fkey",
+        "n|fk|ontology.member.member_id_party_id_fkey",
+        "e|fk|ontology.member.member_id_party_id_fkey",
+        "n|con|ontology.member.member_id_party_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.member",
+        "n|sch|ontology",
+        "n|tbl|ontology.party",
+        "n|sch|ontology",
+        "n|col|ontology.member.id",
+        "n|col|ontology.party.id",
+        "e|uniqueness|ontology.party.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "member"
+      ],
+      "writes": [
+        "s|fk|ontology.member.member_id_type_fk",
+        "n|fk|ontology.member.member_id_type_fk",
+        "e|fk|ontology.member.member_id_type_fk",
+        "n|con|ontology.member.member_id_type_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.member",
+        "n|sch|ontology",
+        "n|tbl|ontology.party",
+        "n|sch|ontology",
+        "n|col|ontology.member.id",
+        "n|col|ontology.member.type",
+        "n|col|ontology.party.id",
+        "n|col|ontology.party.type",
+        "e|uniqueness|ontology.party.id.type"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "member_version"
+      ],
+      "writes": [
+        "s|fk|ontology.member_version.member_version_id_member_id_fkey",
+        "n|fk|ontology.member_version.member_version_id_member_id_fkey",
+        "e|fk|ontology.member_version.member_version_id_member_id_fkey",
+        "n|con|ontology.member_version.member_version_id_member_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.member_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.member",
+        "n|sch|ontology",
+        "n|col|ontology.member_version.id",
+        "n|col|ontology.member.id",
+        "e|uniqueness|ontology.member.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "member_version"
+      ],
+      "writes": [
+        "s|fk|ontology.member_version.member_version_party_version_fk",
+        "n|fk|ontology.member_version.member_version_party_version_fk",
+        "e|fk|ontology.member_version.member_version_party_version_fk",
+        "n|con|ontology.member_version.member_version_party_version_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.member_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.party_version",
+        "n|sch|ontology",
+        "n|col|ontology.member_version.id",
+        "n|col|ontology.member_version.version",
+        "n|col|ontology.party_version.id",
+        "n|col|ontology.party_version.version",
+        "e|uniqueness|ontology.party_version.id.version"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "party"
+      ],
+      "writes": [
+        "s|fk|ontology.party.party_id_realm_id_fkey",
+        "n|fk|ontology.party.party_id_realm_id_fkey",
+        "e|fk|ontology.party.party_id_realm_id_fkey",
+        "n|con|ontology.party.party_id_realm_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.party",
+        "n|sch|ontology",
+        "n|tbl|ontology.realm",
+        "n|sch|ontology",
+        "n|col|ontology.party.id",
+        "n|col|ontology.realm.id",
+        "e|uniqueness|ontology.realm.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "party"
+      ],
+      "writes": [
+        "s|fk|ontology.party.party_id_type_fk",
+        "n|fk|ontology.party.party_id_type_fk",
+        "e|fk|ontology.party.party_id_type_fk",
+        "n|con|ontology.party.party_id_type_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.party",
+        "n|sch|ontology",
+        "n|tbl|ontology.realm",
+        "n|sch|ontology",
+        "n|col|ontology.party.id",
+        "n|col|ontology.party.type",
+        "n|col|ontology.realm.id",
+        "n|col|ontology.realm.type",
+        "e|uniqueness|ontology.realm.id.type"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "party_version"
+      ],
+      "writes": [
+        "s|fk|ontology.party_version.party_version_id_party_id_fkey",
+        "n|fk|ontology.party_version.party_version_id_party_id_fkey",
+        "e|fk|ontology.party_version.party_version_id_party_id_fkey",
+        "n|con|ontology.party_version.party_version_id_party_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.party_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.party",
+        "n|sch|ontology",
+        "n|col|ontology.party_version.id",
+        "n|col|ontology.party.id",
+        "e|uniqueness|ontology.party.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "party_version"
+      ],
+      "writes": [
+        "s|fk|ontology.party_version.party_version_realm_version_fk",
+        "n|fk|ontology.party_version.party_version_realm_version_fk",
+        "e|fk|ontology.party_version.party_version_realm_version_fk",
+        "n|con|ontology.party_version.party_version_realm_version_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.party_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.realm_version",
+        "n|sch|ontology",
+        "n|col|ontology.party_version.id",
+        "n|col|ontology.party_version.version",
+        "n|col|ontology.realm_version.id",
+        "n|col|ontology.realm_version.version",
+        "e|uniqueness|ontology.realm_version.id.version"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "realm"
+      ],
+      "writes": [
+        "s|fk|ontology.realm.realm_id_node_id_fkey",
+        "n|fk|ontology.realm.realm_id_node_id_fkey",
+        "e|fk|ontology.realm.realm_id_node_id_fkey",
+        "n|con|ontology.realm.realm_id_node_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.realm",
+        "n|sch|ontology",
+        "n|tbl|ontology.node",
+        "n|sch|ontology",
+        "n|col|ontology.realm.id",
+        "n|col|ontology.node.id",
+        "e|uniqueness|ontology.node.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "realm"
+      ],
+      "writes": [
+        "s|fk|ontology.realm.realm_id_type_fk",
+        "n|fk|ontology.realm.realm_id_type_fk",
+        "e|fk|ontology.realm.realm_id_type_fk",
+        "n|con|ontology.realm.realm_id_type_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.realm",
+        "n|sch|ontology",
+        "n|tbl|ontology.node",
+        "n|sch|ontology",
+        "n|col|ontology.realm.id",
+        "n|col|ontology.realm.type",
+        "n|col|ontology.node.id",
+        "n|col|ontology.node.type",
+        "e|uniqueness|ontology.node.id.type"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "realm_version"
+      ],
+      "writes": [
+        "s|fk|ontology.realm_version.realm_version_id_realm_id_fkey",
+        "n|fk|ontology.realm_version.realm_version_id_realm_id_fkey",
+        "e|fk|ontology.realm_version.realm_version_id_realm_id_fkey",
+        "n|con|ontology.realm_version.realm_version_id_realm_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.realm_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.realm",
+        "n|sch|ontology",
+        "n|col|ontology.realm_version.id",
+        "n|col|ontology.realm.id",
+        "e|uniqueness|ontology.realm.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "realm_version"
+      ],
+      "writes": [
+        "s|fk|ontology.realm_version.realm_version_node_version_fk",
+        "n|fk|ontology.realm_version.realm_version_node_version_fk",
+        "e|fk|ontology.realm_version.realm_version_node_version_fk",
+        "n|con|ontology.realm_version.realm_version_node_version_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.realm_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.node_version",
+        "n|sch|ontology",
+        "n|col|ontology.realm_version.id",
+        "n|col|ontology.realm_version.version",
+        "n|col|ontology.node_version.id",
+        "n|col|ontology.node_version.version",
+        "e|uniqueness|ontology.node_version.id.version"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "band_view"
+      ],
+      "writes": [
+        "s|view|ontology.band_view",
+        "n|view|ontology.band_view",
+        "e|view|ontology.band_view",
+        "n|rel|ontology.band_view",
+        "n|type|ontology.band_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "member_view"
+      ],
+      "writes": [
+        "s|view|ontology.member_view",
+        "n|view|ontology.member_view",
+        "e|view|ontology.member_view",
+        "n|rel|ontology.member_view",
+        "n|type|ontology.member_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "party_view"
+      ],
+      "writes": [
+        "s|view|ontology.party_view",
+        "n|view|ontology.party_view",
+        "e|view|ontology.party_view",
+        "n|rel|ontology.party_view",
+        "n|type|ontology.party_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "realm_view"
+      ],
+      "writes": [
+        "s|view|ontology.realm_view",
+        "n|view|ontology.realm_view",
+        "e|view|ontology.realm_view",
+        "n|rel|ontology.realm_view",
+        "n|type|ontology.realm_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "band",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "band_version",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "guild",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "guild_version",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "member",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "member_version",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "party",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "party_version",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "realm",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "realm_version",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "band",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "band",
+        "name": "type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "band_version",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "band_version",
+        "name": "version",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "band_version",
+        "name": "genre",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "guild",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "guild",
+        "name": "type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "guild_version",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "guild_version",
+        "name": "version",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "guild_version",
+        "name": "motto",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "member",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "member",
+        "name": "type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "member",
+        "name": "badge",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "member_version",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "member_version",
+        "name": "version",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "member_version",
+        "name": "rank",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "party",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "party",
+        "name": "type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "party_version",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "party_version",
+        "name": "version",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "party_version",
+        "name": "handle",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "realm",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "realm",
+        "name": "type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "realm_version",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "realm_version",
+        "name": "version",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "band",
+        "name": "band_id_guild_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "guild",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "band",
+        "name": "band_id_type_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "guild",
+        "columnsTo": [
+          "id",
+          "type"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "band_version",
+        "name": "band_version_id_band_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "band",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "band_version",
+        "name": "band_version_guild_version_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "version"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "guild_version",
+        "columnsTo": [
+          "id",
+          "version"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "guild",
+        "name": "guild_id_party_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "party",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "guild",
+        "name": "guild_id_type_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "party",
+        "columnsTo": [
+          "id",
+          "type"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "guild_version",
+        "name": "guild_version_id_guild_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "guild",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "guild_version",
+        "name": "guild_version_party_version_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "version"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "party_version",
+        "columnsTo": [
+          "id",
+          "version"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "member",
+        "name": "member_id_party_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "party",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "member",
+        "name": "member_id_type_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "party",
+        "columnsTo": [
+          "id",
+          "type"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "member_version",
+        "name": "member_version_id_member_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "member",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "member_version",
+        "name": "member_version_party_version_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "version"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "party_version",
+        "columnsTo": [
+          "id",
+          "version"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "party",
+        "name": "party_id_realm_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "realm",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "party",
+        "name": "party_id_type_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "realm",
+        "columnsTo": [
+          "id",
+          "type"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "party_version",
+        "name": "party_version_id_party_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "party",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "party_version",
+        "name": "party_version_realm_version_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "version"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "realm_version",
+        "columnsTo": [
+          "id",
+          "version"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "realm",
+        "name": "realm_id_node_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "node",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "realm",
+        "name": "realm_id_type_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "node",
+        "columnsTo": [
+          "id",
+          "type"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "realm_version",
+        "name": "realm_version_id_realm_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "realm",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "realm_version",
+        "name": "realm_version_node_version_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "version"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "node_version",
+        "columnsTo": [
+          "id",
+          "version"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "band_version",
+        "name": "band_version_pkey",
+        "columns": [
+          "id",
+          "version"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "guild_version",
+        "name": "guild_version_pkey",
+        "columns": [
+          "id",
+          "version"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "member_version",
+        "name": "member_version_pkey",
+        "columns": [
+          "id",
+          "version"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "party_version",
+        "name": "party_version_pkey",
+        "columns": [
+          "id",
+          "version"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "realm_version",
+        "name": "realm_version_pkey",
+        "columns": [
+          "id",
+          "version"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "band",
+        "name": "band_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "guild",
+        "name": "guild_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "member",
+        "name": "member_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "party",
+        "name": "party_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "realm",
+        "name": "realm_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "band",
+        "name": "band_id_type_unique",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "guild",
+        "name": "guild_id_type_unique",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "member",
+        "name": "member_id_type_unique",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "party",
+        "name": "party_id_type_unique",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "realm",
+        "name": "realm_id_type_unique",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "band",
+        "name": "band_type_valid",
+        "value": "\"type\" IN ('band')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "guild",
+        "name": "guild_type_valid",
+        "value": "\"type\" IN ('band')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "member",
+        "name": "member_type_valid",
+        "value": "\"type\" IN ('member')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "party",
+        "name": "party_type_valid",
+        "value": "\"type\" IN ('party', 'member', 'band')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "realm",
+        "name": "realm_type_valid",
+        "value": "\"type\" IN ('party', 'member', 'band')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "band_view",
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"party_version\".\"handle\", \"ontology\".\"guild_version\".\"motto\", \"ontology\".\"band_version\".\"genre\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from \"ontology\".\"band_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"band_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"band_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"band_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"party_version\" on ((\"ontology\".\"band_version\".\"id\" = \"ontology\".\"party_version\".\"id\") and (\"ontology\".\"band_version\".\"version\" = \"ontology\".\"party_version\".\"version\")) inner join \"ontology\".\"guild_version\" on ((\"ontology\".\"band_version\".\"id\" = \"ontology\".\"guild_version\".\"id\") and (\"ontology\".\"band_version\".\"version\" = \"ontology\".\"guild_version\".\"version\")) cross join lateral (select  from \"ontology\".\"realm_version\" where ((\"ontology\".\"band_version\".\"id\" = \"ontology\".\"realm_version\".\"id\") and (\"ontology\".\"band_version\".\"version\" = \"ontology\".\"realm_version\".\"version\")) offset 0) \"tail\" inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"band_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"band_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"band_version\".\"version\")))",
+        "with": null,
+        "withNoData": null,
+        "using": null,
+        "tablespace": null,
+        "materialized": false,
+        "entityType": "views"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "member_view",
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"party_version\".\"handle\", \"tail\".\"badge\", \"ontology\".\"member_version\".\"rank\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from \"ontology\".\"member_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"member_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"member_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"member_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"party_version\" on ((\"ontology\".\"member_version\".\"id\" = \"ontology\".\"party_version\".\"id\") and (\"ontology\".\"member_version\".\"version\" = \"ontology\".\"party_version\".\"version\")) cross join lateral (select \"ontology\".\"member\".\"badge\" from \"ontology\".\"realm_version\" inner join \"ontology\".\"member\" on \"ontology\".\"member_version\".\"id\" = \"ontology\".\"member\".\"id\" where ((\"ontology\".\"member_version\".\"id\" = \"ontology\".\"realm_version\".\"id\") and (\"ontology\".\"member_version\".\"version\" = \"ontology\".\"realm_version\".\"version\")) offset 0) \"tail\" inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"member_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"member_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"member_version\".\"version\")))",
+        "with": null,
+        "withNoData": null,
+        "using": null,
+        "tablespace": null,
+        "materialized": false,
+        "entityType": "views"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "party_view",
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"party_version\".\"handle\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from \"ontology\".\"party_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"party_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"party_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"party_version\".\"id\" = \"ontology\".\"node\".\"id\" cross join lateral (select  from \"ontology\".\"realm_version\" where ((\"ontology\".\"party_version\".\"id\" = \"ontology\".\"realm_version\".\"id\") and (\"ontology\".\"party_version\".\"version\" = \"ontology\".\"realm_version\".\"version\")) offset 0) \"tail\" inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"party_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"party_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"party_version\".\"version\")))",
+        "with": null,
+        "withNoData": null,
+        "using": null,
+        "tablespace": null,
+        "materialized": false,
+        "entityType": "views"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "realm_view",
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"node\".\"type\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from \"ontology\".\"realm_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"realm_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"realm_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"realm_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"realm_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where ((not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"realm_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"realm_version\".\"version\")))) and (case \"ontology\".\"node\".\"type\" when 'party' then exists (select 1 from \"ontology\".\"party_version\" where ((\"ontology\".\"realm_version\".\"id\" = \"ontology\".\"party_version\".\"id\") and (\"ontology\".\"realm_version\".\"version\" = \"ontology\".\"party_version\".\"version\")) offset 0) when 'member' then ((exists (select 1 from \"ontology\".\"party_version\" where ((\"ontology\".\"realm_version\".\"id\" = \"ontology\".\"party_version\".\"id\") and (\"ontology\".\"realm_version\".\"version\" = \"ontology\".\"party_version\".\"version\")) offset 0)) and (exists (select 1 from \"ontology\".\"member_version\" where ((\"ontology\".\"realm_version\".\"id\" = \"ontology\".\"member_version\".\"id\") and (\"ontology\".\"realm_version\".\"version\" = \"ontology\".\"member_version\".\"version\")) offset 0)) and (exists (select 1 from \"ontology\".\"member\" where \"ontology\".\"realm_version\".\"id\" = \"ontology\".\"member\".\"id\" offset 0))) when 'band' then ((exists (select 1 from \"ontology\".\"party_version\" where ((\"ontology\".\"realm_version\".\"id\" = \"ontology\".\"party_version\".\"id\") and (\"ontology\".\"realm_version\".\"version\" = \"ontology\".\"party_version\".\"version\")) offset 0)) and (exists (select 1 from \"ontology\".\"guild_version\" where ((\"ontology\".\"realm_version\".\"id\" = \"ontology\".\"guild_version\".\"id\") and (\"ontology\".\"realm_version\".\"version\" = \"ontology\".\"guild_version\".\"version\")) offset 0)) and (exists (select 1 from \"ontology\".\"band_version\" where ((\"ontology\".\"realm_version\".\"id\" = \"ontology\".\"band_version\".\"id\") and (\"ontology\".\"realm_version\".\"version\" = \"ontology\".\"band_version\".\"version\")) offset 0))) else false end))",
+        "with": null,
+        "withNoData": null,
+        "using": null,
+        "tablespace": null,
+        "materialized": false,
+        "entityType": "views"
+      }
+    }
+  ]
+}

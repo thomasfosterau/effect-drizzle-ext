@@ -603,7 +603,9 @@ export const defineTreeFor =
  * state it and the database layer derive every table, constraint and view from
  * it. Each entry is a level: a **marker** (no `leaf`) or a **leaf**, whose
  * `leaf` is the struct fields of its domain columns (`dbColumn`-annotated) and
- * whose name is its discriminator value. An entry names its `parent` (absent:
+ * whose name is its discriminator value. A leaf may have children: its name
+ * then joins its own subtree leaves, and a node of it can later be refined to
+ * a descendant leaf. An entry names its `parent` (absent:
  * a branch root under the tree's root), and may carry level `columns`
  * contributed to every descendant's view and a level `kind`.
  *
@@ -612,7 +614,7 @@ export const defineTreeFor =
  * all in declaration order. A parent naming no level of the tree, or the level
  * itself, is a type error. Throws {@link DerivationError} at module load for
  * every structural fault the types can't catch: a missing parent or a cycle, a
- * leaf with children, a marker with no leaf below it, an unannotated level
+ * marker with no leaf below it, an unannotated level
  * column, a reserved column name (`id`, `version`, `action`, `type`), or two
  * columns on one root-to-leaf path sharing a field key or a column name.
  *

@@ -34,11 +34,12 @@ export const fieldColumnBounds: (fields: Schema.Struct.Fields) => Record<string,
 - `parent` names another level; absent, the level is a branch root under the tree's root (the `node` identity and `node_version` tables).
 - `columns` are **level columns**: fields on that level's version table that reach every descendant's view (a work's `title` on every book).
 - `kind: "fact-scoped"` keeps a level's columns in one 6NF fact table each, where a fact's absence at a version is its `NULL`.
+- A leaf may have children (a branch root that is also a concrete type): its name joins its own subtree leaves, so its discriminator CHECK admits it beside its descendants, and a node of it can later be refined to one of them (`LeafChain.refine` in `-pg/chain`, under a `refinable` level).
 - `keyed: { name, columns }` (a leaf only) declares a **keyed fact level**: columns held once per `(id, version, key)`, such as a localised leaf's translated columns keyed by `locale`. They stay out of the leaf's shared columns.
 
 `defineResourceTree` (`./jsonapi`) is the same over `Resource.make` definitions, each leaf's resource `type` being its level's name. `defineTreeFor<Ext>()` / `defineResourceTreeFor<Ext>()` pin an extension record every entry must carry (pulpit's registry flags), which the library never reads.
 
-The result is a checked `Tree`: per level, its ancestors, children, descendants, subtree leaves (its discriminator CHECK value set) and branch, all in declaration order. A parent naming no level is a type error. Every other fault throws `DerivationError` at module load: a cycle, a leaf with children, a marker with no leaf below it, an unannotated column, a reserved name (`id`, `version`, `action`, `type`), two columns on one root-to-leaf path sharing a key or column name, or a keyed level on a marker.
+The result is a checked `Tree`: per level, its ancestors, children, descendants, subtree leaves (its discriminator CHECK value set) and branch, all in declaration order. A parent naming no level is a type error. Every other fault throws `DerivationError` at module load: a cycle, a marker with no leaf below it, an unannotated column, a reserved name (`id`, `version`, `action`, `type`), two columns on one root-to-leaf path sharing a key or column name, or a keyed level on a marker.
 
 ```ts
 import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext";
