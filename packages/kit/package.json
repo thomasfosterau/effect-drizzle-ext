@@ -1,6 +1,6 @@
 {
   "name": "@thomasfosterau/effect-drizzle-ext-kit",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "effect-drizzle-kit: a command-line companion to drizzle-kit that migrates what drizzle-kit doesn't (extensions, domains, composite types) and gates schema and extras drift in one check.",
   "keywords": [
     "cli",
