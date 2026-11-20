@@ -8,8 +8,7 @@
   "author": "Thomas Foster <me@thomasfoster.au>",
   "type": "module",
   "scripts": {
-    "prepare": "vp config && effect-tsgo patch --typescript --oxlint",
-    "release": "pnpm -r --filter './packages/*' publish --access public --no-git-checks --ignore-scripts && changeset tag"
+    "prepare": "vp config && effect-tsgo patch --typescript --oxlint"
   },
   "devDependencies": {
     "@changesets/changelog-github": "catalog:",
