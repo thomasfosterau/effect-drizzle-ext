@@ -20,7 +20,7 @@ import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import { ChildProcess } from "effect/process";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
-import { afterAll, assert, describe, expect, it } from "vite-plus/test";
+import { afterAll, afterEach, assert, describe, expect, it, vi } from "vite-plus/test";
 import * as fixtureSchema from "./fixtures/schema.ts";
 import {
   checkBaseAncestry,
@@ -228,35 +228,47 @@ describe("resolveBaseRef", () => {
   });
 });
 
+/** A scratch repository holding the fixture chain on `trunk`, read back by `readBaseMigrations`. */
+const readScratchBase = () =>
+  run(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const spawner = yield* ChildProcessSpawner;
+        const repo = yield* fs.makeTempDirectoryScoped();
+        const git = (...args: string[]) =>
+          spawner.string(
+            ChildProcess.make(
+              "git",
+              ["-c", "user.name=t", "-c", "user.email=t@example.com", ...args],
+              {
+                cwd: repo,
+                env: { GIT_DIR: undefined, GIT_INDEX_FILE: undefined, GIT_WORK_TREE: undefined },
+                extendEnv: true,
+              },
+            ),
+          );
+        yield* git("init", "--quiet", "--initial-branch=trunk");
+        yield* fs.copy(FIXTURE_MIGRATIONS, path.join(repo, "db", "migrations"));
+        yield* git("add", ".");
+        yield* git("commit", "--quiet", "-m", "base");
+        return yield* readBaseMigrations({
+          ref: "trunk",
+          migrationsPath: "db/migrations",
+          cwd: repo,
+        });
+      }),
+    ),
+  );
+
 describe("readBaseMigrations", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("reads the base's directories and latest snapshot out of git", async () => {
-    const base = await run(
-      Effect.scoped(
-        Effect.gen(function* () {
-          const fs = yield* FileSystem.FileSystem;
-          const path = yield* Path.Path;
-          const spawner = yield* ChildProcessSpawner;
-          const repo = yield* fs.makeTempDirectoryScoped();
-          const git = (...args: string[]) =>
-            spawner.string(
-              ChildProcess.make(
-                "git",
-                ["-c", "user.name=t", "-c", "user.email=t@example.com", ...args],
-                { cwd: repo },
-              ),
-            );
-          yield* git("init", "--quiet", "--initial-branch=trunk");
-          yield* fs.copy(FIXTURE_MIGRATIONS, path.join(repo, "db", "migrations"));
-          yield* git("add", ".");
-          yield* git("commit", "--quiet", "-m", "base");
-          return yield* readBaseMigrations({
-            ref: "trunk",
-            migrationsPath: "db/migrations",
-            cwd: repo,
-          });
-        }),
-      ),
-    );
+    const base = await readScratchBase();
     expect(base.dirs).toEqual([
       "20260925111534_widget",
       "20260925111541_widget-retired-at",
@@ -276,6 +288,15 @@ describe("readBaseMigrations", () => {
     expect(Option.map(base.head, (h) => h.snapshot.id)).toEqual(
       Option.some("f2a148b0-f889-4529-89f6-3f38d937fe1f"),
     );
+  });
+
+  it("reads the cwd's repository even when a git hook has exported GIT_DIR", async () => {
+    vi.stubEnv("GIT_DIR", "/nonexistent");
+    vi.stubEnv("GIT_INDEX_FILE", "/nonexistent/index");
+    vi.stubEnv("GIT_WORK_TREE", "/nonexistent");
+    const base = await readScratchBase();
+    expect(base.dirs).toHaveLength(13);
+    expect(Option.isSome(base.head)).toBe(true);
   });
 });
 

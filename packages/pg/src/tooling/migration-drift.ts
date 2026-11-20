@@ -387,13 +387,24 @@ export interface GitBase {
   readonly cwd: string;
 }
 
+/**
+ * Git's repository-locating variables, cleared so `cwd` alone picks the
+ * repository: a git hook exports them, and a linked worktree's `GIT_DIR`
+ * would otherwise point every call at the hook's repository.
+ */
+const gitOptions = (cwd: string): ChildProcess.CommandOptions => ({
+  cwd,
+  env: { GIT_DIR: undefined, GIT_INDEX_FILE: undefined, GIT_WORK_TREE: undefined },
+  extendEnv: true,
+});
+
 const git = (
   base: GitBase,
   args: ReadonlyArray<string>,
 ): Effect.Effect<string, PlatformError, ChildProcessSpawner> =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner;
-    return yield* spawner.string(ChildProcess.make("git", [...args], { cwd: base.cwd }));
+    return yield* spawner.string(ChildProcess.make("git", [...args], gitOptions(base.cwd)));
   });
 
 /**
@@ -427,9 +438,11 @@ export const readBaseMigrations = (
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner;
     const present = yield* spawner.exitCode(
-      ChildProcess.make("git", ["rev-parse", "--verify", "--quiet", `${base.ref}^{commit}`], {
-        cwd: base.cwd,
-      }),
+      ChildProcess.make(
+        "git",
+        ["rev-parse", "--verify", "--quiet", `${base.ref}^{commit}`],
+        gitOptions(base.cwd),
+      ),
     );
     if (present !== 0) {
       yield* git(base, ["fetch", "--depth=1", "origin", base.ref.replace(/^origin\//, "")]);

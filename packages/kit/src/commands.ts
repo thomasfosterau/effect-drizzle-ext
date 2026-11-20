@@ -80,7 +80,12 @@ const pullRequestBase = (migrationsDir: string, cwd: string) =>
     const path = yield* Path.Path;
     const spawner = yield* ChildProcessSpawner;
     const root = (yield* spawner.string(
-      ChildProcess.make("git", ["rev-parse", "--show-toplevel"], { cwd }),
+      ChildProcess.make("git", ["rev-parse", "--show-toplevel"], {
+        cwd,
+        // A git hook exports these; cleared, `cwd` alone picks the repository.
+        env: { GIT_DIR: undefined, GIT_INDEX_FILE: undefined, GIT_WORK_TREE: undefined },
+        extendEnv: true,
+      }),
     )).trim();
     return Option.some<GitBase>({
       ref: ref.value,
