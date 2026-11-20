@@ -16,3 +16,7 @@ Read [README.md](README.md) and [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) fir
 - **Derived SQL is a migration for every consumer.** Changing the emitted DDL or view SQL recreates objects in their next `drizzle-kit generate`; see core's `AGENTS.md`.
 - **`effect-tsgo patch` is version-locked.** `@effect/tsgo`, `@typescript/native` and `vite-plus` move together, or `vp install` fails.
 - **Declare every required peer of a dependency.** A missing one passes on a warm tree and fails on a fresh CI runner.
+
+## Fallow
+
+The `fallow` agent skill is linked into `.claude/skills/` from the installed `fallow` package after `vp install`; repository-specific rules (the pre-commit audit, tracing before deleting) are in docs/CONTRIBUTING.md.
