@@ -7,16 +7,7 @@
  * @module ExternalIds
  */
 
-import { DerivationError } from "@thomasfosterau/effect-drizzle-ext/derive";
-import {
-  and,
-  eq,
-  getTableColumns,
-  getTableName,
-  inArray,
-  sql,
-  type AnyRelations,
-} from "drizzle-orm";
+import { and, eq, inArray, sql, type AnyRelations } from "drizzle-orm";
 import {
   pgTable,
   primaryKey,
@@ -32,9 +23,9 @@ import type * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as HashMap from "effect/HashMap";
 import * as Option from "effect/Option";
-import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
 import type { PgTransaction } from "./index.ts";
+import { columnOf as tableColumnOf, type QueryError } from "./internal/table.ts";
 
 /** The most external ids one {@link ExternalIdStore.lookup} reads. */
 export const MAX_LOOKUP = 1000;
@@ -116,21 +107,7 @@ export interface ExternalIdStore<E, I> {
   readonly link: (link: ExternalIdLink) => Effect.Effect<LinkResult, E, I>;
 }
 
-/** The query failure a Drizzle `CurrentTransaction` reports. */
-type QueryError<Tx> = Tx extends {
-  readonly select: () => { readonly from: (table: never) => infer Q };
-}
-  ? Q extends Effect.Effect<unknown, infer E, unknown>
-    ? E
-    : never
-  : never;
-
-const columnOf = (table: PgTable, key: string): AnyPgColumn =>
-  Option.getOrElse(R.get(getTableColumns(table), key), () => {
-    throw new DerivationError({
-      message: `makeExternalIdStore: table "${getTableName(table)}" has no "${key}" column; was it built from externalIdColumns()?`,
-    });
-  });
+const columnOf = tableColumnOf("makeExternalIdStore", "externalIdColumns");
 
 /** A string PostgreSQL's `uuid` input takes; anything else names no node rather than failing the statement. */
 const UUID = /^(?:\{[0-9a-f]{4}(?:-?[0-9a-f]{4}){7}\}|[0-9a-f]{4}(?:-?[0-9a-f]{4}){7})$/i;

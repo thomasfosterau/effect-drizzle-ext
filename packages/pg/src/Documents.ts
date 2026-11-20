@@ -8,17 +8,16 @@
  */
 
 import { bytea } from "@thomasfosterau/effect-drizzle-ext/columns";
-import { DerivationError } from "@thomasfosterau/effect-drizzle-ext/derive";
-import { getTableColumns, getTableName, sql, type AnyRelations, type SQL } from "drizzle-orm";
-import { jsonb, type AnyPgColumn, type PgTable } from "drizzle-orm/pg-core";
+import { sql, type AnyRelations, type SQL } from "drizzle-orm";
+import { jsonb, type PgTable } from "drizzle-orm/pg-core";
 import * as Arr from "effect/Array";
 import type * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as HashMap from "effect/HashMap";
 import * as Option from "effect/Option";
-import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
 import type { PgTransaction } from "./index.ts";
+import { columnOf as tableColumnOf, type QueryError } from "./internal/table.ts";
 
 /**
  * A document's hash: its SHA-256 as 64 lowercase hex characters, the form
@@ -66,21 +65,7 @@ export interface DocumentStore<Document, E, I> {
   ) => Effect.Effect<HashMap.HashMap<DocumentHash, Document>, E, I>;
 }
 
-/** The query failure a Drizzle `CurrentTransaction` reports. */
-type QueryError<Tx> = Tx extends {
-  readonly select: () => { readonly from: (table: never) => infer Q };
-}
-  ? Q extends Effect.Effect<unknown, infer E, unknown>
-    ? E
-    : never
-  : never;
-
-const columnOf = (table: PgTable, key: string): AnyPgColumn =>
-  Option.getOrElse(R.get(getTableColumns(table), key), () => {
-    throw new DerivationError({
-      message: `makeDocumentStore: table "${getTableName(table)}" has no "${key}" column; was it built from documentColumns()?`,
-    });
-  });
+const columnOf = tableColumnOf("makeDocumentStore", "documentColumns");
 
 const isDocumentHash = Schema.is(DocumentHash);
 const decodeHash = Schema.decodeEffect(DocumentHash);
