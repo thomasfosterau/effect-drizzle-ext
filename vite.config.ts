@@ -257,9 +257,10 @@ export default defineConfig({
         cache: false,
       },
       // Every package's `check`, plus the dist-consumer check against the
-      // emitted declarations.
+      // emitted declarations, then the root configs (tsconfig.config.json),
+      // which no package covers.
       check: {
-        command: "echo 'check: every type gate green'",
+        command: "tsc -p tsconfig.config.json",
         dependsOn: [
           "@thomasfosterau/effect-drizzle-ext#check",
           "@thomasfosterau/effect-drizzle-ext-pg#check",
