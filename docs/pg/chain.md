@@ -12,6 +12,8 @@ The version-chain discipline, Drizzle-concrete, over the tables core's `makeTree
 | `delete(id, { actor, expectedVersion?, root? })` | A tombstone carrying every column forward. Idempotent: on a tombstone it returns `alreadyDeleted: true` and writes nothing. |
 | `refine({ id, from, patch, actor, keyed?, stable?, expectedVersion?, root? })` | On the target leaf: refines a node of `from`, a leaf above it on its path, to the target. It reads `from`'s head and checks `expectedVersion` there, sets the identity row's `type` (the arcs cascade it), inserts the stable rows of the levels the target adds (with `stable`), and appends an `update` at every level carrying `from`'s state with `patch` applied. An unknown, tombstoned or already-refined node fails `NodeNotFound`. See [Refining a node](#refining-a-node). |
 | `restoreVersion(id, n, { actor, ... })` | Reads the whole snapshot at `n` (every level) first, and fails `VersionNotFound` before writing anything if any level is missing. Then it appends that snapshot as an `update`. |
+| `head(id)` / `load(id)` | The head's entry; `load` adds its state (and `keyed`), read with the version in one statement (a keyed leaf adds one for its keyed level). `Option.none()` for an id with no versions of this leaf. A tombstone's is its `delete` snapshot. |
+| `setPointer({ pointer, id, version, at?, actor, expectedVersion? })` | Appends a fact to a named pointer's log (core's `root.pointers`): from `at` (now when absent) the pointer names `version`, or nothing for `Option.none()`. Never appends a version. Fails `NodeNotFound`, `VersionNotFound` for a version the node doesn't have, and `StaleVersion` under the precondition. |
 | `getVersion(id, n)` / `history(id, limit?)` | One version's `{ version, action, timestamp, state }`. The chain oldest first, capped at `MAX_HISTORY_LIMIT` (1000). |
 
 **A keyed leaf** (core's `keyed: { name, columns }`, such as a localised leaf's locales) also writes its keyed level on every append. `create` takes `keyed`, the whole level. `update` / `restore` take `keyed`, a per-key tri-state patch: a patch updates a key, `null` drops it, and an absent key carries it forward. `delete` and `restoreVersion` carry or restore every key, and `getVersion` returns them as `keyed`, keyed by key (`{}` for none).
@@ -56,3 +58,34 @@ yield *
 ```
 
 It is the one chain write that changes a stable row. Without a cascading arc, the identity update fails with the driver's foreign-key violation. Versions before the refinement have no row at the added levels, so the target leaf reads none of them: `getVersion` fails `VersionNotFound` and its views fail closed. `history` lists them, and `from`'s view keeps showing the node, now under the target's `type`. A keyed level of `from` does not carry over; `keyed` is the target's own.
+
+## As an aggregate repository
+
+A leaf is an aggregate type and its head version the concurrency token. Load, decide, then write with the version you loaded:
+
+```ts
+const rename = (id: string, title: string) =>
+  transact(
+    Effect.gen(function* () {
+      const loaded = yield* chain.book.load(id);
+      if (Option.isNone(loaded) || loaded.value.action === "delete") {
+        return yield* new NodeNotFound({ type: "book", id });
+      }
+      return yield* chain.book.update({
+        id,
+        patch: { title },
+        actor: userId,
+        expectedVersion: loaded.value.version,
+      });
+    }),
+  );
+```
+
+| Command | Write |
+| --- | --- |
+| Create (expected version: none) | `create`, which lands at version `0` and fails `NodeAlreadyExists` on a taken id, the "expected new" precondition. |
+| Edit, tombstone, restore | `update`, `delete`, `restore`, `restoreVersion` with `expectedVersion`. A stale read fails `StaleVersion`; a race past the check fails `VersionConflict`. `delete` on a tombstone is a no-op that ignores the precondition. |
+| Publish, schedule, unpublish | `setPointer`, with `expectedVersion` when the command was decided against the head. |
+| One locale (a keyed fact) | `update({ id, patch: {}, keyed: { fr: { abstract } } })`: one version of the whole node, other keys carried forward. |
+
+History and as-of reads stay plain reads (`history`, `getVersion`, core's views). A flat table that needs a version column but no history is [`./VersionedRow`](versioned-row.md).
