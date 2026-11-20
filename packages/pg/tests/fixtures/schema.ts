@@ -83,7 +83,10 @@ const ontologyBuilders = {
  * locale), a fact-scoped level, a refinable agent branch whose `person`
  * leaf carries an external key on its stable table, unique across persons, and
  * a `collection` branch with a `series` marker between it and two of its three
- * leaves, the marker carrying a stable column.
+ * leaves, the marker carrying a stable column; and a refinable `realm` branch
+ * whose `party` leaf has children, so a party can be refined to a `member`
+ * (one added level, with a stable column) or a `band` (two, the `guild`
+ * marker's column required).
  */
 export const ontologyTree = defineTree({
   work: {
@@ -132,6 +135,24 @@ export const ontologyTree = defineTree({
     parent: "collection",
     leaf: { label: dbColumn(Schema.String, { column: "label", pg: "text", notNull: false }) },
   },
+  realm: {},
+  party: {
+    parent: "realm",
+    columns: { handle: dbColumn(Schema.String, { column: "handle", pg: "text", notNull: true }) },
+    leaf: {},
+  },
+  member: {
+    parent: "party",
+    leaf: { rank: dbColumn(Schema.Finite, { column: "rank", pg: "integer", notNull: false }) },
+  },
+  guild: {
+    parent: "party",
+    columns: { motto: dbColumn(Schema.String, { column: "motto", pg: "text", notNull: true }) },
+  },
+  band: {
+    parent: "guild",
+    leaf: { genre: dbColumn(Schema.String, { column: "genre", pg: "text", notNull: false }) },
+  },
 });
 
 /** The tree's own Postgres schema, exported so drizzle-kit creates it. */
@@ -151,6 +172,8 @@ export const ontologyTables = makeTreeTables(ontologyTree, {
         ),
     },
     series: { stableColumns: { code: text("code") } },
+    realm: { refinable: true },
+    member: { stableColumns: { badge: text("badge") } },
   },
   root: { pointers: ["live"] },
 });
@@ -184,12 +207,22 @@ export const supplement = ontologyTables.levels.supplement.stable;
 export const supplementVersion = ontologyTables.levels.supplement.version;
 export const pamphlet = ontologyTables.levels.pamphlet.stable;
 export const pamphletVersion = ontologyTables.levels.pamphlet.version;
+export const realm = ontologyTables.levels.realm.stable;
+export const realmVersion = ontologyTables.levels.realm.version;
+export const party = ontologyTables.levels.party.stable;
+export const partyVersion = ontologyTables.levels.party.version;
+export const member = ontologyTables.levels.member.stable;
+export const memberVersion = ontologyTables.levels.member.version;
+export const guild = ontologyTables.levels.guild.stable;
+export const guildVersion = ontologyTables.levels.guild.version;
+export const band = ontologyTables.levels.band.stable;
+export const bandVersion = ontologyTables.levels.band.version;
 export const essayLocale = ontologyTables.keyed.essay;
 export const livePointer = ontologyTables.pointers.live;
 
 /**
- * Every view the tree derives: a view per leaf, the `work`, `collection` and
- * `series` branches (`collection` projecting each leaf's own `label`), essay's
+ * Every view the tree derives: a view per leaf, the `work`, `collection`,
+ * `series` and `realm` branches (`collection` projecting each leaf's own `label`), essay's
  * locale view, and book's and essay's views at the `live` pointer.
  */
 export const ontologyViews = makeTreeViews(ontologyTree, ontologyTables, {
@@ -198,6 +231,7 @@ export const ontologyViews = makeTreeViews(ontologyTree, ontologyTables, {
     work: true,
     collection: { project: (_leaf, columns) => ({ label: columns.label }) },
     series: true,
+    realm: true,
   },
   pointers: { live: ["book", "essay"] },
 });
@@ -213,6 +247,10 @@ export const seriesView = ontologyViews.branches.series;
 export const volumeView = ontologyViews.leaves.volume;
 export const supplementView = ontologyViews.leaves.supplement;
 export const pamphletView = ontologyViews.leaves.pamphlet;
+export const partyView = ontologyViews.leaves.party;
+export const memberView = ontologyViews.leaves.member;
+export const bandView = ontologyViews.leaves.band;
+export const realmView = ontologyViews.branches.realm;
 export const essayLocaleView = ontologyViews.keyed.essay;
 export const bookLiveView = ontologyViews.pointers.live.leaves.book;
 export const essayLiveView = ontologyViews.pointers.live.leaves.essay;

@@ -2294,7 +2294,14 @@ export const makeTreeViews = <
     R.toEntries(branchEntries),
     ([name, entry]): readonly [string, RuntimeBranchConfig] => {
       if (!isMarker(name)) {
-        treeError(`branches names "${name}", which is not a marker level of this tree`);
+        treeError(
+          Option.exists(
+            Arr.findFirst(tree.levels, (level) => level.name === name),
+            (level) => Arr.isReadonlyArrayNonEmpty(level.children),
+          )
+            ? `branches names "${name}", a leaf with children: its leaf view already takes "${name}_view"`
+            : `branches names "${name}", which is not a marker level of this tree`,
+        );
       }
       return [name, entry === true || entry === undefined ? {} : entry];
     },
