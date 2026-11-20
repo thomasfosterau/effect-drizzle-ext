@@ -18,8 +18,8 @@ import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
 import { assert, describe, expect } from "vite-plus/test";
 import { integrationLayer } from "./database-url.ts";
-import { makePgDatabase } from "../../src/index.ts";
-import { makeTestTransaction } from "../../src/testing.ts";
+import { makePgDatabase } from "../../src/PgDatabase.ts";
+import { makeTestTransaction } from "../../src/Testing.ts";
 
 const locateSchema = pgSchema("edx_locate");
 

@@ -1,10 +1,10 @@
 /**
  * Ephemeral test-database provisioning: an explicit URL, else a reachable local
- * server, else a Testcontainers container. Re-exported from `./testing`. See
+ * server, else a Testcontainers container. Re-exported from `./Testing`. See
  * the
  * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/testing.md).
  *
- * @module provisioning
+ * @module internal/provisioning
  */
 
 import * as PgClient from "@effect/sql-pg/PgClient";
@@ -19,7 +19,7 @@ import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import type * as Scope from "effect/Scope";
 import type { SqlError } from "effect/sql/SqlError";
-import { applyMigrations, type MigrationError } from "./migrations.ts";
+import { applyMigrations, type MigrationError } from "../Migrations.ts";
 
 /**
  * The environment the resolution reads — the shape of `process.env`, taken
@@ -244,7 +244,7 @@ export interface ProvisionedDatabase {
 /**
  * How a provisioned database is migrated: handed the new database's URL,
  * returns how many migrations ran. The default applies the migrations under
- * {@link ProvisionOptions.migrationsDir} with `./migrations`'
+ * {@link ProvisionOptions.migrationsDir} with `./Migrations`'
  * `applyMigrations` over a one-connection `PgClient`.
  */
 export type MigrationRunner<E, R> = (url: Redacted.Redacted<string>) => Effect.Effect<number, E, R>;
@@ -258,7 +258,7 @@ export interface ProvisionOptions<E = never, R = never> extends DatabaseSourceOp
   readonly applyMigrations?: MigrationRunner<E, R>;
 }
 
-/** The default {@link MigrationRunner}: `./migrations` over a one-connection client. */
+/** The default {@link MigrationRunner}: `./Migrations` over a one-connection client. */
 const defaultRunner =
   (
     migrationsDir: string,
@@ -326,7 +326,7 @@ const startContainer = (
  * ```ts
  * // vitest global setup
  * import * as NodeServices from "@effect/platform-node/NodeServices";
- * import { provisionTestDatabase } from "@thomasfosterau/effect-drizzle-ext-pg/testing";
+ * import { provisionTestDatabase } from "@thomasfosterau/effect-drizzle-ext-pg/Testing";
  * import * as Effect from "effect/Effect";
  * import * as Exit from "effect/Exit";
  * import * as Redacted from "effect/Redacted";

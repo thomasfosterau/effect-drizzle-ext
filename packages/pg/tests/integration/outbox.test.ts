@@ -15,8 +15,8 @@ import * as Fiber from "effect/Fiber";
 import * as Option from "effect/Option";
 import { describe, expect } from "vite-plus/test";
 import { makeOutbox, type OutboxEvent, type OutboxRecord } from "../../src/Outbox.ts";
-import { makePgDatabase } from "../../src/index.ts";
-import { makeTestTransaction } from "../../src/testing.ts";
+import { makePgDatabase } from "../../src/PgDatabase.ts";
+import { makeTestTransaction } from "../../src/Testing.ts";
 import { outbox as outboxTable } from "../fixtures/schema.ts";
 import { integrationLayer, separateDatabase } from "./database-url.ts";
 

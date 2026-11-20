@@ -1,5 +1,5 @@
 /**
- * Unit tests for `src/database.ts` — the service factory, the read-path handle
+ * Unit tests for `src/Database.ts` — the service factory, the read-path handle
  * resolver and the write-path transaction boundary.
  *
  * `readHandle` is the deliberate asymmetry in the boundary design: `transact`
@@ -31,7 +31,7 @@ import {
   makeDatabaseServices,
   type ReadSurface,
   type TransactionalDatabase,
-} from "../src/database.ts";
+} from "../src/Database.ts";
 
 /**
  * A sentinel transaction handle: every read member reports the handle's label,

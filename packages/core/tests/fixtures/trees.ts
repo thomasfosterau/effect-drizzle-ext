@@ -6,8 +6,8 @@
  */
 import { Resource } from "@thomasfosterau/effect-jsonapi";
 import * as Schema from "effect/Schema";
-import { dbColumn, defineTree } from "../../src/index.ts";
-import { defineResourceTree } from "../../src/jsonapi/index.ts";
+import { dbColumn, defineTree } from "../../src/Annotation.ts";
+import { defineResourceTree } from "../../src/JsonApi.ts";
 
 const text = <const C extends string>(column: C) =>
   dbColumn(Schema.String, { column, pg: "text", notNull: false });

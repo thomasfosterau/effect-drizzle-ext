@@ -5,7 +5,7 @@ import * as DateTime from "effect/DateTime";
 import * as HashSet from "effect/HashSet";
 import * as Option from "effect/Option";
 import { describe, expect, it } from "vite-plus/test";
-import { filterLiteral, predicateFromFilter } from "../src/jsonapi/index.ts";
+import { filterLiteral, predicateFromFilter } from "../src/JsonApi.ts";
 import * as Predicate from "../src/Predicate.ts";
 import * as Where from "../src/Where.ts";
 

@@ -5,10 +5,10 @@
  * surface is `makePgDatabase`'s `locate` and the types re-exported from the
  * package root.
  *
- * @module locate
+ * @module internal/locate
  */
 
-import { findPgError, type PgErrorFacts } from "@thomasfosterau/effect-drizzle-ext/errors";
+import { findPgError, type PgErrorFacts } from "@thomasfosterau/effect-drizzle-ext/Errors";
 import { getTableColumns, is } from "drizzle-orm";
 import { getTableConfig, IndexedColumn, type PgColumn, PgTable } from "drizzle-orm/pg-core";
 import type { AnyRelations } from "drizzle-orm/relations";

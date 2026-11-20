@@ -8,7 +8,7 @@
  * @module packages/pg/tests/integration/search-where
  */
 
-import { tsvector } from "@thomasfosterau/effect-drizzle-ext/columns";
+import { tsvector } from "@thomasfosterau/effect-drizzle-ext/Columns";
 import * as Predicate from "@thomasfosterau/effect-drizzle-ext/Predicate";
 import * as Search from "@thomasfosterau/effect-drizzle-ext/Search";
 import * as Where from "@thomasfosterau/effect-drizzle-ext/Where";
@@ -19,8 +19,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import { describe, expect } from "vite-plus/test";
-import { makePgDatabase } from "../../src/index.ts";
-import { makeTestTransaction } from "../../src/testing.ts";
+import { makePgDatabase } from "../../src/PgDatabase.ts";
+import { makeTestTransaction } from "../../src/Testing.ts";
 import { integrationLayerWith } from "./database-url.ts";
 
 const database = makePgDatabase({ relations: {}, key: "Database" });

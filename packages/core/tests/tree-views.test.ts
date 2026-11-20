@@ -15,9 +15,9 @@ import * as Order from "effect/Order";
 import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
 import { describe, expect, expectTypeOf, it } from "vite-plus/test";
-import { DerivationError, type ColumnBuilders } from "../src/derive.ts";
-import { dbColumn, defineTree } from "../src/index.ts";
-import { makeTreeTables, makeTreeViews } from "../src/versioned-chain.ts";
+import { DerivationError, type ColumnBuilders } from "../src/Derive.ts";
+import { dbColumn, defineTree } from "../src/Annotation.ts";
+import { makeTreeTables, makeTreeViews } from "../src/VersionedChain.ts";
 import { bfoTree, frbrTree } from "./fixtures/trees.ts";
 
 const builders = {

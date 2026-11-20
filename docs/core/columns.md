@@ -1,4 +1,4 @@
-# `./columns`
+# `./Columns`
 
 _A guide to [`@thomasfosterau/effect-drizzle-ext`](../../packages/core/README.md). The API reference is the doc comments on each export (your editor's hover, or `vp run docgen`)._
 

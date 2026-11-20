@@ -4,7 +4,7 @@
  * the
  * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/errors.md).
  *
- * @module errors
+ * @module Errors
  */
 
 import * as Arr from "effect/Array";
@@ -223,7 +223,7 @@ export class NotNullViolation extends Schema.TaggedError<NotNullViolation>()("No
   cause: Schema.Defect(),
 }) {}
 
-/** SQLSTATE `23514`: a CHECK constraint was violated — including the bounds checks `./derive` writes. */
+/** SQLSTATE `23514`: a CHECK constraint was violated — including the bounds checks `./Derive` writes. */
 export class CheckViolation extends Schema.TaggedError<CheckViolation>()("CheckViolation", {
   constraint: Schema.Option(Schema.String),
   table: Schema.Option(Schema.String),
@@ -457,7 +457,7 @@ export const isRetryableTransactionFailure = (cause: unknown): boolean =>
  *
  * @example
  * ```ts
- * import { classifyErrors } from "@thomasfosterau/effect-drizzle-ext/errors";
+ * import { classifyErrors } from "@thomasfosterau/effect-drizzle-ext/Errors";
  * import * as Effect from "effect/Effect";
  * import * as Option from "effect/Option";
  *
@@ -538,7 +538,7 @@ export interface RetryTransactionOptions {
  *
  * @example
  * ```ts
- * import { retryTransaction } from "@thomasfosterau/effect-drizzle-ext/errors";
+ * import { retryTransaction } from "@thomasfosterau/effect-drizzle-ext/Errors";
  * import * as Effect from "effect/Effect";
  *
  * let attempts = 0;

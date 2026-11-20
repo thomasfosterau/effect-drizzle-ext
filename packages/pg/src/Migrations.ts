@@ -4,7 +4,7 @@
  * ledger. See the
  * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/migrations.md).
  *
- * @module migrations
+ * @module Migrations
  */
 
 import * as Arr from "effect/Array";
@@ -114,7 +114,7 @@ export const applyMigrationList = Effect.fn("Migrations.applyMigrationList")(fun
  * ```ts
  * import * as NodeServices from "@effect/platform-node/NodeServices";
  * import * as PgClient from "@effect/sql-pg/PgClient";
- * import { applyMigrations } from "@thomasfosterau/effect-drizzle-ext-pg/migrations";
+ * import { applyMigrations } from "@thomasfosterau/effect-drizzle-ext-pg/Migrations";
  * import * as Effect from "effect/Effect";
  * import * as Redacted from "effect/Redacted";
  *

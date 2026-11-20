@@ -132,7 +132,7 @@ const typeModifier = (kind: "geometry" | "geography", options?: SpatialColumnOpt
  * @example
  * ```ts
  * import { pgTable, uuid } from "drizzle-orm/pg-core";
- * import { geometryColumn } from "@thomasfosterau/effect-drizzle-ext/postgis";
+ * import { geometryColumn } from "@thomasfosterau/effect-drizzle-ext/PostGis";
  *
  * export const parcel = pgTable("parcel", {
  *   id: uuid("id").primaryKey(),
@@ -158,7 +158,7 @@ export const geometryColumn = (
  * @example
  * ```ts
  * import { pgTable, uuid } from "drizzle-orm/pg-core";
- * import { geographyColumn } from "@thomasfosterau/effect-drizzle-ext/postgis";
+ * import { geographyColumn } from "@thomasfosterau/effect-drizzle-ext/PostGis";
  *
  * export const venue = pgTable("venue", {
  *   id: uuid("id").primaryKey(),
@@ -184,7 +184,7 @@ export const geographyColumn = (
  *
  * @example
  * ```ts
- * import { stPoint } from "@thomasfosterau/effect-drizzle-ext/postgis";
+ * import { stPoint } from "@thomasfosterau/effect-drizzle-ext/PostGis";
  *
  * export const sydney = stPoint(151.2093, -33.8688, 4326);
  * ```
@@ -223,7 +223,7 @@ export const stGeogFromText = (wkt: string): SQL<Geography> =>
  *
  * @example
  * ```ts
- * import { stGeomFromGeoJSON } from "@thomasfosterau/effect-drizzle-ext/postgis";
+ * import { stGeomFromGeoJSON } from "@thomasfosterau/effect-drizzle-ext/PostGis";
  *
  * export const point = stGeomFromGeoJSON({ type: "Point", coordinates: [151.2093, -33.8688] });
  * ```
@@ -275,7 +275,7 @@ const geometryPredicate =
  * @example
  * ```ts
  * import { pgTable, uuid } from "drizzle-orm/pg-core";
- * import { geometryColumn, stIntersects, stMakeEnvelope } from "@thomasfosterau/effect-drizzle-ext/postgis";
+ * import { geometryColumn, stIntersects, stMakeEnvelope } from "@thomasfosterau/effect-drizzle-ext/PostGis";
  *
  * const parcel = pgTable("parcel", { id: uuid("id"), boundary: geometryColumn("boundary") });
  * export const inView = stIntersects(parcel.boundary, stMakeEnvelope(151.1, -33.95, 151.3, -33.8, 4326));
@@ -318,7 +318,7 @@ export const stDisjoint = geometryPredicate("ST_Disjoint");
  * @example
  * ```ts
  * import { pgTable, uuid } from "drizzle-orm/pg-core";
- * import { asGeography, geographyColumn, stDWithin, stPoint } from "@thomasfosterau/effect-drizzle-ext/postgis";
+ * import { asGeography, geographyColumn, stDWithin, stPoint } from "@thomasfosterau/effect-drizzle-ext/PostGis";
  *
  * const venue = pgTable("venue", { id: uuid("id"), location: geographyColumn("location") });
  * export const nearby = stDWithin(venue.location, asGeography(stPoint(151.2093, -33.8688, 4326)), 5_000);
@@ -352,7 +352,7 @@ export const stDistance = <L extends SpatialOperand>(
  * @example
  * ```ts
  * import { pgTable, uuid } from "drizzle-orm/pg-core";
- * import { asGeography, geographyColumn, knnDistance, stPoint } from "@thomasfosterau/effect-drizzle-ext/postgis";
+ * import { asGeography, geographyColumn, knnDistance, stPoint } from "@thomasfosterau/effect-drizzle-ext/PostGis";
  *
  * const venue = pgTable("venue", { id: uuid("id"), location: geographyColumn("location") });
  * export const nearestFirst = knnDistance(venue.location, asGeography(stPoint(151.2093, -33.8688, 4326)));

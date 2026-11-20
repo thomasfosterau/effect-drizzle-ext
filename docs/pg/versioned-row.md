@@ -2,7 +2,7 @@
 
 _A guide to [`@thomasfosterau/effect-drizzle-ext-pg`](../../packages/pg/README.md). The API reference is the doc comments on each export (your editor's hover, or `vp run docgen`)._
 
-Optimistic concurrency over a flat table: one mutable row per id and a `version` column every write bumps. Use it for an aggregate that needs a concurrency token but no history; for history, use [`./chain`](chain.md).
+Optimistic concurrency over a flat table: one mutable row per id and a `version` column every write bumps. Use it for an aggregate that needs a concurrency token but no history; for history, use [`./Chain`](chain.md).
 
 ## The table
 
@@ -20,7 +20,7 @@ export const account = pgTable("account", {
 
 ## Operations
 
-`makeVersionedRow({ table, CurrentTransaction, type? })` returns four operations. Each requires `CurrentTransaction`, and none opens a transaction. `type` names the table in the errors (default: its name), which are `./chain`'s classes, so a repository maps both the same way.
+`makeVersionedRow({ table, CurrentTransaction, type? })` returns four operations. Each requires `CurrentTransaction`, and none opens a transaction. `type` names the table in the errors (default: its name), which are `./Chain`'s classes, so a repository maps both the same way.
 
 | Operation | What it does |
 | --- | --- |

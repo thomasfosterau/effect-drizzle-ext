@@ -7,7 +7,7 @@
  * @module Documents
  */
 
-import { bytea } from "@thomasfosterau/effect-drizzle-ext/columns";
+import { bytea } from "@thomasfosterau/effect-drizzle-ext/Columns";
 import { sql, type AnyRelations, type SQL } from "drizzle-orm";
 import { jsonb, type PgTable } from "drizzle-orm/pg-core";
 import * as Arr from "effect/Array";
@@ -16,7 +16,7 @@ import * as Effect from "effect/Effect";
 import * as HashMap from "effect/HashMap";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import type { PgTransaction } from "./index.ts";
+import type { PgTransaction } from "./PgDatabase.ts";
 import { columnOf as tableColumnOf, type QueryError } from "./internal/table.ts";
 
 /**
@@ -89,7 +89,7 @@ const hashKey = (hash: DocumentHash): SQL => sql`decode(${hash}, 'hex')`;
  * @example
  * ```ts
  * import { strictEqual } from "node:assert";
- * import { makePgDatabase } from "@thomasfosterau/effect-drizzle-ext-pg";
+ * import { makePgDatabase } from "@thomasfosterau/effect-drizzle-ext-pg/PgDatabase";
  * import { documentColumns, makeDocumentStore } from "@thomasfosterau/effect-drizzle-ext-pg/Documents";
  * import { pgTable } from "drizzle-orm/pg-core";
  * import * as Schema from "effect/Schema";

@@ -4,7 +4,7 @@
  * See the
  * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/derive.md).
  *
- * @module derive
+ * @module Derive
  */
 
 import { sql, type ColumnBuilderBase, type SQL } from "drizzle-orm";
@@ -17,7 +17,7 @@ import {
 import * as Arr from "effect/Array";
 import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
-import { DerivationError } from "./derivation-error.ts";
+import { DerivationError } from "./internal/derivationError.ts";
 import {
   fieldColumnBounds,
   fieldColumns,
@@ -25,7 +25,7 @@ import {
   type DbColumn,
   type DbColumnReference,
   type FieldColumnsMetaOf,
-} from "./index.ts";
+} from "./Annotation.ts";
 
 /**
  * A construction-time derivation failure, thrown at module load when a table
@@ -77,7 +77,7 @@ type WithDefault<X, M> = M extends { readonly default: boolean | number | string
  * applies them in. A defaulted column is therefore optional on the table's
  * `$inferInsert`, as it is at runtime.
  *
- * Exported so a projection-specific derivation (the `./jsonapi/derive` entry)
+ * Exported so a projection-specific derivation (the `./JsonApiDerive` entry)
  * can name this type without restating it.
  */
 export type BuilderFor<M, B extends ColumnBuilders> = M extends {
@@ -102,7 +102,7 @@ export type DerivedColumns<Meta, B extends ColumnBuilders> = {
  * **The one statement of the `?: T | undefined` rule.** Every optional member
  * of a config type this library hands to Drizzle — `resolveReference` below,
  * the annotation entry's `DbColumn.default` / `.references` / `.checkName`,
- * `./versioned-chain`'s table and view builder config — is spelled
+ * `./VersionedChain`'s table and view builder config — is spelled
  * `?: T | undefined`, never `Option`. Drizzle reads `undefined` as "not
  * supplied"; handed an `Option` it would emit the wrapper object as a literal
  * value (a DEFAULT of `{_tag: "None"}`, a referential action of `[Object]`) —
@@ -118,7 +118,7 @@ export type DerivedColumns<Meta, B extends ColumnBuilders> = {
  * `.references()` needs — the seam that lets FK-backed attributes derive their
  * column instead of being hand-authored. Without it, a `references` annotation
  * is a configuration error (throws), so a consumer only wires it when it
- * declares FK columns. The `./references` entry ships one implementation.
+ * declares FK columns. The `./References` entry ships one implementation.
  */
 export interface DeriveOptions {
   readonly resolveReference?: ((reference: DbColumnReference) => () => AnyPgColumn) | undefined;
@@ -164,7 +164,7 @@ export interface DeriveColumns<B extends ColumnBuilders> {
  * - `fromFields` takes a `Schema.Struct`'s fields directly (peeling the
  *   `optional` / `NullOr` wrappers via {@link fieldColumns});
  * - `fromMeta` takes an already-projected metadata map, for a projection this
- *   entry knows nothing about (the `./jsonapi/derive` entry is one).
+ *   entry knows nothing about (the `./JsonApiDerive` entry is one).
  */
 export const deriveColumnsWith = <B extends ColumnBuilders>(
   builders: B,

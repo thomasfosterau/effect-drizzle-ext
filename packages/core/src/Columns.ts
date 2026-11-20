@@ -5,7 +5,7 @@
  * every plain table carries, and the hex codec for rendering / parsing
  * `bytea` values without the Node `Buffer` global.
  *
- * @module columns
+ * @module Columns
  */
 import type { EncodingError } from "effect/encoding";
 import { Hex } from "effect/encoding";

@@ -23,7 +23,7 @@
     "sourceMap": true,
     "strict": true,
     // Every optional config member Drizzle reads is spelled `?: T | undefined`
-    // because of this flag — see packages/core/src/derive.ts.
+    // because of this flag — see packages/core/src/Derive.ts.
     "exactOptionalPropertyTypes": true,
     "noUnusedLocals": true,
     "noImplicitOverride": true,

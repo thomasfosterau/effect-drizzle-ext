@@ -32,14 +32,15 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./chain": "./src/chain.ts",
-    "./migrations": "./src/migrations.ts",
-    "./testing": "./src/testing.ts",
-    "./Tin": "./src/Tin.ts",
-    "./Outbox": "./src/Outbox.ts",
-    "./tooling": "./src/tooling/index.ts",
+    "./Chain": "./src/Chain.ts",
     "./Documents": "./src/Documents.ts",
     "./ExternalIds": "./src/ExternalIds.ts",
+    "./Migrations": "./src/Migrations.ts",
+    "./Outbox": "./src/Outbox.ts",
+    "./PgDatabase": "./src/PgDatabase.ts",
+    "./Testing": "./src/Testing.ts",
+    "./Tin": "./src/Tin.ts",
+    "./Tooling": "./src/Tooling.ts",
     "./VersionedRow": "./src/VersionedRow.ts"
   },
   "publishConfig": {
@@ -48,29 +49,9 @@
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
       },
-      "./chain": {
-        "types": "./dist/chain.d.ts",
-        "default": "./dist/chain.js"
-      },
-      "./migrations": {
-        "types": "./dist/migrations.d.ts",
-        "default": "./dist/migrations.js"
-      },
-      "./testing": {
-        "types": "./dist/testing.d.ts",
-        "default": "./dist/testing.js"
-      },
-      "./Tin": {
-        "types": "./dist/Tin.d.ts",
-        "default": "./dist/Tin.js"
-      },
-      "./Outbox": {
-        "types": "./dist/Outbox.d.ts",
-        "default": "./dist/Outbox.js"
-      },
-      "./tooling": {
-        "types": "./dist/tooling/index.d.ts",
-        "default": "./dist/tooling/index.js"
+      "./Chain": {
+        "types": "./dist/Chain.d.ts",
+        "default": "./dist/Chain.js"
       },
       "./Documents": {
         "types": "./dist/Documents.d.ts",
@@ -79,6 +60,30 @@
       "./ExternalIds": {
         "types": "./dist/ExternalIds.d.ts",
         "default": "./dist/ExternalIds.js"
+      },
+      "./Migrations": {
+        "types": "./dist/Migrations.d.ts",
+        "default": "./dist/Migrations.js"
+      },
+      "./Outbox": {
+        "types": "./dist/Outbox.d.ts",
+        "default": "./dist/Outbox.js"
+      },
+      "./PgDatabase": {
+        "types": "./dist/PgDatabase.d.ts",
+        "default": "./dist/PgDatabase.js"
+      },
+      "./Testing": {
+        "types": "./dist/Testing.d.ts",
+        "default": "./dist/Testing.js"
+      },
+      "./Tin": {
+        "types": "./dist/Tin.d.ts",
+        "default": "./dist/Tin.js"
+      },
+      "./Tooling": {
+        "types": "./dist/Tooling.d.ts",
+        "default": "./dist/Tooling.js"
       },
       "./VersionedRow": {
         "types": "./dist/VersionedRow.d.ts",

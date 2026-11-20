@@ -12,14 +12,14 @@
 pnpm add --save-dev @thomasfosterau/effect-drizzle-ext-kit @thomasfosterau/effect-drizzle-ext-pg drizzle-kit drizzle-orm effect @effect/sql-pg @effect/platform-node
 ```
 
-`effect` (`^4.0.0`), `@effect/platform-node` (`^4.0.0`), `@effect/sql-pg` (`^4.0.0`, the pg package's peer), `drizzle-orm` and `drizzle-kit` (`>=1.0.0-rc.5`) are peer dependencies. `@thomasfosterau/effect-drizzle-ext-pg` is a regular dependency: the commands are its `./tooling` generator and guards. Node.js 22.18 or newer is required, because the config module is loaded with Node's own type stripping.
+`effect` (`^4.0.0`), `@effect/platform-node` (`^4.0.0`), `@effect/sql-pg` (`^4.0.0`, the pg package's peer), `drizzle-orm` and `drizzle-kit` (`>=1.0.0-rc.5`) are peer dependencies. `@thomasfosterau/effect-drizzle-ext-pg` is a regular dependency: the commands are its `./Tooling` generator and guards. Node.js 22.18 or newer is required, because the config module is loaded with Node's own type stripping.
 
 ## Example
 
 ```ts
 // effect-drizzle-kit.config.ts, beside drizzle.config.ts
 import { defineConfig } from "@thomasfosterau/effect-drizzle-ext-kit";
-import { domain, extension } from "@thomasfosterau/effect-drizzle-ext-pg/tooling";
+import { domain, extension } from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";
 import * as schema from "./src/schema.ts";
 
 export default defineConfig({
@@ -49,7 +49,7 @@ The [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs
 
 ## Links
 
-- The [extras generator](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tooling.md#extras-what-drizzle-kit-doesnt-manage) these commands run, in the pg package's `./tooling` guide.
+- The [extras generator](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tooling.md#extras-what-drizzle-kit-doesnt-manage) these commands run, in the pg package's `./Tooling` guide.
 - The [pg package](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/packages/pg/README.md), and the [changelog](CHANGELOG.md).
 
 ## License

@@ -4,7 +4,7 @@
  * current-version views. See the
  * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/versioned-chain.md).
  *
- * @module versioned-chain
+ * @module VersionedChain
  */
 
 import {
@@ -69,16 +69,16 @@ import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as P from "effect/Predicate";
 import * as R from "effect/Record";
-import { enumCheck, discriminatorConstraintsFor, type TypedStable } from "./constraints.ts";
+import { enumCheck, discriminatorConstraintsFor, type TypedStable } from "./Constraints.ts";
 import {
   deriveColumnsWith,
   type ColumnBuilders,
   type DerivedColumns,
   type DeriveOptions,
-} from "./derive.ts";
-import type { DbColumn } from "./index.ts";
-import { treeError, type LeafName, type MarkerName, type Tree } from "./tree.ts";
-import type { VersionAction } from "./version-chain-types.ts";
+} from "./Derive.ts";
+import type { DbColumn } from "./Annotation.ts";
+import { treeError, type LeafName, type MarkerName, type Tree } from "./internal/tree.ts";
+import type { VersionAction } from "./internal/versionChainTypes.ts";
 
 // ── Subtype table pair ────────────────────────────────────────────────
 
@@ -628,11 +628,15 @@ export const makeCurrentVersionView =
 
 /**
  * The version-chain read shapes: `VersionAction`, `VersionChainEntry` and
- * `VersionSnapshot`. They live in a Drizzle-free module so the root entry
- * (`.`) exports the same types without reaching Drizzle; this subpath
+ * `VersionSnapshot`. They live in a Drizzle-free module so the root entry's
+ * `Annotation` namespace exports the same types without reaching Drizzle; this subpath
  * re-exports them unchanged.
  */
-export type { VersionAction, VersionChainEntry, VersionSnapshot } from "./version-chain-types.ts";
+export type {
+  VersionAction,
+  VersionChainEntry,
+  VersionSnapshot,
+} from "./internal/versionChainTypes.ts";
 
 /** The `createdAt` / `updatedAt` pair {@link versionTimestamps} returns. */
 export interface VersionTimestamps {
@@ -949,7 +953,7 @@ export interface TreeTablesConfig<
   readonly schema: PgSchema;
   /** The builder registry the `dbColumn` kinds resolve against. */
   readonly builders: B;
-  /** Resolves a `references` annotation to its target column (see `./derive`). */
+  /** Resolves a `references` annotation to its target column (see `./Derive`). */
   readonly resolveReference?: DeriveOptions["resolveReference"];
   /** The root tables' names, injected columns and named pointers. */
   readonly root?: TreeRootConfig<IE, VE, P> | undefined;
@@ -1021,8 +1025,8 @@ const VERSION_ACTIONS = LiteralExact.tuple<VersionAction>()(["create", "update",
  *
  * @example
  * ```ts
- * import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext";
- * import { makeTreeTables } from "@thomasfosterau/effect-drizzle-ext/versioned-chain";
+ * import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext/Annotation";
+ * import { makeTreeTables } from "@thomasfosterau/effect-drizzle-ext/VersionedChain";
  * import { getTableConfig, integer, pgSchema, text } from "drizzle-orm/pg-core";
  * import * as Schema from "effect/Schema";
  *
@@ -1630,7 +1634,7 @@ const fencedTail = "tail";
 
 /**
  * A tail column as the outer query reads it, `"tail"."<name>"`: a column keeps
- * its type (so `./sort` still lists it), an aliased expression its decoder.
+ * its type (so `./Sort` still lists it), an aliased expression its decoder.
  */
 const throughTail = (value: AnyPgColumn | SQL | SQL.Aliased): AnyPgColumn | SQL.Aliased => {
   if (is(value, Column)) return aliasedTableColumn(value, fencedTail);
@@ -1924,8 +1928,8 @@ const caseOverLeaves = (
  *
  * @example
  * ```ts
- * import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext";
- * import { makeTreeTables, makeTreeViews } from "@thomasfosterau/effect-drizzle-ext/versioned-chain";
+ * import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext/Annotation";
+ * import { makeTreeTables, makeTreeViews } from "@thomasfosterau/effect-drizzle-ext/VersionedChain";
  * import { getViewConfig, integer, pgSchema, text } from "drizzle-orm/pg-core";
  * import * as Schema from "effect/Schema";
  *

@@ -52,14 +52,14 @@ export default defineConfig({
       // Reads any two-argument `.catch(…)` as `Promise.prototype.catch`, so it
       // reports the data-first `Effect.catch(self, handler)` calls that
       // `catchConstraintViolation` / `catchUniqueViolation` are built from
-      // (packages/core/src/errors.ts). This library has no promise `.catch`
+      // (packages/core/src/Errors.ts). This library has no promise `.catch`
       // chains for it to check; the rule cannot apply.
       "promise/valid-params": "off",
       // The `Buffer` global is typed `any` wherever a consumer loads
       // @cloudflare/workers-types next to @types/node (every application this
       // library serves), so every call on it is unchecked there. The library
       // never reaches for it: `bytea` is `Uint8Array`, and `byteaToHex` /
-      // `hexToBytea` (packages/core/src/columns.ts) replace the Buffer helpers.
+      // `hexToBytea` (packages/core/src/Columns.ts) replace the Buffer helpers.
       "eslint/no-restricted-globals": [
         "error",
         {
@@ -112,14 +112,14 @@ export default defineConfig({
       // and no guard can recover it. A new `as` anywhere else is an error.
       {
         files: [
-          "packages/core/src/query-functions.ts",
-          "packages/core/src/derive.ts",
-          "packages/core/src/jsonapi/derive.ts",
-          "packages/core/src/versioned-chain.ts",
-          "packages/core/src/index.ts",
-          "packages/core/src/update.ts",
-          "packages/pg/src/chain.ts",
-          "packages/pg/src/locate.ts",
+          "packages/core/src/QueryFunctions.ts",
+          "packages/core/src/Derive.ts",
+          "packages/core/src/JsonApiDerive.ts",
+          "packages/core/src/VersionedChain.ts",
+          "packages/core/src/Annotation.ts",
+          "packages/core/src/Update.ts",
+          "packages/pg/src/Chain.ts",
+          "packages/pg/src/internal/locate.ts",
         ],
         rules: {
           "typescript/no-unsafe-type-assertion": "off",
@@ -131,13 +131,13 @@ export default defineConfig({
       // own state, so the two share no overlap TypeScript accepts a direct
       // assertion across, and the conversion goes through `unknown`.
       {
-        files: ["packages/pg/src/chain.ts"],
+        files: ["packages/pg/src/Chain.ts"],
         rules: {
           "effect/no-chained-type-assertions": "off",
           "effect/avoid-any": "off",
         },
       },
-      // The replay seam of `./query-functions`: a deferred query records
+      // The replay seam of `./QueryFunctions`: a deferred query records
       // member reads and calls on a Proxy and replays them onto whatever
       // handle the context holds, so the values it passes along (a member,
       // its receiver, a call's result, the replayed builder's Effect) are
@@ -145,7 +145,7 @@ export default defineConfig({
       // honest type at each step; the replayed Effect's error and requirement
       // channels are re-typed by that surface, not here.
       {
-        files: ["packages/core/src/query-functions.ts"],
+        files: ["packages/core/src/QueryFunctions.ts"],
         rules: {
           "effect/no-unknown-parameters": "off",
           "effect/no-unknown-returns": "off",
@@ -159,14 +159,14 @@ export default defineConfig({
       // clears, `undefined` carries forward) is Drizzle's SET semantics.
       {
         files: [
-          "packages/core/src/index.ts",
-          "packages/core/src/derive.ts",
-          "packages/core/src/query.ts",
-          "packages/core/src/versioned-chain.ts",
+          "packages/core/src/Annotation.ts",
+          "packages/core/src/Derive.ts",
+          "packages/core/src/Query.ts",
+          "packages/core/src/VersionedChain.ts",
           "packages/core/src/Predicate.ts",
-          "packages/pg/src/index.ts",
-          "packages/pg/src/testing.ts",
-          "packages/pg/src/chain.ts",
+          "packages/pg/src/PgDatabase.ts",
+          "packages/pg/src/Testing.ts",
+          "packages/pg/src/Chain.ts",
           "packages/core/tests/versioned-chain.test.ts",
           "packages/core/tests/update.test.ts",
           "packages/pg/tests/query-functions.test.ts",
@@ -218,7 +218,7 @@ export default defineConfig({
       // `effecttsgo/strict-effect-provide` asks for; the layer never leaks
       // into the caller's requirements.
       {
-        files: ["packages/pg/src/index.ts", "packages/pg/src/provisioning.ts"],
+        files: ["packages/pg/src/PgDatabase.ts", "packages/pg/src/internal/provisioning.ts"],
         rules: {
           "effecttsgo/strict-effect-provide": "off",
         },

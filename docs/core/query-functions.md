@@ -1,8 +1,8 @@
-# `./query-functions`
+# `./QueryFunctions`
 
 _A guide to [`@thomasfosterau/effect-drizzle-ext`](../../packages/core/README.md). The API reference is the doc comments on each export (your editor's hover, or `vp run docgen`)._
 
-`makeQueryFunctions<Surface>()(services)` turns a Drizzle handle's query surface into free functions that find the handle in the Effect context, so a caller writes `yield* select().from(users)` instead of yielding the client and writing `db.select().from(users)`. It takes the `Database` and `CurrentTransaction` keys from [`./database`](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/database.md)'s `makeDatabaseServices`, so there is no second service to wire.
+`makeQueryFunctions<Surface>()(services)` turns a Drizzle handle's query surface into free functions that find the handle in the Effect context, so a caller writes `yield* select().from(users)` instead of yielding the client and writing `db.select().from(users)`. It takes the `Database` and `CurrentTransaction` keys from [`./Database`](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/database.md)'s `makeDatabaseServices`, so there is no second service to wire.
 
 An application on `@effect/sql-pg` doesn't call it: `makePgDatabase` already returns the result as `queries`, typed by Drizzle itself (see the [pg overview](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/overview.md#context-bound-query-functions)). This entry is for a binding over another Effect-native driver.
 
@@ -51,4 +51,4 @@ export interface QueryFunctionsOptions {
 }
 ```
 
-`options.mapQuery` wraps the real query each deferred one replays to, just before it runs, inside the query's own context. The pg binding passes `./errors`' `classifyErrors`, so its queries fail with the tagged Postgres classes; its `Surface` type is what says so, since `mapQuery`'s own types are erased.
+`options.mapQuery` wraps the real query each deferred one replays to, just before it runs, inside the query's own context. The pg binding passes `./Errors`' `classifyErrors`, so its queries fail with the tagged Postgres classes; its `Surface` type is what says so, since `mapQuery`'s own types are erased.

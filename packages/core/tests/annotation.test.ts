@@ -28,7 +28,7 @@ import {
   readDbColumn,
   readDbTable,
   type UnwrapColumn,
-} from "../src/index.ts";
+} from "../src/Annotation.ts";
 
 /** What a hostile `toJsonSchema` hook throws: the walker must swallow it. */
 class WalkerContextError extends Schema.TaggedError<WalkerContextError>()("WalkerContextError", {

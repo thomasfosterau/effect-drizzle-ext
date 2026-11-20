@@ -11,7 +11,7 @@
  * @module packages/pg/tests/locate
  */
 
-import { UniqueViolation } from "@thomasfosterau/effect-drizzle-ext/errors";
+import { UniqueViolation } from "@thomasfosterau/effect-drizzle-ext/Errors";
 import { defineRelations } from "drizzle-orm";
 import {
   integer,
@@ -25,7 +25,7 @@ import {
 } from "drizzle-orm/pg-core";
 import * as Option from "effect/Option";
 import { describe, expect, expectTypeOf, it } from "vite-plus/test";
-import { makePgDatabase } from "../src/index.ts";
+import { makePgDatabase } from "../src/PgDatabase.ts";
 
 const authors = pgTable("authors", {
   id: integer("id").primaryKey(),

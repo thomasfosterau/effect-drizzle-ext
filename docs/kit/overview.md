@@ -2,7 +2,7 @@
 
 _A guide to [`@thomasfosterau/effect-drizzle-ext-kit`](../../packages/kit/README.md). The API reference is the doc comments on each export (your editor's hover, or `vp run docgen`)._
 
-drizzle-kit's postgres diff has no extensions, domains or composite types. The pg package's `./tooling` fills that gap with bin-less Effects ([guide](../pg/tooling.md#extras-what-drizzle-kit-doesnt-manage)). This package wraps them, together with the migration-drift gate, in a command an application runs next to `drizzle-kit`.
+drizzle-kit's postgres diff has no extensions, domains or composite types. The pg package's `./Tooling` fills that gap with bin-less Effects ([guide](../pg/tooling.md#extras-what-drizzle-kit-doesnt-manage)). This package wraps them, together with the migration-drift gate, in a command an application runs next to `drizzle-kit`.
 
 ## The config module
 
@@ -12,7 +12,7 @@ drizzle-kit's postgres diff has no extensions, domains or composite types. The p
 | --- | --- |
 | `migrationsDir` | The drizzle-kit migrations directory. |
 | `drizzleKit` | `{ config: "drizzle.config.ts" }` (its `out` must be `migrationsDir`) or `{ schema: "src/schema.ts" }`. |
-| `extras` | Optional: `{ extensions, domains, compositeTypes }`, built with `./tooling`'s `extension`, `domain` and `compositeType`. |
+| `extras` | Optional: `{ extensions, domains, compositeTypes }`, built with `./Tooling`'s `extension`, `domain` and `compositeType`. |
 | `schema` | Optional: the Drizzle schema module (`import * as schema from "./src/schema.ts"`). When present, `check` also runs `checkMigrationDrift`. |
 | `command` | Optional: how drizzle-kit is started, `["drizzle-kit"]` on `PATH` by default (which a package script has). |
 

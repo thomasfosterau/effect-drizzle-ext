@@ -3,7 +3,7 @@
  * view, which drizzle-kit can't order on DROP. See the
  * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tooling.md).
  *
- * @module tooling/view-dependencies
+ * @module internal/viewDependencies
  */
 
 import { generateDrizzleJson, generateMigration } from "drizzle-kit/api-postgres";
@@ -12,7 +12,7 @@ import * as Effect from "effect/Effect";
 import * as Order from "effect/Order";
 import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
-import { drizzleKit, type SchemaDiffError, type SchemaModule } from "./migration-drift.ts";
+import { drizzleKit, type SchemaDiffError, type SchemaModule } from "./migrationDrift.ts";
 
 /** One view as drizzle-kit would create it. */
 export interface ViewDefinition {
@@ -115,7 +115,7 @@ export class ViewDependencyError extends Schema.TaggedError<ViewDependencyError>
  * @example
  * ```ts
  * // An application's `db:view-dependencies` task passes its own schema module.
- * import { checkViewDependencies } from "@thomasfosterau/effect-drizzle-ext-pg/tooling";
+ * import { checkViewDependencies } from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";
  * import { integer, pgTable, pgView, text } from "drizzle-orm/pg-core";
  * import * as Effect from "effect/Effect";
  *

@@ -1,5 +1,5 @@
 /**
- * Integration coverage for `@thomasfosterau/effect-drizzle-ext-pg/testing`
+ * Integration coverage for `@thomasfosterau/effect-drizzle-ext-pg/Testing`
  * against a real PostgreSQL server — the properties the fake-handle unit test
  * can only model:
  *
@@ -19,7 +19,7 @@
  * @module packages/pg/tests/integration/testing
  */
 
-import { executeRows } from "@thomasfosterau/effect-drizzle-ext/query";
+import { executeRows } from "@thomasfosterau/effect-drizzle-ext/Query";
 import { sql } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -28,8 +28,8 @@ import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Schema from "effect/Schema";
 import { afterAll, beforeAll, describe, expect, test } from "vite-plus/test";
 import { integrationDatabaseLayer, integrationLayerWith } from "./database-url.ts";
-import { makePgDatabase } from "../../src/index.ts";
-import { makeTestTransaction } from "../../src/testing.ts";
+import { makePgDatabase } from "../../src/PgDatabase.ts";
+import { makeTestTransaction } from "../../src/Testing.ts";
 
 const relations = {};
 const database = makePgDatabase({ relations, key: "Database" });

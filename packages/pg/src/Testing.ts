@@ -4,7 +4,7 @@
  * See the
  * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/testing.md).
  *
- * @module testing
+ * @module Testing
  */
 
 import type { AnyRelations } from "drizzle-orm/relations";
@@ -29,8 +29,8 @@ import type {
   DatabaseServices,
   ReadSurface,
   TransactionalDatabase,
-} from "@thomasfosterau/effect-drizzle-ext/database";
-import { type PgDatabase, pgClientFromUrl } from "./index.ts";
+} from "@thomasfosterau/effect-drizzle-ext/Database";
+import { type PgDatabase, pgClientFromUrl } from "./PgDatabase.ts";
 
 export {
   connectionUrl,
@@ -49,7 +49,7 @@ export {
   type ServerProbe,
   ServerUnreachable,
   testDatabaseName,
-} from "./provisioning.ts";
+} from "./internal/provisioning.ts";
 
 // ── Connect-seam retry classification ─────────────────────────────────
 //

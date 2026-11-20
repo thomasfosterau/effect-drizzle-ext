@@ -1,5 +1,5 @@
 /**
- * Unit coverage for `@thomasfosterau/effect-drizzle-ext-pg/testing`.
+ * Unit coverage for `@thomasfosterau/effect-drizzle-ext-pg/Testing`.
  *
  * Two halves, neither needing a database:
  *
@@ -42,13 +42,13 @@ import {
   UniqueViolation,
   UnknownError,
 } from "effect/sql/SqlError";
-import { makeDatabaseServices } from "@thomasfosterau/effect-drizzle-ext/database";
+import { makeDatabaseServices } from "@thomasfosterau/effect-drizzle-ext/Database";
 import { assert, describe, expect } from "vite-plus/test";
 import {
   isRetryableConnectFailure,
   makeTestTransaction,
   testDatabaseLayer,
-} from "../src/testing.ts";
+} from "../src/Testing.ts";
 
 /** A stand-in for the plain driver / spec error a cause or failure carries (no `.code`). */
 class TestFault extends Schema.TaggedError<TestFault>()("TestFault", {

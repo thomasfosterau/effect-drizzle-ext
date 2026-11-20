@@ -1,5 +1,5 @@
 /**
- * `./chain`'s version-chain discipline over the fixture tree's tables
+ * `./Chain`'s version-chain discipline over the fixture tree's tables
  * (`tests/fixtures/schema.ts`), proven against PostgreSQL. The cases are
  * pulpit's `version-chain` unit tests, ported from its in-memory store to the
  * real tables: create is never an upsert, update carries forward and never
@@ -11,7 +11,7 @@
  * @module packages/pg/tests/integration/chain
  */
 
-import { classifyError } from "@thomasfosterau/effect-drizzle-ext/errors";
+import { classifyError } from "@thomasfosterau/effect-drizzle-ext/Errors";
 import { eq, sql } from "drizzle-orm";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
@@ -21,10 +21,10 @@ import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Option from "effect/Option";
 import { assert, describe, expect } from "vite-plus/test";
-import { makeVersionChain, MAX_HISTORY_LIMIT } from "../../src/chain.ts";
+import { makeVersionChain, MAX_HISTORY_LIMIT } from "../../src/Chain.ts";
 import { integrationLayer, separateDatabase } from "./database-url.ts";
-import { makePgDatabase } from "../../src/index.ts";
-import { makeTestTransaction } from "../../src/testing.ts";
+import { makePgDatabase } from "../../src/PgDatabase.ts";
+import { makeTestTransaction } from "../../src/Testing.ts";
 import {
   node,
   nodeVersion,

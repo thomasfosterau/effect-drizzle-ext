@@ -25,15 +25,15 @@
  * @module packages/pg/tests/integration/database
  */
 
-import { executeRows } from "@thomasfosterau/effect-drizzle-ext/query";
+import { executeRows } from "@thomasfosterau/effect-drizzle-ext/Query";
 import { sql } from "drizzle-orm";
 import { integer, pgTable } from "drizzle-orm/pg-core";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { describe, expect } from "vite-plus/test";
 import { integrationLayer } from "./database-url.ts";
-import { makePgDatabase } from "../../src/index.ts";
-import { makeTestTransaction } from "../../src/testing.ts";
+import { makePgDatabase } from "../../src/PgDatabase.ts";
+import { makeTestTransaction } from "../../src/Testing.ts";
 
 /** This library is relations-agnostic; the specs need no relational graph. */
 const relations = {};

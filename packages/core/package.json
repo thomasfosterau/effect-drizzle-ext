@@ -33,23 +33,24 @@
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./derive": "./src/derive.ts",
-    "./references": "./src/references.ts",
-    "./constraints": "./src/constraints.ts",
-    "./columns": "./src/columns.ts",
-    "./query": "./src/query.ts",
-    "./query-functions": "./src/query-functions.ts",
-    "./sort": "./src/sort.ts",
-    "./update": "./src/update.ts",
-    "./errors": "./src/errors.ts",
-    "./database": "./src/database.ts",
-    "./versioned-chain": "./src/versioned-chain.ts",
-    "./postgis": "./src/PostGis.ts",
-    "./jsonapi": "./src/jsonapi/index.ts",
-    "./jsonapi/derive": "./src/jsonapi/derive.ts",
+    "./Annotation": "./src/Annotation.ts",
+    "./Columns": "./src/Columns.ts",
+    "./Constraints": "./src/Constraints.ts",
+    "./Database": "./src/Database.ts",
+    "./Derive": "./src/Derive.ts",
+    "./Errors": "./src/Errors.ts",
+    "./JsonApi": "./src/JsonApi.ts",
+    "./JsonApiDerive": "./src/JsonApiDerive.ts",
+    "./PostGis": "./src/PostGis.ts",
     "./Predicate": "./src/Predicate.ts",
-    "./Where": "./src/Where.ts",
-    "./Search": "./src/Search.ts"
+    "./Query": "./src/Query.ts",
+    "./QueryFunctions": "./src/QueryFunctions.ts",
+    "./References": "./src/References.ts",
+    "./Search": "./src/Search.ts",
+    "./Sort": "./src/Sort.ts",
+    "./Update": "./src/Update.ts",
+    "./VersionedChain": "./src/VersionedChain.ts",
+    "./Where": "./src/Where.ts"
   },
   "publishConfig": {
     "exports": {
@@ -57,73 +58,77 @@
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
       },
-      "./derive": {
-        "types": "./dist/derive.d.ts",
-        "default": "./dist/derive.js"
+      "./Annotation": {
+        "types": "./dist/Annotation.d.ts",
+        "default": "./dist/Annotation.js"
       },
-      "./references": {
-        "types": "./dist/references.d.ts",
-        "default": "./dist/references.js"
+      "./Columns": {
+        "types": "./dist/Columns.d.ts",
+        "default": "./dist/Columns.js"
       },
-      "./constraints": {
-        "types": "./dist/constraints.d.ts",
-        "default": "./dist/constraints.js"
+      "./Constraints": {
+        "types": "./dist/Constraints.d.ts",
+        "default": "./dist/Constraints.js"
       },
-      "./columns": {
-        "types": "./dist/columns.d.ts",
-        "default": "./dist/columns.js"
+      "./Database": {
+        "types": "./dist/Database.d.ts",
+        "default": "./dist/Database.js"
       },
-      "./query": {
-        "types": "./dist/query.d.ts",
-        "default": "./dist/query.js"
+      "./Derive": {
+        "types": "./dist/Derive.d.ts",
+        "default": "./dist/Derive.js"
       },
-      "./query-functions": {
-        "types": "./dist/query-functions.d.ts",
-        "default": "./dist/query-functions.js"
+      "./Errors": {
+        "types": "./dist/Errors.d.ts",
+        "default": "./dist/Errors.js"
       },
-      "./sort": {
-        "types": "./dist/sort.d.ts",
-        "default": "./dist/sort.js"
+      "./JsonApi": {
+        "types": "./dist/JsonApi.d.ts",
+        "default": "./dist/JsonApi.js"
       },
-      "./update": {
-        "types": "./dist/update.d.ts",
-        "default": "./dist/update.js"
+      "./JsonApiDerive": {
+        "types": "./dist/JsonApiDerive.d.ts",
+        "default": "./dist/JsonApiDerive.js"
       },
-      "./errors": {
-        "types": "./dist/errors.d.ts",
-        "default": "./dist/errors.js"
-      },
-      "./database": {
-        "types": "./dist/database.d.ts",
-        "default": "./dist/database.js"
-      },
-      "./versioned-chain": {
-        "types": "./dist/versioned-chain.d.ts",
-        "default": "./dist/versioned-chain.js"
-      },
-      "./postgis": {
-        "types": "./dist/postgis.d.ts",
-        "default": "./dist/postgis.js"
-      },
-      "./jsonapi": {
-        "types": "./dist/jsonapi/index.d.ts",
-        "default": "./dist/jsonapi/index.js"
-      },
-      "./jsonapi/derive": {
-        "types": "./dist/jsonapi/derive.d.ts",
-        "default": "./dist/jsonapi/derive.js"
+      "./PostGis": {
+        "types": "./dist/PostGis.d.ts",
+        "default": "./dist/PostGis.js"
       },
       "./Predicate": {
         "types": "./dist/Predicate.d.ts",
         "default": "./dist/Predicate.js"
       },
-      "./Where": {
-        "types": "./dist/Where.d.ts",
-        "default": "./dist/Where.js"
+      "./Query": {
+        "types": "./dist/Query.d.ts",
+        "default": "./dist/Query.js"
+      },
+      "./QueryFunctions": {
+        "types": "./dist/QueryFunctions.d.ts",
+        "default": "./dist/QueryFunctions.js"
+      },
+      "./References": {
+        "types": "./dist/References.d.ts",
+        "default": "./dist/References.js"
       },
       "./Search": {
         "types": "./dist/Search.d.ts",
         "default": "./dist/Search.js"
+      },
+      "./Sort": {
+        "types": "./dist/Sort.d.ts",
+        "default": "./dist/Sort.js"
+      },
+      "./Update": {
+        "types": "./dist/Update.d.ts",
+        "default": "./dist/Update.js"
+      },
+      "./VersionedChain": {
+        "types": "./dist/VersionedChain.d.ts",
+        "default": "./dist/VersionedChain.js"
+      },
+      "./Where": {
+        "types": "./dist/Where.d.ts",
+        "default": "./dist/Where.js"
       }
     },
     "access": "public"

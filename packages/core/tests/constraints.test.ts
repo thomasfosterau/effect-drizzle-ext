@@ -13,7 +13,7 @@
 
 import { describe, expect, it } from "vite-plus/test";
 import { getTableConfig, PgDialect, pgTable, text, uuid } from "drizzle-orm/pg-core";
-import { enumCheck, discriminatorConstraintsFor } from "../src/constraints.ts";
+import { enumCheck, discriminatorConstraintsFor } from "../src/Constraints.ts";
 
 const dialect = new PgDialect();
 

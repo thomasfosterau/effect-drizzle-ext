@@ -41,8 +41,8 @@ import {
   type SortKey,
   sortableColumnsFor,
   UnsupportedSortError,
-} from "../src/sort.ts";
-import { makeCurrentVersionView } from "../src/versioned-chain.ts";
+} from "../src/Sort.ts";
+import { makeCurrentVersionView } from "../src/VersionedChain.ts";
 
 // ── fixture: a two-level chain and its current-version view ──────────────
 

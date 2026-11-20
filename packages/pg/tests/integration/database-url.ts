@@ -14,8 +14,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import type * as Redacted from "effect/Redacted";
 import type { SqlError } from "effect/sql/SqlError";
-import type { PgDatabase } from "../../src/index.ts";
-import { testDatabaseLayer } from "../../src/testing.ts";
+import type { PgDatabase } from "../../src/PgDatabase.ts";
+import { testDatabaseLayer } from "../../src/Testing.ts";
 
 /**
  * The provisioned database's URL. The global setup always sets

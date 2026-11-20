@@ -13,15 +13,15 @@
  * @module packages/pg/tests/integration/tree
  */
 
-import { classifyError } from "@thomasfosterau/effect-drizzle-ext/errors";
+import { classifyError } from "@thomasfosterau/effect-drizzle-ext/Errors";
 import { sql } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
 import { assert, describe, expect } from "vite-plus/test";
 import { integrationLayer } from "./database-url.ts";
-import { makePgDatabase } from "../../src/index.ts";
-import { makeTestTransaction } from "../../src/testing.ts";
+import { makePgDatabase } from "../../src/PgDatabase.ts";
+import { makeTestTransaction } from "../../src/Testing.ts";
 
 const database = makePgDatabase({ relations: {}, key: "Database" });
 const { CurrentTransaction } = database;

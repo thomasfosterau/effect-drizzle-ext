@@ -7,7 +7,7 @@ import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
 import * as Redacted from "effect/Redacted";
 import { expect } from "vite-plus/test";
-import { applyMigrations, MigrationError } from "../../src/migrations.ts";
+import { applyMigrations, MigrationError } from "../../src/Migrations.ts";
 import { testDatabaseUrl } from "./database-url.ts";
 
 /**

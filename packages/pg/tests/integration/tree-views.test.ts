@@ -15,8 +15,8 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import { describe, expect } from "vite-plus/test";
 import { integrationLayer } from "./database-url.ts";
-import { makePgDatabase } from "../../src/index.ts";
-import { makeTestTransaction } from "../../src/testing.ts";
+import { makePgDatabase } from "../../src/PgDatabase.ts";
+import { makeTestTransaction } from "../../src/Testing.ts";
 import { bookView, editionView, ontologyViews, workView } from "../fixtures/schema.ts";
 
 const database = makePgDatabase({ relations: {}, key: "Database" });

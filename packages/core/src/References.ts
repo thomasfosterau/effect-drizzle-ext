@@ -4,7 +4,7 @@
  * See the
  * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/references.md).
  *
- * @module references
+ * @module References
  */
 
 import { getColumns, getTableName, is } from "drizzle-orm";
@@ -12,8 +12,8 @@ import { PgColumn, type AnyPgColumn, type PgTable } from "drizzle-orm/pg-core";
 import * as MutableHashMap from "effect/MutableHashMap";
 import * as Option from "effect/Option";
 import * as R from "effect/Record";
-import { DerivationError } from "./derive.ts";
-import type { DbColumnReference } from "./index.ts";
+import { DerivationError } from "./Derive.ts";
+import type { DbColumnReference } from "./Annotation.ts";
 
 /**
  * A name-keyed registry of FK-reference targets, plus the lazy resolver the

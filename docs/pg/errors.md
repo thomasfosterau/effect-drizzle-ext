@@ -25,7 +25,7 @@ const createWidget = (slug: string) =>
 A failure raised outside a query is not classified for you: a `COMMIT` that loses a serialization conflict fails `transact` itself, and a query run on a handle (`tx.insert(…)`, `db.select(…)`) carries the driver's error. Pipe core's `classifyErrors` onto those, for example to retry a serializable transaction:
 
 ```ts
-import { classifyErrors } from "@thomasfosterau/effect-drizzle-ext/errors";
+import { classifyErrors } from "@thomasfosterau/effect-drizzle-ext/Errors";
 
 const transfer = transact(moveFunds).pipe(
   classifyErrors,
@@ -64,10 +64,10 @@ const createAuthor = (handle: string, email: string) =>
 
 ## Recovering a classification
 
-`classifyError` from [`@thomasfosterau/effect-drizzle-ext/errors`](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/errors.md) recovers a tagged, fact-carrying error from the drizzle / `@effect/sql-pg` error graph a real query raises — `constraint`, `table` and `column` are populated the same way against this driver as they are documented in the core package. `catchUniqueViolation` is the combinator most operations reach for, typically wrapping a `transact`ed write:
+`classifyError` from [`@thomasfosterau/effect-drizzle-ext/Errors`](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/errors.md) recovers a tagged, fact-carrying error from the drizzle / `@effect/sql-pg` error graph a real query raises — `constraint`, `table` and `column` are populated the same way against this driver as they are documented in the core package. `catchUniqueViolation` is the combinator most operations reach for, typically wrapping a `transact`ed write:
 
 ```ts
-import { catchUniqueViolation } from "@thomasfosterau/effect-drizzle-ext/errors";
+import { catchUniqueViolation } from "@thomasfosterau/effect-drizzle-ext/Errors";
 
 const createWidget = (slug: string) =>
   transact(

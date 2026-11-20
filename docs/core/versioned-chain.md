@@ -1,8 +1,8 @@
-# `./versioned-chain`
+# `./VersionedChain`
 
 _A guide to [`@thomasfosterau/effect-drizzle-ext`](../../packages/core/README.md). The API reference is the doc comments on each export (your editor's hover, or `vp run docgen`)._
 
-The opt-in interpreter for "a tree of levels, each a stable + version table pair, joined up a composite `(id, version)` FK chain to a root, with fail-closed current-version views" — the shape a temporal-versioned node hierarchy takes. `./versioned-chain` carries no application ontology; both factories are parameterised over the bits one hierarchy pins.
+The opt-in interpreter for "a tree of levels, each a stable + version table pair, joined up a composite `(id, version)` FK chain to a root, with fail-closed current-version views" — the shape a temporal-versioned node hierarchy takes. `./VersionedChain` carries no application ontology; both factories are parameterised over the bits one hierarchy pins.
 
 ### The whole tree: `makeTreeTables` and `makeTreeViews`
 
@@ -38,7 +38,7 @@ The chain writes stable columns once, at `create`; no later write touches them. 
 - **Per pointer and leaf named in `pointers`, the leaf view at the pointer's effective fact.** It projects the head's `action` and `${pointer}At`, and composes with the keyed view.
 - **`asOf(leaf, { version } | { at })`:** the leaf view at an older point, as a subquery.
 
-Every derived view reads base tables only, never another view. Each view's row type is derived from the tree. The write side is [`@thomasfosterau/effect-drizzle-ext-pg/chain`](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/chain.md).
+Every derived view reads base tables only, never another view. Each view's row type is derived from the tree. The write side is [`@thomasfosterau/effect-drizzle-ext-pg/Chain`](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/chain.md).
 
 #### Head resolution
 
@@ -58,7 +58,7 @@ The anti-join probes the primary key once per candidate row, so a paged list (`O
 
 The set of rows is the same as the `max` head's: a row exists when every joined level has a row at the node's maximum root version. A head that moved to another leaf, or advanced past a level, has a newer root version, so the old leaf's view yields no row. A tombstone is the head, so it shows with `action = 'delete'`. A branch view drives from the branch level's own version table with the same anti-join (see [Branch views](#branch-views)). `asOf` bounds both sides, the joined root row and the `newer` one (`version <= v`, or `timestamp <= at`), so it resolves the latest version within the bound. A pointer view still drives from the effective pointer fact; the head row it reads `action` from is found by the same anti-join.
 
-**Upgrading.** Every derived view's SQL changed, `makeCurrentVersionView`'s included. A consumer's next `drizzle-kit generate` emits a `DROP VIEW` and a `CREATE VIEW` for each derived view, with no table or data change. Regenerate and apply that migration. drizzle-kit does not order view drops by dependency, so an application view that selects from a derived view must be dropped before that migration and recreated after it: hand-edit the generated migration, or better, remove the edge. `checkViewDependencies` in [`@thomasfosterau/effect-drizzle-ext-pg/tooling`](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tooling.md) fails on any such edge before a migration is generated.
+**Upgrading.** Every derived view's SQL changed, `makeCurrentVersionView`'s included. A consumer's next `drizzle-kit generate` emits a `DROP VIEW` and a `CREATE VIEW` for each derived view, with no table or data change. Regenerate and apply that migration. drizzle-kit does not order view drops by dependency, so an application view that selects from a derived view must be dropped before that migration and recreated after it: hand-edit the generated migration, or better, remove the edge. `checkViewDependencies` in [`@thomasfosterau/effect-drizzle-ext-pg/Tooling`](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tooling.md) fails on any such edge before a migration is generated.
 
 #### Branch views
 
@@ -95,7 +95,7 @@ On the fixture chain (PostgreSQL 16.15, two leaves, 50,000 books and 50,000 essa
 
 ### Per-leaf builders
 
-`makeSubtypeTables(applyDiscriminator)(schema, config)` builds one leaf's `{ stable, version }` pair: the stable identity row (`id` primary key referencing the parent branch's stable `id`, plus a denormalised `type` discriminator), and the version row (`(id, version)` primary key, `(id, version)` foreign-keyed to the parent branch's version table). Domain columns are authored per leaf and merged in via `config.columns`, and `config.stableColumns` / `config.stableConstraints` extend the stable row after `id` / `type` and after the discriminator constraints; `discriminator`, when present, makes `type` `NOT NULL` and appends the constraints `applyDiscriminator` returns (a `./constraints` `DiscriminatorToolkit` is the intended hook). Its return type, `SubtypeTables<TColumns, TStable>`, is written out as an explicit annotation rather than inferred — the declaration printer cannot reduce the homomorphic `PgBuildColumns` mapped type while `TColumns` is still generic, and would otherwise emit an unbound `TTableName` reference that `skipLibCheck` hides.
+`makeSubtypeTables(applyDiscriminator)(schema, config)` builds one leaf's `{ stable, version }` pair: the stable identity row (`id` primary key referencing the parent branch's stable `id`, plus a denormalised `type` discriminator), and the version row (`(id, version)` primary key, `(id, version)` foreign-keyed to the parent branch's version table). Domain columns are authored per leaf and merged in via `config.columns`, and `config.stableColumns` / `config.stableConstraints` extend the stable row after `id` / `type` and after the discriminator constraints; `discriminator`, when present, makes `type` `NOT NULL` and appends the constraints `applyDiscriminator` returns (a `./Constraints` `DiscriminatorToolkit` is the intended hook). Its return type, `SubtypeTables<TColumns, TStable>`, is written out as an explicit annotation rather than inferred — the declaration printer cannot reduce the homomorphic `PgBuildColumns` mapped type while `TColumns` is still generic, and would otherwise emit an unbound `TTableName` reference that `skipLibCheck` hides.
 
 `makeCurrentVersionView(deps)(schema, name, config)` builds the uniform fail-closed current-version view: currency resolves from `deps.rootVersion` (its row with no newer version of the same node drives the FROM, the same anti-join as [head resolution](#head-resolution)), and `config.leaf` / `config.through` INNER JOIN at exactly that `(id, version)` — a node whose root version advanced past its leaf (a partial-chain tombstone) yields **no row**, rather than surfacing a stale older leaf row. `config.optional` LEFT JOINs 6NF satellite fact tables instead, where row-absence at a version encodes NULL. `deps.merge` can be a plain object (columns merged from `deps.identity`, no extra join, the emitted view definition unchanged) or a function (additionally INNER JOINs a `version = 0` alias of `rootVersion` and hands it to the callback, so a hierarchy can merge in a true `createdAt` sourced from the node's birth row, distinct from the current version's timestamp) — the object form matters for a root version table whose view is itself joined by another hand-written view, since drizzle-kit does not topologically order view-on-view DROPs.
 
@@ -103,7 +103,7 @@ On the fixture chain (PostgreSQL 16.15, two leaves, 50,000 books and 50,000 essa
 
 The read shapes of a chain are structural types, so a history listing and the page that renders it can share them without depending on an operations module. `VersionChainEntry<Action>` is one `{ version, action, timestamp }` row. `VersionSnapshot<Action, Extra>` is one version's reconstructed state: the entry plus `columns` (every leaf-chain domain column at that version) and whatever branch-level facts `Extra` names. `Action` defaults to `"create" | "update" | "delete"`. `versionTimestamps(row)` reads a current-version row's `createdAt` / `updatedAt` pair: `updatedAt` is the current `timestamp`, and `createdAt` comes from the birth-row merge, falling back to `updatedAt` for a view that has none.
 
-The three read-shape types (`VersionAction`, `VersionChainEntry`, `VersionSnapshot`) are also exported from the Drizzle-free root entry, `@thomasfosterau/effect-drizzle-ext`, as the same types: a client-bundled package that only names them imports them from there and keeps `drizzle-orm` out of its module graph.
+The three read-shape types (`VersionAction`, `VersionChainEntry`, `VersionSnapshot`) are also exported from the Drizzle-free `@thomasfosterau/effect-drizzle-ext/Annotation` (the root entry's `Annotation` namespace), as the same types: a client-bundled package that only names them imports them from there and keeps `drizzle-orm` out of its module graph.
 
 ```ts
 export const makeSubtypeTables: <TDiscriminator>(

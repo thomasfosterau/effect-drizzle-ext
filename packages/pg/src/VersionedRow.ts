@@ -20,14 +20,14 @@ import { bigint, type PgTable } from "drizzle-orm/pg-core";
 import {
   catchUniqueViolation,
   type UniqueViolation,
-} from "@thomasfosterau/effect-drizzle-ext/errors";
+} from "@thomasfosterau/effect-drizzle-ext/Errors";
 import * as Arr from "effect/Array";
 import type * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import { NodeAlreadyExists, NodeNotFound, StaleVersion } from "./chain.ts";
-import type { PgTransaction } from "./index.ts";
+import { NodeAlreadyExists, NodeNotFound, StaleVersion } from "./Chain.ts";
+import type { PgTransaction } from "./PgDatabase.ts";
 import { columnOf as tableColumnOf, type QueryError } from "./internal/table.ts";
 
 /**

@@ -1,5 +1,5 @@
 /**
- * Unit coverage for `./errors` — the bounded, cycle-guarded walk that recovers
+ * Unit coverage for `./Errors` — the bounded, cycle-guarded walk that recovers
  * a `pg` driver error's facts from wherever it sits in an error graph, and the
  * tagged classification built on top of it.
  *
@@ -37,8 +37,8 @@ import {
   NotNullViolation,
   SerializationFailure,
   UniqueViolation,
-} from "../src/errors.ts";
-import type { ClassifiedError } from "../src/errors.ts";
+} from "../src/Errors.ts";
+import type { ClassifiedError } from "../src/Errors.ts";
 
 /**
  * Classifies `error`, asserts which tag came back, and narrows to that member

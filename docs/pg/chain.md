@@ -1,4 +1,4 @@
-# `./chain`
+# `./Chain`
 
 _A guide to [`@thomasfosterau/effect-drizzle-ext-pg`](../../packages/pg/README.md). The API reference is the doc comments on each export (your editor's hover, or `vp run docgen`)._
 
@@ -18,7 +18,7 @@ The version-chain discipline, Drizzle-concrete, over the tables core's `makeTree
 
 **A keyed leaf** (core's `keyed: { name, columns }`, such as a localised leaf's locales) also writes its keyed level on every append. `create` takes `keyed`, the whole level. `update` / `restore` take `keyed`, a per-key tri-state patch: a patch updates a key, `null` drops it, and an absent key carries it forward. `delete` and `restoreVersion` carry or restore every key, and `getVersion` returns them as `keyed`, keyed by key (`{}` for none).
 
-**Stable columns** (core's `levels[name].stableColumns`, such as an external key unique across a leaf's nodes) are written once. `create` takes `stable`, keyed by field across the leaf's path, as `identity` is for the root. `update`, `restore`, `delete` and `restoreVersion` never touch a stable row, and there is no `setStable`; `refine` changes their `type` and adds the new levels' rows. A duplicate key fails the insert with the driver's error, which `./errors` classifies as a `UniqueViolation` under your constraint's name.
+**Stable columns** (core's `levels[name].stableColumns`, such as an external key unique across a leaf's nodes) are written once. `create` takes `stable`, keyed by field across the leaf's path, as `identity` is for the root. `update`, `restore`, `delete` and `restoreVersion` never touch a stable row, and there is no `setStable`; `refine` changes their `type` and adds the new levels' rows. A duplicate key fails the insert with the driver's error, which `./Errors` classifies as a `UniqueViolation` under your constraint's name.
 
 **The expected-version precondition.** Every write to an existing node takes `expectedVersion`, the head its caller last read. A moved head fails `StaleVersion { expected, current }` and nothing is written. A writer racing between its read and its append loses the root's `(id, version)` primary key and fails `VersionConflict`; the transaction is aborted for the caller to roll back. `actor` is a required `string | undefined`, so every caller states it. State is keyed by field across the leaf's whole path. The error classes (`NodeNotFound`, `VersionNotFound`, `NodeAlreadyExists`, `VersionConflict`, `StaleVersion`, and `BrokenChain` as a defect) carry pulpit's names and fields.
 

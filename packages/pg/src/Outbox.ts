@@ -23,7 +23,7 @@ import type * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import type { AnyRelations } from "drizzle-orm";
-import type { PgTransaction } from "./index.ts";
+import type { PgTransaction } from "./PgDatabase.ts";
 import { columnOf as tableColumnOf, type QueryError } from "./internal/table.ts";
 
 /**

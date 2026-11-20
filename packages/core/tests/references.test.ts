@@ -10,9 +10,9 @@
 import { describe, expect, it } from "vite-plus/test";
 import * as Schema from "effect/Schema";
 import { getTableConfig, pgTable, text, uuid } from "drizzle-orm/pg-core";
-import { dbColumn } from "../src/index.ts";
-import { DerivationError, deriveColumnsWith, type ColumnBuilders } from "../src/derive.ts";
-import { makeReferenceRegistry } from "../src/references.ts";
+import { dbColumn } from "../src/Annotation.ts";
+import { DerivationError, deriveColumnsWith, type ColumnBuilders } from "../src/Derive.ts";
+import { makeReferenceRegistry } from "../src/References.ts";
 
 const builders = {
   text: (c: string) => text(c),

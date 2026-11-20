@@ -14,9 +14,9 @@ pnpm add @thomasfosterau/effect-drizzle-ext @thomasfosterau/effect-drizzle-ext-p
 ## Usage
 
 ```ts
-import { dbColumnFor } from "@thomasfosterau/effect-drizzle-ext";
-import { deriveColumnsWith } from "@thomasfosterau/effect-drizzle-ext/derive";
-import { makePgDatabase } from "@thomasfosterau/effect-drizzle-ext-pg";
+import { dbColumnFor } from "@thomasfosterau/effect-drizzle-ext/Annotation";
+import { deriveColumnsWith } from "@thomasfosterau/effect-drizzle-ext/Derive";
+import { makePgDatabase } from "@thomasfosterau/effect-drizzle-ext-pg/PgDatabase";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import * as Schema from "effect/Schema";
 import { relations } from "./relations.ts"; // your drizzle relations graph

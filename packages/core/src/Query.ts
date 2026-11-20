@@ -5,7 +5,7 @@
  * `execute` that papers over a driver mismatch between typed and runtime
  * `db.execute` shapes.
  *
- * @module query
+ * @module Query
  */
 import { and, sql } from "drizzle-orm";
 import type { SQL, SQLWrapper } from "drizzle-orm";
@@ -33,7 +33,7 @@ export const TOTAL_COUNT_ALIAS = "__totalCount";
  *
  * @example
  * ```ts
- * import { totalCountColumn } from "@thomasfosterau/effect-drizzle-ext/query";
+ * import { totalCountColumn } from "@thomasfosterau/effect-drizzle-ext/Query";
  * import { eq } from "drizzle-orm";
  * import { integer, pgTable, QueryBuilder, text } from "drizzle-orm/pg-core";
  *
@@ -169,7 +169,7 @@ export type BoundedPagination = ReturnType<typeof boundedPagination>;
  *
  * @example
  * ```ts
- * import { executeRows } from "@thomasfosterau/effect-drizzle-ext/query";
+ * import { executeRows } from "@thomasfosterau/effect-drizzle-ext/Query";
  * import * as Effect from "effect/Effect";
  * import * as Schema from "effect/Schema";
  *

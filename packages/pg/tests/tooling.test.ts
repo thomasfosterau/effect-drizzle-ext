@@ -1,5 +1,5 @@
 /**
- * The two schema guards (`src/tooling/`), run against the committed fixture
+ * The two schema guards (`src/Tooling.ts`), run against the committed fixture
  * chain (`tests/fixtures/`): the fixture passes both, and each failure mode
  * the applications' scripts were written for is reproduced — a schema that
  * drifted from its latest snapshot, a view that selects from a view, a forked
@@ -37,7 +37,7 @@ import {
   ROOT_SENTINEL_ID,
   type SnapshotEntry,
   ViewDependencyError,
-} from "../src/tooling/index.ts";
+} from "../src/Tooling.ts";
 
 const FIXTURE_MIGRATIONS = `${import.meta.dirname}/fixtures/migrations`;
 /** A one-migration chain in the pre-rc.5 full-snapshot format (version `"8"`). */

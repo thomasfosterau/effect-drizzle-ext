@@ -3,7 +3,7 @@
  * or `undefined` carries forward. See the
  * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/update.md).
  *
- * @module update
+ * @module Update
  */
 
 import * as Arr from "effect/Array";

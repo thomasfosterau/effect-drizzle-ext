@@ -14,8 +14,8 @@ import * as HashMap from "effect/HashMap";
 import * as Option from "effect/Option";
 import { describe, expect } from "vite-plus/test";
 import { makeExternalIdStore, makeExternalIdTable } from "../../src/ExternalIds.ts";
-import { makePgDatabase } from "../../src/index.ts";
-import { makeTestTransaction } from "../../src/testing.ts";
+import { makePgDatabase } from "../../src/PgDatabase.ts";
+import { makeTestTransaction } from "../../src/Testing.ts";
 import { integrationLayer } from "./database-url.ts";
 
 const database = makePgDatabase({ relations: {}, key: "Database" });

@@ -1,4 +1,4 @@
-# `./tooling`
+# `./Tooling`
 
 _A guide to [`@thomasfosterau/effect-drizzle-ext-pg`](../../packages/pg/README.md). The API reference is the doc comments on each export (your editor's hover, or `vp run docgen`)._
 
@@ -44,7 +44,7 @@ An application's script:
 // packages/database/scripts/check-migration-drift.ts — run by the `db:migration-drift` task
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { checkMigrationDrift, resolveBaseRef } from "@thomasfosterau/effect-drizzle-ext-pg/tooling";
+import { checkMigrationDrift, resolveBaseRef } from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";
 import * as schema from "../src/schema.ts";
 
 const repoRoot = path.resolve(import.meta.dirname, "../../..");
@@ -67,7 +67,7 @@ drizzle-kit's postgres diff has no extensions, domains or composite types. Its e
 
 ```ts
 // packages/database/src/extras.ts
-import { compositeType, domain, extension } from "@thomasfosterau/effect-drizzle-ext-pg/tooling";
+import { compositeType, domain, extension } from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";
 
 export const extras = {
   extensions: [extension("citext"), extension("vector", { version: "0.8.0" })],
@@ -87,7 +87,7 @@ export const extras = {
 // packages/database/scripts/generate-extras.ts — run by the `db:generate-extras` task
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { generateExtrasMigration } from "@thomasfosterau/effect-drizzle-ext-pg/tooling";
+import { generateExtrasMigration } from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";
 import * as Effect from "effect/Effect";
 import { extras } from "../src/extras.ts";
 
@@ -101,7 +101,7 @@ generateExtrasMigration({
 
 How it works:
 
-- **The state.** Each migration it writes carries an `extras.json` beside `migration.sql` and `snapshot.json`, holding the whole declared state after that migration. The recorded state is the one in the latest-by-name directory that has the file. drizzle-kit (`check`, `generate`), `./migrations` and `checkMigrationDrift` all ignore the file.
+- **The state.** Each migration it writes carries an `extras.json` beside `migration.sql` and `snapshot.json`, holding the whole declared state after that migration. The recorded state is the one in the latest-by-name directory that has the file. drizzle-kit (`check`, `generate`), `./Migrations` and `checkMigrationDrift` all ignore the file.
 - **The directory is drizzle-kit's.** The generator runs `drizzle-kit generate --custom --name <slug> --output json` (`command` overrides how drizzle-kit is started; the default is `drizzle-kit` on `PATH`, which a package script has), so the folder name, its order and the snapshot's `prevIds` stay drizzle-kit's. It then replaces the placeholder `migration.sql`, with `--> statement-breakpoint` between statements. With nothing to migrate it writes nothing and returns `Option.none()`.
 - **Order.** Creates and alters come first: extensions, then domains, then composite types, each in declaration order. Drops follow in the reverse order. An extension or type must exist before the drizzle-kit migration whose table first uses it, so run the generator **before** `drizzle-kit generate`.
 - **Alters.** An extension's schema (`SET SCHEMA`) and pinned version (`UPDATE TO`); a domain's default, `NOT NULL` and named checks; a composite type's attributes (`ADD` / `DROP` / `ALTER ATTRIBUTE … TYPE`). A domain's base type can't be altered, so changing it is an `ExtrasError` naming the domain. Postgres refuses attribute changes to a composite type while a table column uses it.

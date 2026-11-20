@@ -1,5 +1,5 @@
 /**
- * `./chain`'s reads and writes an aggregate repository builds on, against
+ * `./Chain`'s reads and writes an aggregate repository builds on, against
  * PostgreSQL: `load` reads the head's state and version together, and
  * `setPointer` moves a named pointer as a discrete write, never a version.
  *
@@ -13,9 +13,9 @@ import * as Exit from "effect/Exit";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
 import { afterAll, describe, expect, it } from "vite-plus/test";
-import { makeVersionChain } from "../../src/chain.ts";
-import { makePgDatabase } from "../../src/index.ts";
-import { makeTestTransaction } from "../../src/testing.ts";
+import { makeVersionChain } from "../../src/Chain.ts";
+import { makePgDatabase } from "../../src/PgDatabase.ts";
+import { makeTestTransaction } from "../../src/Testing.ts";
 import { bookLiveView, ontologyTables, ontologyTree } from "../fixtures/schema.ts";
 import { integrationDatabaseLayer } from "./database-url.ts";
 

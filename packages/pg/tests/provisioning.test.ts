@@ -1,6 +1,6 @@
 /**
- * The provisioning resolution order (`src/provisioning.ts`, re-exported from
- * `./testing`), ported from the preferenceflow application's
+ * The provisioning resolution order (`src/internal/provisioning.ts`, re-exported from
+ * `./Testing`), ported from the preferenceflow application's
  * `packages/integration-harness/tests/local-database.test.ts` and driven
  * against a fake server probe, so no PostgreSQL server and no Docker daemon
  * is needed: an explicit URL wins without probing; a reachable server yields
@@ -30,7 +30,7 @@ import {
   type ServerProbe,
   ServerUnreachable,
   testDatabaseName,
-} from "../src/testing.ts";
+} from "../src/Testing.ts";
 
 const MIGRATIONS_DIR = "/checkout/packages/database/migrations";
 const IMAGE = "postgres:17";

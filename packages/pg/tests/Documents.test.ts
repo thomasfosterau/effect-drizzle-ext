@@ -6,12 +6,12 @@
  * @module packages/pg/tests/Documents
  */
 
-import { DerivationError } from "@thomasfosterau/effect-drizzle-ext/derive";
+import { DerivationError } from "@thomasfosterau/effect-drizzle-ext/Derive";
 import { getTableConfig, pgTable, text } from "drizzle-orm/pg-core";
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vite-plus/test";
 import { DocumentHash, documentColumns, makeDocumentStore } from "../src/Documents.ts";
-import { makePgDatabase } from "../src/index.ts";
+import { makePgDatabase } from "../src/PgDatabase.ts";
 
 const { CurrentTransaction } = makePgDatabase({ relations: {}, key: "Database" });
 

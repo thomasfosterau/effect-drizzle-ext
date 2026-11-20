@@ -15,8 +15,8 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { describe, expect } from "vite-plus/test";
 import { documentColumns, makeDocumentStore } from "../../src/Documents.ts";
-import { makePgDatabase } from "../../src/index.ts";
-import { makeTestTransaction } from "../../src/testing.ts";
+import { makePgDatabase } from "../../src/PgDatabase.ts";
+import { makeTestTransaction } from "../../src/Testing.ts";
 import { integrationLayer } from "./database-url.ts";
 
 const database = makePgDatabase({ relations: {}, key: "Database" });
