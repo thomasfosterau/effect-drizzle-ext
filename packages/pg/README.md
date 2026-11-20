@@ -1,6 +1,6 @@
 # `@thomasfosterau/effect-drizzle-ext-pg`
 
-The `@effect/sql-pg` binding for `@thomasfosterau/effect-drizzle-ext`: `Database` / `CurrentTransaction` services over `drizzle-orm/effect-postgres`, `PgClient` layers, the version-chain discipline over a tree's tables (`./chain`), a sentinel-rollback test runner with test-database provisioning, a fresh-database migration runner, typed helpers for PlanetScale's TIN full-text search (`./Tin`), and migration-drift / view-dependency guards.
+The `@effect/sql-pg` binding for `@thomasfosterau/effect-drizzle-ext`: `Database` / `CurrentTransaction` services over `drizzle-orm/effect-postgres`, `PgClient` layers, the version-chain discipline over a tree's tables (`./chain`), a sentinel-rollback test runner with test-database provisioning, a fresh-database migration runner, a transactional outbox (`./Outbox`), typed helpers for PlanetScale's TIN full-text search (`./Tin`), and migration-drift / view-dependency guards.
 
 [![npm version](https://img.shields.io/npm/v/@thomasfosterau/effect-drizzle-ext-pg.svg)](https://www.npmjs.com/package/@thomasfosterau/effect-drizzle-ext-pg)
 
@@ -45,6 +45,7 @@ The [overview](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/d
 | `.` | The `makePgDatabase` services (with the context-bound `queries`), the `PgClient` layers (`pgClientFromUrl`, `pgClientFromPool`) and the `Tin` namespace (the `./Tin` entry). | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/overview.md) |
 | `./chain` | The version-chain discipline over a tree's tables: `makeVersionChain`, append-only writes, the pulpit errors. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/chain.md) |
 | `./migrations` | The fresh-database migration runner, `applyMigrations`. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/migrations.md) |
+| `./Outbox` | A transactional outbox: the table builder (`outboxColumns`, `outboxConstraints`) and `makeOutbox`'s `append`, `drain` and `pending`. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/outbox.md) |
 | `./testing` | The sentinel-rollback test runner, test-database provisioning and the connect-seam retry. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/testing.md) |
 | `./Tin` | Typed helpers for PlanetScale's TIN full-text search: `matches` (`==>`), `score`, `highlight`, `tinIndex` and `phrase`. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tin.md) |
 | `./tooling` | The migration-drift and view-dependency schema guards, and migrations for the extensions, domains and composite types drizzle-kit doesn't manage (optional peer `drizzle-kit`). | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tooling.md) |

@@ -114,6 +114,7 @@ import {
 import * as Pg from "@thomasfosterau/effect-drizzle-ext-pg";
 import * as PgChain from "@thomasfosterau/effect-drizzle-ext-pg/chain";
 import * as PgMigrations from "@thomasfosterau/effect-drizzle-ext-pg/migrations";
+import * as PgOutbox from "@thomasfosterau/effect-drizzle-ext-pg/Outbox";
 import * as PgTesting from "@thomasfosterau/effect-drizzle-ext-pg/testing";
 import * as PgTin from "@thomasfosterau/effect-drizzle-ext-pg/Tin";
 import * as PgTooling from "@thomasfosterau/effect-drizzle-ext-pg/tooling";
@@ -493,6 +494,24 @@ export const tinHighlight = PgTin.highlight(post.body, { begin: "<mark>" });
 export const tinPhrase = PgTin.phrase("AND");
 export const tinFromRoot = Pg.Tin.matches(post.body, "apple");
 
+// ── Outbox ────────────────────────────────────────────────────────────────
+
+const outboxDatabase = Pg.makePgDatabase({ relations: {}, key: "OutboxDb" });
+export const outboxTable = pgTable(
+  "outbox",
+  PgOutbox.outboxColumns(),
+  PgOutbox.outboxConstraints("outbox"),
+);
+export const outbox = PgOutbox.makeOutbox({
+  table: outboxTable,
+  CurrentTransaction: outboxDatabase.CurrentTransaction,
+});
+export const outboxAppend = outbox.append([
+  { stream: "a", streamVersion: 0n, eventIndex: 0, type: "Happened", payload: {} },
+]);
+export const outboxDrain = outbox.drain(() => Effect.fail("down" as const));
+type OutboxRow = typeof outboxTable.$inferSelect;
+
 /**
  * Every compile-time assertion, exported so `noUnusedLocals` keeps them and a
  * failing one names itself in the error.
@@ -655,6 +674,15 @@ export type Checks = [
   /** _viewCount */ Assert<Equals<Effect.Success<typeof views>, { readonly viewCount: number }>>,
   /** _viewError */ Assert<
     Equals<Effect.Error<typeof views>, PgTooling.ViewDependencyError | PgTooling.SchemaDiffError>
+  >,
+  /** _outboxSeq */ Assert<Equals<OutboxRow["seq"], bigint>>,
+  /** _outboxPublishedAt */ Assert<Equals<OutboxRow["publishedAt"], Date | null>>,
+  /** _outboxAppendRequiresTx */ Assert<
+    Equals<Effect.Services<typeof outboxAppend>, "OutboxDb/CurrentTransaction">
+  >,
+  /** _outboxDrainSucceeds */ Assert<Equals<Effect.Success<typeof outboxDrain>, number>>,
+  /** _outboxDrainKeepsPublishError */ Assert<
+    Equals<Exclude<Effect.Error<typeof outboxDrain>, Effect.Error<typeof outboxAppend>>, "down">
   >,
   /** _tinMatch */ Assert<Equals<typeof tinMatch, SQL<boolean>>>,
   /** _tinScore */ Assert<Equals<typeof tinScore, SQL<number>>>,

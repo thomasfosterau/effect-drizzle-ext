@@ -61,6 +61,7 @@ describe("readMigrations", () => {
       "20261112164138_branch-view-single-driver",
       "20261112193408_branch-view-case-check",
       "20261112222142_leaf-view-fenced-tail",
+      "20261120050207_outbox",
     ]);
     expect(migrations[0]?.statements[0]).toBe('CREATE SCHEMA "fixture";');
     expect(migrations[0]?.statements).toHaveLength(5);

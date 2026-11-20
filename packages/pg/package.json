@@ -36,6 +36,7 @@
     "./migrations": "./src/migrations.ts",
     "./testing": "./src/testing.ts",
     "./Tin": "./src/Tin.ts",
+    "./Outbox": "./src/Outbox.ts",
     "./tooling": "./src/tooling/index.ts"
   },
   "publishConfig": {
@@ -59,6 +60,10 @@
       "./Tin": {
         "types": "./dist/Tin.d.ts",
         "default": "./dist/Tin.js"
+      },
+      "./Outbox": {
+        "types": "./dist/Outbox.d.ts",
+        "default": "./dist/Outbox.js"
       },
       "./tooling": {
         "types": "./dist/tooling/index.d.ts",
