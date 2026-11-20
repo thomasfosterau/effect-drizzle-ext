@@ -15,4 +15,9 @@ Read [README.md](README.md) and [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) fir
 - **Emitted declarations are the product.** An inferred type that mentions Drizzle's table or view types can emit as `any`; `tests/dist-consumer` (run by `vp run check`) is the gate.
 - **Derived SQL is a migration for every consumer.** Changing the emitted DDL or view SQL recreates objects in their next `drizzle-kit generate`; see core's `AGENTS.md`.
 - **`effect-tsgo patch` is version-locked.** `@effect/tsgo`, `@typescript/native` and `vite-plus` move together, or `vp install` fails.
+- **Publish only through the Release workflow** (`vp run release`: `vp pm publish -r`, then `changeset git-tag`). Release-path registry calls go through `vp pm`, never `npm` / `pnpm` directly, and `release` depends only on the builds.
 - **Declare every required peer of a dependency.** A missing one passes on a warm tree and fails on a fresh CI runner.
+
+## Fallow
+
+The `fallow` agent skill is linked into `.claude/skills/` from the installed `fallow` package after `vp install`; repository-specific rules (the pre-commit audit, tracing before deleting) are in docs/CONTRIBUTING.md.

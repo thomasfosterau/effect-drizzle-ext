@@ -48,4 +48,4 @@ Dependabot groups the sets that must move together (toolchain, effect, drizzle).
 
 ## Changesets
 
-Every change to a published package's behaviour or its `.d.ts` (doc comments included, as a `patch`) needs a changeset: `vp exec changeset`. Docs-, CI- and tooling-only changes need none. The three packages are `linked`. Never version or publish by hand: see [PUBLISHING.md](PUBLISHING.md).
+Every change to a published package's behaviour or its `.d.ts` (doc comments included, as a `patch`) needs a changeset: `vp exec changeset`. Docs-, CI- and tooling-only changes need none. The three packages are `linked`. Never version or publish by hand: the Release workflow publishes with `vp run release` (`vp pm publish -r`, then `changeset git-tag`; there is no publish script), and `vp run release:dry-run` shows what it would publish. See [PUBLISHING.md](PUBLISHING.md).
