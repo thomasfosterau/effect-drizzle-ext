@@ -291,11 +291,12 @@ describe("readBaseMigrations", () => {
   });
 
   it("reads the cwd's repository even when a git hook has exported GIT_DIR", async () => {
+    const unhooked = await readScratchBase();
     vi.stubEnv("GIT_DIR", "/nonexistent");
     vi.stubEnv("GIT_INDEX_FILE", "/nonexistent/index");
     vi.stubEnv("GIT_WORK_TREE", "/nonexistent");
     const base = await readScratchBase();
-    expect(base.dirs).toHaveLength(13);
+    expect(base.dirs).toEqual(unhooked.dirs);
     expect(Option.isSome(base.head)).toBe(true);
   });
 });
