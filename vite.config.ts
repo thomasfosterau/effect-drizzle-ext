@@ -163,6 +163,7 @@ export default defineConfig({
           "packages/core/src/derive.ts",
           "packages/core/src/query.ts",
           "packages/core/src/versioned-chain.ts",
+          "packages/core/src/Predicate.ts",
           "packages/pg/src/index.ts",
           "packages/pg/src/testing.ts",
           "packages/pg/src/chain.ts",

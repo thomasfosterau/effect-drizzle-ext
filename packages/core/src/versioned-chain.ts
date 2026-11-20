@@ -537,6 +537,10 @@ const isMergeFunction = <TRoot, TMerge>(
  * `(id, version)` PKs, so no `DISTINCT ON` / `ORDER BY` is needed. A leaf
  * missing at the current version drops out of the INNER JOIN — the view yields
  * no row.
+ *
+ * Throws `DerivationError` at module load when `columns` and `merge` share a
+ * key (a leaf column named `createdAt` beside a merged birth timestamp, say),
+ * which a plain spread would resolve by silently keeping the merged one.
  */
 export const makeCurrentVersionView =
   <TRoot extends PgTable & VersionTable, TMerge extends ViewColumns>({
@@ -587,6 +591,13 @@ export const makeCurrentVersionView =
       // `columns` + `merge`. The injected `merge` columns ride along on every
       // view — merged into the fixed selection here, resolved via the identity
       // (and, if present, version-zero) join below.
+      Arr.forEach(R.keys(mergeColumns), (key) => {
+        if (R.has(columns, key)) {
+          treeError(
+            `${name} selects "${key}" from both its columns and merge; the merged column would silently shadow the leaf's. Rename one.`,
+          );
+        }
+      });
       const select = qb.select({ ...columns, ...mergeColumns }).from(rootTable);
       // reason: dynamic join chain.
       let q: any = select;

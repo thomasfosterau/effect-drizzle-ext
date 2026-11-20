@@ -337,6 +337,28 @@ describe("makeCurrentVersionView", () => {
     expect(view).toBeDefined();
     expect(Object.getOwnPropertySymbols(view).length).toBeGreaterThan(0);
   });
+
+  it("refuses a column that merge would shadow", () => {
+    const withCreatedAt = makeCurrentVersionView({
+      rootVersion: nodeVersion,
+      identity: node,
+      merge: (versionZero) => ({ createdAt: versionZero.timestamp }),
+    });
+    const { version } = defineSubtypeTables(app, {
+      name: "widget3",
+      parentId: entity.id,
+      parentVersion: entityVersion,
+      columns: { createdAt: text("created_at") },
+    });
+    expect(() =>
+      withCreatedAt(app, "widget3_view", {
+        leaf: version,
+        through: [entityVersion],
+        on: [entity],
+        columns: { id: version.id, createdAt: version.createdAt },
+      }),
+    ).toThrow(/widget3_view selects "createdAt" from both its columns and merge/);
+  });
 });
 
 // A consumer reading only the emitted `.d.ts` (not this source file) is what

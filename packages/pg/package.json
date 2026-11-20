@@ -37,7 +37,9 @@
     "./testing": "./src/testing.ts",
     "./Tin": "./src/Tin.ts",
     "./Outbox": "./src/Outbox.ts",
-    "./tooling": "./src/tooling/index.ts"
+    "./tooling": "./src/tooling/index.ts",
+    "./Documents": "./src/Documents.ts",
+    "./ExternalIds": "./src/ExternalIds.ts"
   },
   "publishConfig": {
     "exports": {
@@ -68,6 +70,14 @@
       "./tooling": {
         "types": "./dist/tooling/index.d.ts",
         "default": "./dist/tooling/index.js"
+      },
+      "./Documents": {
+        "types": "./dist/Documents.d.ts",
+        "default": "./dist/Documents.js"
+      },
+      "./ExternalIds": {
+        "types": "./dist/ExternalIds.d.ts",
+        "default": "./dist/ExternalIds.js"
       }
     },
     "access": "public"

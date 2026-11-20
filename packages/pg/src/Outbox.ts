@@ -6,7 +6,7 @@
  * @module Outbox
  */
 
-import { asc, getTableColumns, getTableName, inArray, isNull, sql } from "drizzle-orm";
+import { asc, getTableName, inArray, isNull, sql } from "drizzle-orm";
 import {
   bigint,
   index,
@@ -15,19 +15,16 @@ import {
   text,
   timestamp,
   unique,
-  type AnyPgColumn,
   type ExtraConfigColumn,
   type PgTable,
 } from "drizzle-orm/pg-core";
 import * as Arr from "effect/Array";
 import type * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
-import * as Option from "effect/Option";
-import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
-import { DerivationError } from "@thomasfosterau/effect-drizzle-ext/derive";
 import type { AnyRelations } from "drizzle-orm";
 import type { PgTransaction } from "./index.ts";
+import { columnOf as tableColumnOf, type QueryError } from "./internal/table.ts";
 
 /**
  * The outbox table's columns, for the application to build its table with
@@ -149,23 +146,9 @@ const decodeRows = Schema.decodeUnknownEffect(Schema.Array(Row));
 const Locked = Schema.Struct({ isLocked: Schema.Boolean });
 const decodeLocked = Schema.decodeUnknownEffect(Schema.Array(Locked));
 
-const columnOf = (table: PgTable, key: string): AnyPgColumn =>
-  Option.getOrElse(R.get(getTableColumns(table), key), () => {
-    throw new DerivationError({
-      message: `makeOutbox: table "${getTableName(table)}" has no "${key}" column; was it built from outboxColumns()?`,
-    });
-  });
+const columnOf = tableColumnOf("makeOutbox", "outboxColumns");
 
 const clamp = (limit = 100): number => Math.max(1, Math.min(limit, MAX_DRAIN_LIMIT));
-
-/** The query failure a Drizzle `CurrentTransaction` reports. */
-type QueryError<Tx> = Tx extends {
-  readonly select: () => { readonly from: (table: never) => infer Q };
-}
-  ? Q extends Effect.Effect<unknown, infer E, unknown>
-    ? E
-    : never
-  : never;
 
 /**
  * The outbox operations over `table`, which must be built from

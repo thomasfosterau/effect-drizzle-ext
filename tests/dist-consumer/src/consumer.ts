@@ -111,9 +111,16 @@ import {
   type SameKindOperand,
   type GeographyOperand,
 } from "@thomasfosterau/effect-drizzle-ext/postgis";
+import * as Predicate from "@thomasfosterau/effect-drizzle-ext/Predicate";
+import * as Search from "@thomasfosterau/effect-drizzle-ext/Search";
+import * as Where from "@thomasfosterau/effect-drizzle-ext/Where";
+import { predicateFromFilter } from "@thomasfosterau/effect-drizzle-ext/jsonapi";
+import { Filter } from "@thomasfosterau/effect-jsonapi";
 import * as Pg from "@thomasfosterau/effect-drizzle-ext-pg";
 import * as PgChain from "@thomasfosterau/effect-drizzle-ext-pg/chain";
 import * as PgMigrations from "@thomasfosterau/effect-drizzle-ext-pg/migrations";
+import * as PgDocuments from "@thomasfosterau/effect-drizzle-ext-pg/Documents";
+import * as PgExternalIds from "@thomasfosterau/effect-drizzle-ext-pg/ExternalIds";
 import * as PgOutbox from "@thomasfosterau/effect-drizzle-ext-pg/Outbox";
 import * as PgTesting from "@thomasfosterau/effect-drizzle-ext-pg/testing";
 import * as PgTin from "@thomasfosterau/effect-drizzle-ext-pg/Tin";
@@ -512,6 +519,47 @@ export const outboxAppend = outbox.append([
 export const outboxDrain = outbox.drain(() => Effect.fail("down" as const));
 type OutboxRow = typeof outboxTable.$inferSelect;
 
+// ── Predicate, Where, Search ──────────────────────────────────────────────
+
+export const predicate = Predicate.and(
+  Predicate.eq("title", "Dune"),
+  Predicate.not(Predicate.isNull("year")),
+);
+export const filterPredicate = predicateFromFilter(Filter.eq("title", "Dune"));
+const searchDoc = pgTable("search_doc", {
+  title: text("title"),
+  config: Search.regconfig("config").notNull(),
+  ids: Search.textArray("ids").notNull(),
+});
+export const wherePredicate = Where.render(predicate, { title: searchDoc.title });
+export const searchVector = Search.weightedTsvector(searchDoc.config, { A: searchDoc.title });
+export const searchRank = Search.trigram({ column: searchDoc.title, query: "dune" });
+type SearchDocRow = typeof searchDoc.$inferSelect;
+
+// ── Documents, ExternalIds ────────────────────────────────────────────────
+
+export const documentTable = pgTable("document", PgDocuments.documentColumns());
+export const documents = PgDocuments.makeDocumentStore({
+  table: documentTable,
+  document: Schema.Struct({ title: Schema.String }),
+  CurrentTransaction: outboxDatabase.CurrentTransaction,
+});
+export const documentPut = documents.put({ title: "Dune" });
+export const documentGet = documents.get("x");
+type DocumentRow = typeof documentTable.$inferSelect;
+const externalIdNode = pgTable("node", { id: uuid("id").primaryKey() });
+export const externalIdTable = PgExternalIds.makeExternalIdTable({ identity: externalIdNode });
+export const externalIds = PgExternalIds.makeExternalIdStore({
+  table: externalIdTable,
+  CurrentTransaction: outboxDatabase.CurrentTransaction,
+});
+export const externalIdLink = externalIds.link({
+  authority: "wikidata",
+  externalId: "Q1",
+  nodeId: "x",
+});
+type ExternalIdRow = typeof externalIdTable.$inferSelect;
+
 /**
  * Every compile-time assertion, exported so `noUnusedLocals` keeps them and a
  * failing one names itself in the error.
@@ -683,6 +731,25 @@ export type Checks = [
   /** _outboxDrainSucceeds */ Assert<Equals<Effect.Success<typeof outboxDrain>, number>>,
   /** _outboxDrainKeepsPublishError */ Assert<
     Equals<Exclude<Effect.Error<typeof outboxDrain>, Effect.Error<typeof outboxAppend>>, "down">
+  >,
+  /** _predicate */ Assert<Equals<typeof predicate, Predicate.Predicate<never>>>,
+  /** _filterPredicate */ Assert<Equals<typeof filterPredicate, Predicate.Predicate>>,
+  /** _where */ Assert<Equals<typeof wherePredicate, Option.Option<SQL>>>,
+  /** _searchVector */ Assert<Equals<typeof searchVector, SQL>>,
+  /** _searchRank */ Assert<Equals<typeof searchRank, Option.Option<Search.Rank>>>,
+  /** _searchConfig */ Assert<Equals<SearchDocRow["config"], string>>,
+  /** _searchIds */ Assert<Equals<SearchDocRow["ids"], ReadonlyArray<string>>>,
+  /** _documentHash */ Assert<Equals<DocumentRow["hash"], Uint8Array>>,
+  /** _documentPut */ Assert<Equals<Effect.Success<typeof documentPut>, PgDocuments.PutResult>>,
+  /** _documentGet */ Assert<
+    Equals<Effect.Success<typeof documentGet>, Option.Option<{ readonly title: string }>>
+  >,
+  /** _documentRequiresTx */ Assert<
+    Equals<Effect.Services<typeof documentPut>, "OutboxDb/CurrentTransaction">
+  >,
+  /** _externalIdNode */ Assert<Equals<ExternalIdRow["nodeId"], string>>,
+  /** _externalIdLink */ Assert<
+    Equals<Effect.Success<typeof externalIdLink>, PgExternalIds.LinkResult>
   >,
   /** _tinMatch */ Assert<Equals<typeof tinMatch, SQL<boolean>>>,
   /** _tinScore */ Assert<Equals<typeof tinScore, SQL<number>>>,

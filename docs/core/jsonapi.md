@@ -59,3 +59,7 @@ export const deriveCheckConstraints: (
   tableName: string,
 ) => (table: Record<string, ExtraConfigColumn>) => PgTableExtraConfigValue[];
 ```
+
+## Filters
+
+`predicateFromFilter(filter, { literal? })` compiles a decoded `Filter.Ast` to a [`./Predicate`](predicate.md), which `./Where` renders over a view's columns. Node for node, the filter profile's three-valued logic carries over: a negated null test is `not(isNull)`, and a literal the reader can't take makes its node unknown, so it matches no row.

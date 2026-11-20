@@ -22,6 +22,8 @@ Imports nothing from this workspace (`.fallowrc.json` zone `core`, no outbound r
 - **A refinable level cascades its whole subtree**: every `(id, type)` arc at or below it gets `ON UPDATE CASCADE`, or a flipped root `type` stops at the first non-cascading arc.
 - **A tree keeps declaration order** wherever it becomes SQL order: level lists, subtree-leaf (CHECK value) lists and column order. A level name that is an array index is rejected because a JS object would reorder it.
 - **No application vocabulary** (see the root rule): the version-chain column names `./sort` defaults to (`action`, `timestamp`, `createdAt`) and `versionTimestamps` reads are `./versioned-chain`'s conventions; `./sort` takes them as overridable options.
+- **`./Where` and `Predicate.evaluate` never disagree**: three-valued logic, strings by code point, a missing column or unreadable comparand unknown (SQL `NULL`, so never true under `not`). `packages/pg/tests/integration/search-where.test.ts` checks both against PostgreSQL. `./Predicate` stays Drizzle-free, since `./jsonapi` imports it.
+- **`./Search` fragments stay immutable where DDL reads them**: `configForLanguage` and a named configuration inline `regconfig` constants (never a text-to-`regconfig` cast, which Postgres won't accept in a generated column), and a list binds one parameter per value (`ARRAY[$1, $2]`), never a JS array Drizzle would spread.
 - **Every resolved sort order ends in the view's `id`**; matched by column _name_, since Drizzle hands back a fresh proxy per view-column access.
 
 ## Terms

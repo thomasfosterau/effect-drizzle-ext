@@ -46,7 +46,10 @@
     "./versioned-chain": "./src/versioned-chain.ts",
     "./postgis": "./src/PostGis.ts",
     "./jsonapi": "./src/jsonapi/index.ts",
-    "./jsonapi/derive": "./src/jsonapi/derive.ts"
+    "./jsonapi/derive": "./src/jsonapi/derive.ts",
+    "./Predicate": "./src/Predicate.ts",
+    "./Where": "./src/Where.ts",
+    "./Search": "./src/Search.ts"
   },
   "publishConfig": {
     "exports": {
@@ -109,6 +112,18 @@
       "./jsonapi/derive": {
         "types": "./dist/jsonapi/derive.d.ts",
         "default": "./dist/jsonapi/derive.js"
+      },
+      "./Predicate": {
+        "types": "./dist/Predicate.d.ts",
+        "default": "./dist/Predicate.js"
+      },
+      "./Where": {
+        "types": "./dist/Where.d.ts",
+        "default": "./dist/Where.js"
+      },
+      "./Search": {
+        "types": "./dist/Search.d.ts",
+        "default": "./dist/Search.js"
       }
     },
     "access": "public"
