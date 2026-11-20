@@ -13,8 +13,10 @@ import { it } from "@effect/vitest";
 import { describe, expect } from "vite-plus/test";
 import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
 import * as P from "effect/Predicate";
+import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import { SqlError, UniqueViolation as SqlUniqueViolation } from "effect/sql/SqlError";
 import {
@@ -30,6 +32,7 @@ import {
   isClassifiedError,
   isConstraintViolation,
   isRetryableTransactionFailure,
+  retryTransaction,
   isUniqueViolation,
   NotNullViolation,
   SerializationFailure,
@@ -370,6 +373,49 @@ describe("isRetryableTransactionFailure", () => {
 });
 
 // ── Effect combinators ─────────────────────────────────────────────
+
+/** Fails with `failure` on the first `failures` attempts, then succeeds; counts attempts. */
+const flaky = <F>(attempts: Ref.Ref<number>, failures: number, failure: F) =>
+  Ref.updateAndGet(attempts, (n) => n + 1).pipe(
+    Effect.flatMap((n) => (n <= failures ? Effect.fail(failure) : Effect.succeed("committed"))),
+  );
+
+describe("retryTransaction", () => {
+  it.live("re-runs a serialization failure or deadlock until it commits", () =>
+    Effect.gen(function* () {
+      const attempts = yield* Ref.make(0);
+      const result = yield* flaky(attempts, 2, drizzleWrapped(deadlockFixture)).pipe(
+        retryTransaction({ base: "1 millis" }),
+      );
+      expect(result).toBe("committed");
+      expect(yield* Ref.get(attempts)).toBe(3);
+    }),
+  );
+
+  it.live("gives up after `times` retries with the last failure", () =>
+    Effect.gen(function* () {
+      const attempts = yield* Ref.make(0);
+      const exit = yield* Effect.exit(
+        flaky(attempts, 10, serializationFixture).pipe(
+          retryTransaction({ times: 2, base: "1 millis" }),
+        ),
+      );
+      expect(exit).toStrictEqual(Exit.fail(serializationFixture));
+      expect(yield* Ref.get(attempts)).toBe(3);
+    }),
+  );
+
+  it.live("never retries a constraint violation", () =>
+    Effect.gen(function* () {
+      const attempts = yield* Ref.make(0);
+      const exit = yield* Effect.exit(
+        flaky(attempts, 1, uniqueFixture).pipe(retryTransaction({ base: "1 millis" })),
+      );
+      expect(exit).toStrictEqual(Exit.fail(uniqueFixture));
+      expect(yield* Ref.get(attempts)).toBe(1);
+    }),
+  );
+});
 
 describe("catchConstraintViolation", () => {
   it.effect("recovers a matching failure with the classified violation", () =>

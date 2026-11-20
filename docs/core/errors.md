@@ -18,7 +18,7 @@ _A guide to [`@thomasfosterau/effect-drizzle-ext`](../../packages/core/README.md
 
 `classifyErrors` puts the classification in the error channel itself: piped onto any Effect, it replaces each failure that classifies with its tagged class and passes every other failure through unchanged, widening the error type to `E | ClassifiedError`, so a caller can `Effect.catchTag("UniqueViolation", …)` (or `catchTags`) on the specific case. `classifyError` returns a value that is already classified as it is (`isClassifiedError`), so classifying twice never nests one class inside another. The pg binding's context-bound `queries` apply `classifyErrors` to every query.
 
-Every class carries `cause` (the value classification started from, so the wrapping graph — drizzle's query text and params, the `SqlError` — survives). `classifyError` is `Option.none()` outside these seven (a syntax error, a connection failure — `SqlError.reason` already covers those well). `catchConstraintViolation` / `catchUniqueViolation` are data-last Effect combinators that recover the matching class and re-fail everything else, including other constraint classes, unchanged. `isUniqueViolation` is kept for adoption parity with the consuming applications' pre-existing predicate: same name, same semantics, including a fallback to the stable Postgres message fragment when no `code` survived the wrapping.
+Every class carries `cause` (the value classification started from, so the wrapping graph — drizzle's query text and params, the `SqlError` — survives). `classifyError` is `Option.none()` outside these seven (a syntax error, a connection failure — `SqlError.reason` already covers those well). `catchConstraintViolation` / `catchUniqueViolation` are data-last Effect combinators that recover the matching class and re-fail everything else, including other constraint classes, unchanged. `retryTransaction` is the remedy the table's last column names: piped onto a whole `transact(…)`, it re-runs it on a jittered exponential backoff (default 3 retries from 50 ms) while the failure is a `40001` / `40P01`, and passes every other failure through on the first attempt. `isUniqueViolation` is kept for adoption parity with the consuming applications' pre-existing predicate: same name, same semantics, including a fallback to the stable Postgres message fragment when no `code` survived the wrapping.
 
 ```ts
 export const findPgError: (cause: unknown) => Option.Option<PgErrorFacts>;
@@ -36,6 +36,10 @@ export const catchConstraintViolation: <A2, E2, R2>(
 export const catchUniqueViolation: <A2, E2, R2>(
   f: (violation: UniqueViolation) => Effect.Effect<A2, E2, R2>,
 ) => <A, E, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<A | A2, E | E2, R | R2>;
+export const retryTransaction: (options?: {
+  readonly times?: number;
+  readonly base?: Duration.Input;
+}) => <A, E, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
 ```
 
 Not owned here: `NotFound` / `Unauthorized` / `Forbidden` (application / JSON:API wire vocabulary).
