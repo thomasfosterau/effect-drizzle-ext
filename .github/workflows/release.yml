@@ -109,7 +109,7 @@ jobs:
     environment: release
     permissions:
       contents: write # release tags and GitHub releases
-      id-token: write # npm trusted publishing
+      id-token: write # trusted publishing (pnpm's OIDC exchange)
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -125,8 +125,8 @@ jobs:
       # Needs no `prepare`: the Effect patch only adds diagnostics.
       - name: Build
         run: vp run -r build
-      # scripts/release.sh: `pnpm pack` and `npm publish` per unpublished
-      # package, then `changeset tag`.
+      # `pnpm run release`: `pnpm -r publish` (pnpm does the OIDC exchange
+      # and skips versions already on npm), then `changeset tag`.
       - name: Publish to npm
         uses: changesets/action/publish@v2.1.2
         with:

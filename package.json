@@ -9,7 +9,7 @@
   "type": "module",
   "scripts": {
     "prepare": "vp config && effect-tsgo patch --typescript --oxlint",
-    "release": "bash scripts/release.sh"
+    "release": "pnpm -r --filter './packages/*' publish --access public --no-git-checks --ignore-scripts && changeset tag"
   },
   "devDependencies": {
     "@changesets/changelog-github": "catalog:",
@@ -36,5 +36,5 @@
       "version": "lts"
     }
   },
-  "packageManager": "pnpm@11.18.0"
+  "packageManager": "pnpm@12.21.0"
 }
