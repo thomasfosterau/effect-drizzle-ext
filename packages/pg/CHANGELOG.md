@@ -1,5 +1,18 @@
 # @thomasfosterau/effect-drizzle-ext-pg
 
+## 0.7.0
+
+### Minor Changes
+
+- [#243](https://github.com/thomasfosterau/effect-drizzle-ext/pull/243) [`aeecce2`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/aeecce239c6f902d9f7ba183cc80975813ce1b71) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - Add `./Documents`, a content-addressed document store keyed by Postgres's own digest of the canonical `jsonb` (`documentColumns`, `makeDocumentStore` with `put`, `get` and `getMany`), and `./ExternalIds`, a node's ids at outside authorities (`makeExternalIdTable`, `makeExternalIdStore` with `lookup`, `linksOf` and `link`).
+
+- [#237](https://github.com/thomasfosterau/effect-drizzle-ext/pull/237) [`20cf6a0`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/20cf6a0be085382d836ff73a9895afa780adb426) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - Add `./Outbox`, a transactional outbox: `outboxColumns()` and `outboxConstraints(name)` build the table in your own schema, and `makeOutbox({ table, CurrentTransaction })` returns `append` (inside the caller's transaction), `drain` (one drain per table at a time, in `seq` order, at least once) and `pending`.
+
+### Patch Changes
+
+- Updated dependencies [[`aeecce2`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/aeecce239c6f902d9f7ba183cc80975813ce1b71)]:
+  - @thomasfosterau/effect-drizzle-ext@0.7.0
+
 ## 0.6.0
 
 ### Minor Changes

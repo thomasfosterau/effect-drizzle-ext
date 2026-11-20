@@ -1,5 +1,12 @@
 # @thomasfosterau/effect-drizzle-ext-kit
 
+## 0.7.0
+
+### Patch Changes
+
+- Updated dependencies [[`aeecce2`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/aeecce239c6f902d9f7ba183cc80975813ce1b71), [`20cf6a0`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/20cf6a0be085382d836ff73a9895afa780adb426)]:
+  - @thomasfosterau/effect-drizzle-ext-pg@0.7.0
+
 ## 0.6.0
 
 ### Minor Changes

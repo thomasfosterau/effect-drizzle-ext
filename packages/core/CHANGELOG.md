@@ -1,5 +1,11 @@
 # @thomasfosterau/effect-drizzle-ext
 
+## 0.7.0
+
+### Minor Changes
+
+- [#243](https://github.com/thomasfosterau/effect-drizzle-ext/pull/243) [`aeecce2`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/aeecce239c6f902d9f7ba183cc80975813ce1b71) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - Add `./Predicate`, a neutral row predicate with an in-memory `evaluate`, and `./Where`, which renders one as a fail-closed `WHERE` over a view's columns (three-valued logic, strings by code point). `./jsonapi` gains `predicateFromFilter`, which compiles a JSON:API `Filter.Ast` to it. Add `./Search`, the hybrid search primitives: `regconfig` and `textArray` columns, `configForLanguage`, `weightedTsvector`, `ftsIndexes`, and the `fullText`, `trigram`, `literal` and `vector` rank fragments with `reciprocalRank`. `makeCurrentVersionView` now throws `DerivationError` when `columns` and `merge` share a key, instead of silently keeping the merged column.
+
 ## 0.6.0
 
 ### Minor Changes
