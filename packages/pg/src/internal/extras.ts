@@ -1,13 +1,17 @@
 /**
  * Migrations for what drizzle-kit doesn't manage (extensions, domains,
- * composite types): `generateExtrasMigration` and the `checkExtrasDrift` gate.
- * See the
+ * composite types, functions, triggers): `generateMigrations`, which
+ * writes them around drizzle-kit's own migration, and the `checkExtrasDrift`
+ * gate. See the
  * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tooling.md).
  *
  * @module internal/extras
  */
 
 import * as Arr from "effect/Array";
+import * as Clock from "effect/Clock";
+import * as DateTime from "effect/DateTime";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Eq from "effect/Equal";
 import * as FileSystem from "effect/FileSystem";
@@ -61,11 +65,67 @@ export const CompositeType = Schema.Struct({
 /** A composite type, as {@link compositeType} returns it. */
 export type CompositeType = typeof CompositeType.Type;
 
+/** A function's volatility; Postgres assumes `VOLATILE` when none is given. */
+export const Volatility = Schema.Literals(["IMMUTABLE", "STABLE", "VOLATILE"]);
+
+/** A function's volatility, as {@link Volatility} decodes it. */
+export type Volatility = typeof Volatility.Type;
+
+/**
+ * A function, as declared and as recorded. Postgres keys a function on its
+ * schema, name and argument types, and so does the plan.
+ */
+export const SqlFunction = Schema.Struct({
+  schema: Schema.String,
+  name: Schema.String,
+  args: Schema.Array(Schema.Struct({ name: Schema.String, type: Schema.String })),
+  returns: Schema.String,
+  language: Schema.String,
+  body: Schema.String,
+  volatility: Schema.OptionFromOptionalKey(Volatility),
+});
+
+/** A function, as {@link fn} returns it. */
+export type SqlFunction = typeof SqlFunction.Type;
+
+/** When a trigger fires, relative to its event. */
+export const TriggerTiming = Schema.Literals(["BEFORE", "AFTER", "INSTEAD OF"]);
+
+/** A trigger's timing, as {@link TriggerTiming} decodes it. */
+export type TriggerTiming = typeof TriggerTiming.Type;
+
+/** An event a trigger fires on. */
+export const TriggerEvent = Schema.Literals(["INSERT", "UPDATE", "DELETE", "TRUNCATE"]);
+
+/** A trigger event, as {@link TriggerEvent} decodes it. */
+export type TriggerEvent = typeof TriggerEvent.Type;
+
+/**
+ * A trigger, as declared and as recorded; `schema` + `table` + `name` is the
+ * key, `schema` being the table's. `function` names the trigger function,
+ * which takes no arguments.
+ */
+export const Trigger = Schema.Struct({
+  schema: Schema.String,
+  table: Schema.String,
+  name: Schema.String,
+  timing: TriggerTiming,
+  events: Schema.NonEmptyArray(TriggerEvent),
+  forEach: Schema.Literals(["ROW", "STATEMENT"]),
+  when: Schema.OptionFromOptionalKey(Schema.String),
+  function: Schema.Struct({ schema: Schema.String, name: Schema.String }),
+});
+
+/** A trigger, as {@link trigger} returns it. */
+export type Trigger = typeof Trigger.Type;
+
 /** The extras an application declares; each list is in creation order. */
 export interface Extras {
   readonly extensions?: ReadonlyArray<Extension>;
   readonly domains?: ReadonlyArray<Domain>;
   readonly compositeTypes?: ReadonlyArray<CompositeType>;
+  readonly functions?: ReadonlyArray<SqlFunction>;
+  readonly triggers?: ReadonlyArray<Trigger>;
 }
 
 /** The options {@link extension} takes. */
@@ -160,14 +220,117 @@ export const compositeType = (
   })),
 });
 
+/** The options {@link fn} takes. */
+export interface FunctionOptions {
+  /** The function's schema; `public` when absent. */
+  readonly schema?: string;
+  readonly name: string;
+  /** The arguments, name to SQL type, in the record's order; none when absent. */
+  readonly args?: Readonly<Record<string, string>>;
+  /** The return type, as SQL (`trigger` for a trigger function). */
+  readonly returns: string;
+  /** The language, such as `plpgsql` or `sql`. */
+  readonly language: string;
+  /** The body, emitted as written inside a dollar quote. */
+  readonly body: string;
+  /** The volatility; Postgres's default (`VOLATILE`) when absent. */
+  readonly volatility?: Volatility;
+}
+
+/**
+ * Declare a function (`CREATE OR REPLACE FUNCTION`). A changed body, language
+ * or volatility is one `CREATE OR REPLACE`; a changed return type or argument
+ * name is a drop and a create, and changed argument types are another
+ * function, since Postgres keys a function on them.
+ *
+ * @example
+ * ```ts
+ * import { fn } from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";
+ *
+ * export const touchUpdatedAt = fn({
+ *   name: "touch_updated_at",
+ *   returns: "trigger",
+ *   language: "plpgsql",
+ *   body: "BEGIN NEW.updated_at := now(); RETURN NEW; END;",
+ * });
+ * ```
+ */
+export const fn = (options: FunctionOptions): SqlFunction => ({
+  schema: options.schema ?? "public",
+  name: options.name,
+  args: Arr.map(R.toEntries(options.args ?? {}), ([arg, type]) => ({ name: arg, type })),
+  returns: options.returns,
+  language: options.language,
+  body: options.body,
+  volatility: Option.fromUndefinedOr(options.volatility),
+});
+
+/** The options {@link trigger} takes. */
+export interface TriggerOptions {
+  /** The table's name. */
+  readonly table: string;
+  /** The table's schema, which is the trigger's; `public` when absent. */
+  readonly schema?: string;
+  readonly name: string;
+  readonly timing: TriggerTiming;
+  readonly events: Arr.NonEmptyReadonlyArray<TriggerEvent>;
+  /** `ROW` when absent. */
+  readonly forEach?: "ROW" | "STATEMENT";
+  /** A `WHEN` condition, as SQL. */
+  readonly when?: string;
+  /** The trigger function: a declared {@link fn}, or one Postgres or an extension provides (`public` when its schema is absent). */
+  readonly fn: { readonly schema?: string; readonly name: string };
+}
+
+/**
+ * Declare a trigger (`CREATE OR REPLACE TRIGGER`, Postgres 14+). Any change is
+ * one `CREATE OR REPLACE`; a changed table or name is a drop and a create.
+ *
+ * @example
+ * ```ts
+ * import { fn, trigger } from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";
+ *
+ * const touchUpdatedAt = fn({
+ *   name: "touch_updated_at",
+ *   returns: "trigger",
+ *   language: "plpgsql",
+ *   body: "BEGIN NEW.updated_at := now(); RETURN NEW; END;",
+ * });
+ *
+ * export const articleTouch = trigger({
+ *   table: "article",
+ *   name: "article_touch_updated_at",
+ *   timing: "BEFORE",
+ *   events: ["UPDATE"],
+ *   fn: touchUpdatedAt,
+ * });
+ * ```
+ */
+export const trigger = (options: TriggerOptions): Trigger => ({
+  schema: options.schema ?? "public",
+  table: options.table,
+  name: options.name,
+  timing: options.timing,
+  events: options.events,
+  forEach: options.forEach ?? "ROW",
+  when: Option.fromUndefinedOr(options.when),
+  function: { schema: options.fn.schema ?? "public", name: options.fn.name },
+});
+
 // ── State ───────────────────────────────────────────────────────────────
 
-/** The extras state {@link EXTRAS_STATE_FILE} records: every declared object, in declaration order. */
+/**
+ * The extras state {@link EXTRAS_STATE_FILE} records: every object that
+ * exists after that migration, in declaration order. Version 1 files (before
+ * functions and triggers) decode with neither; every file written is version 2.
+ */
 export const ExtrasState = Schema.Struct({
-  version: Schema.Literal(1),
+  version: Schema.Literals([1, 2]),
   extensions: Schema.Array(Extension),
   domains: Schema.Array(Domain),
   compositeTypes: Schema.Array(CompositeType),
+  functions: Schema.Array(SqlFunction).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  triggers: Schema.Array(Trigger).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
 });
 
 /** The extras state, as {@link ExtrasState} decodes it. */
@@ -177,18 +340,22 @@ const ExtrasStateJson = Schema.fromJsonString(ExtrasState);
 
 /** The state before the first extras migration: nothing recorded. */
 export const emptyExtrasState: ExtrasState = {
-  version: 1,
+  version: 2,
   extensions: [],
   domains: [],
   compositeTypes: [],
+  functions: [],
+  triggers: [],
 };
 
 /** The declared extras as the state a migration records. */
 export const toExtrasState = (extras: Extras): ExtrasState => ({
-  version: 1,
+  version: 2,
   extensions: extras.extensions ?? [],
   domains: extras.domains ?? [],
   compositeTypes: extras.compositeTypes ?? [],
+  functions: extras.functions ?? [],
+  triggers: extras.triggers ?? [],
 });
 
 /** An {@link EXTRAS_STATE_FILE} could not be decoded; `file` is its path. */
@@ -249,11 +416,32 @@ export class ExtrasError extends Schema.TaggedError<ExtrasError>()("ExtrasError"
   }
 }
 
-/** The SQL that moves the recorded state to the declared one, or why it can't. */
+/** Which side of drizzle-kit's own migration an extras migration runs on. */
+export type ExtrasPhase = "before" | "after";
+
+/**
+ * The SQL that moves the recorded state to the declared one, split around
+ * drizzle-kit's migration, or why it can't. Each list holds one
+ * `;`-terminated statement per entry, in apply order.
+ */
 export interface ExtrasPlan {
-  /** One statement each, `;`-terminated, in apply order. */
+  /**
+   * Runs before drizzle-kit's migration: creates and alters of extensions,
+   * domains and composite types, then drops of triggers and functions.
+   */
+  readonly before: ReadonlyArray<string>;
+  /**
+   * Runs after drizzle-kit's migration: creates and replaces of functions,
+   * then triggers, then drops of composite types, domains and extensions.
+   */
+  readonly after: ReadonlyArray<string>;
+  /** Problems that block the plan; non-empty means neither list may be applied. */
+  readonly issues: ReadonlyArray<string>;
+}
+
+/** A kind's statements and the issues that block them. */
+interface Planned {
   readonly statements: ReadonlyArray<string>;
-  /** Problems that block the plan; non-empty means `statements` must not be applied. */
   readonly issues: ReadonlyArray<string>;
 }
 
@@ -320,7 +508,7 @@ const createDomain = (each: Domain): string =>
     .join("") +
   ";";
 
-const alterDomain = (prev: Domain, next: Domain): ExtrasPlan => {
+const alterDomain = (prev: Domain, next: Domain): Planned => {
   if (prev.type !== next.type) {
     return {
       statements: [],
@@ -379,9 +567,75 @@ const alterCompositeType = (prev: CompositeType, next: CompositeType): ReadonlyA
   ];
 };
 
+const functionKey = (each: SqlFunction): string =>
+  `${label(each)}(${each.args.map((arg) => arg.type).join(", ")})`;
+
+/** The key of the no-argument function a trigger calls. */
+const triggerFunctionKey = (each: Trigger): string => `${label(each.function)}()`;
+
+const triggerKey = (each: Trigger): string => `${each.schema}.${each.table}.${each.name}`;
+
+const triggerLabel = (each: Trigger): string =>
+  `trigger '${each.name}' on ${each.schema}.${each.table}`;
+
+/** A dollar-quote tag that doesn't occur in `body`. */
+const dollarTag = (body: string, n = 0): string => {
+  const tag = n === 0 ? "$body$" : `$body${n}$`;
+  return body.includes(tag) ? dollarTag(body, n + 1) : tag;
+};
+
+const createFunction = (each: SqlFunction): string => {
+  const tag = dollarTag(each.body);
+  return (
+    `CREATE OR REPLACE FUNCTION ${qualified(each)}(` +
+    each.args.map((arg) => `${ident(arg.name)} ${arg.type}`).join(", ") +
+    `) RETURNS ${each.returns} LANGUAGE ${each.language}` +
+    Option.match(each.volatility, { onNone: () => "", onSome: (v) => ` ${v}` }) +
+    ` AS ${tag}${each.body}${tag};`
+  );
+};
+
+const dropFunction = (each: SqlFunction): string =>
+  `DROP FUNCTION ${qualified(each)}(${each.args.map((arg) => arg.type).join(", ")});`;
+
+/** `CREATE OR REPLACE FUNCTION` can't change a return type or an argument name. */
+const replaceable = (prev: SqlFunction, next: SqlFunction): boolean =>
+  prev.returns === next.returns &&
+  Arr.makeEquivalence(Str.Equivalence)(
+    Arr.map(prev.args, (arg) => arg.name),
+    Arr.map(next.args, (arg) => arg.name),
+  );
+
+const createTrigger = (each: Trigger): string =>
+  `CREATE OR REPLACE TRIGGER ${ident(each.name)} ${each.timing} ${each.events.join(" OR ")}` +
+  ` ON ${ident(each.schema)}.${ident(each.table)} FOR EACH ${each.forEach}` +
+  Option.match(each.when, { onNone: () => "", onSome: (w) => ` WHEN (${w})` }) +
+  ` EXECUTE FUNCTION ${qualified(each.function)}();`;
+
+const dropTrigger = (each: Trigger): string =>
+  `DROP TRIGGER ${ident(each.name)} ON ${ident(each.schema)}.${ident(each.table)};`;
+
+/** The keys of `items`, as a record for `R.has`. */
+const keysOf = <A>(items: ReadonlyArray<A>, key: (item: A) => string): Record<string, true> =>
+  R.fromEntries(Arr.map(items, (item) => [key(item), true as const]));
+
+/** The drops of the `prev` items `kept` lacks, in reverse recorded order. */
+const dropsOf = <A>(
+  prev: ReadonlyArray<A>,
+  kept: ReadonlyArray<A>,
+  key: (item: A) => string,
+  drop: (item: A) => string,
+): ReadonlyArray<string> => {
+  const keep = keysOf(kept, key);
+  return prev
+    .filter((item) => !R.has(keep, key(item)))
+    .toReversed()
+    .map(drop);
+};
+
 /** One kind's creates and alters (in declared order) and drops (in reverse recorded order). */
 interface KindPlan {
-  readonly upserts: ExtrasPlan;
+  readonly upserts: Planned;
   readonly drops: ReadonlyArray<string>;
 }
 
@@ -390,14 +644,13 @@ const planKind = <A>(
   next: ReadonlyArray<A>,
   key: (item: A) => string,
   create: (item: A) => string,
-  alter: (prev: A, next: A) => ExtrasPlan,
+  alter: (prev: A, next: A) => Planned,
   drop: (item: A) => string,
 ): KindPlan => {
   const recorded = R.fromEntries(Arr.map(prev, (item) => [key(item), item]));
-  const declared = R.fromEntries(Arr.map(next, (item) => [key(item), item]));
   const upserts = next.map((item) =>
     Option.match(R.get(recorded, key(item)), {
-      onNone: (): ExtrasPlan => ({ statements: [create(item)], issues: [] }),
+      onNone: (): Planned => ({ statements: [create(item)], issues: [] }),
       onSome: (before) => alter(before, item),
     }),
   );
@@ -406,16 +659,31 @@ const planKind = <A>(
       statements: upserts.flatMap((plan) => plan.statements),
       issues: upserts.flatMap((plan) => plan.issues),
     },
-    drops: prev
-      .filter((item) => !R.has(declared, key(item)))
-      .toReversed()
-      .map(drop),
+    drops: dropsOf(prev, next, key, drop),
   };
 };
 
 const statementsOnly =
   <A>(alter: (prev: A, next: A) => ReadonlyArray<string>) =>
-  (prev: A, next: A): ExtrasPlan => ({ statements: alter(prev, next), issues: [] });
+  (prev: A, next: A): Planned => ({ statements: alter(prev, next), issues: [] });
+
+/** Replaced when its create statement differs; `CREATE OR REPLACE` creates and replaces alike. */
+const replaceIfChanged =
+  <A>(create: (item: A) => string) =>
+  (prev: A, next: A): Planned => ({
+    statements: create(prev) === create(next) ? [] : [create(next)],
+    issues: [],
+  });
+
+/** The recorded objects of one kind still declared, then the rest, which the after phase drops. */
+const withRemoved = <A>(
+  prev: ReadonlyArray<A>,
+  next: ReadonlyArray<A>,
+  key: (item: A) => string,
+): ReadonlyArray<A> => {
+  const declared = keysOf(next, key);
+  return [...next, ...prev.filter((item) => !R.has(declared, key(item)))];
+};
 
 // ── Rename hints ────────────────────────────────────────────────────────
 
@@ -588,14 +856,71 @@ const attributeHints = (
 
 // ── The plan ────────────────────────────────────────────────────────────
 
+/**
+ * The state once the before phase ran, from a `prev` whose renames are
+ * applied; see {@link intermediateExtrasState}.
+ */
+const midState = (prev: ExtrasState, next: ExtrasState): ExtrasState => {
+  const declaredFunctions = R.fromEntries(Arr.map(next.functions, (f) => [functionKey(f), f]));
+  const functions = prev.functions.filter((f) =>
+    Option.match(R.get(declaredFunctions, functionKey(f)), {
+      onNone: () => false,
+      onSome: (declared) => replaceable(f, declared),
+    }),
+  );
+  const kept = keysOf(functions, functionKey);
+  const dropped = keysOf(
+    prev.functions.filter((f) => !R.has(kept, functionKey(f))),
+    functionKey,
+  );
+  const declaredTriggers = keysOf(next.triggers, triggerKey);
+  return {
+    version: 2,
+    extensions: withRemoved(prev.extensions, next.extensions, extensionKey),
+    domains: withRemoved(prev.domains, next.domains, label),
+    compositeTypes: withRemoved(prev.compositeTypes, next.compositeTypes, label),
+    functions,
+    triggers: prev.triggers.filter(
+      (t) => R.has(declaredTriggers, triggerKey(t)) && !R.has(dropped, triggerFunctionKey(t)),
+    ),
+  };
+};
+
+/** A trigger whose function is declared here must call one that returns `trigger`. */
+const triggerFunctionIssues = (next: ExtrasState): ReadonlyArray<string> => {
+  const declared = R.fromEntries(Arr.map(next.functions, (f) => [functionKey(f), f]));
+  return next.triggers.flatMap((t) =>
+    Option.match(R.get(declared, triggerFunctionKey(t)), {
+      onNone: () => [],
+      onSome: (f) =>
+        f.returns.trim().toLowerCase() === "trigger"
+          ? []
+          : [
+              `${triggerLabel(t)} calls function '${label(f)}', which returns \`${f.returns}\`; a trigger function returns \`trigger\`.`,
+            ],
+    }),
+  );
+};
+
 /** A plan whose `issues` are split by whether a hand-written migration can resolve them. */
 interface SplitPlan {
-  readonly statements: ReadonlyArray<string>;
-  /** Duplicate declarations and bad rename hints: nothing can be recorded. */
+  readonly before: ReadonlyArray<string>;
+  readonly after: ReadonlyArray<string>;
+  /** The state once `before` ran; `prev` when the plan is blocked. */
+  readonly mid: ExtrasState;
+  /** Duplicate declarations, bad rename hints and bad trigger functions: nothing can be recorded. */
   readonly blocking: ReadonlyArray<string>;
   /** Changes Postgres can't `ALTER`: a recordOnly migration can carry them. */
   readonly refused: ReadonlyArray<string>;
 }
+
+const blocked = (prev: ExtrasState, blocking: ReadonlyArray<string>): SplitPlan => ({
+  before: [],
+  after: [],
+  mid: prev,
+  blocking,
+  refused: [],
+});
 
 const planSplit = (
   prev: ExtrasState,
@@ -606,10 +931,11 @@ const planSplit = (
     ...duplicates("extension", next.extensions, extensionKey),
     ...duplicates("domain", next.domains, label),
     ...duplicates("composite type", next.compositeTypes, label),
+    ...duplicates("function", next.functions, functionKey),
+    ...duplicates("trigger", next.triggers, triggerKey),
+    ...triggerFunctionIssues(next),
   ];
-  if (Arr.isReadonlyArrayNonEmpty(declarationIssues)) {
-    return { statements: [], blocking: declarationIssues, refused: [] };
-  }
+  if (Arr.isReadonlyArrayNonEmpty(declarationIssues)) return blocked(prev, declarationIssues);
   const domainRenames = renameObjects(
     "domain",
     "DOMAIN",
@@ -634,9 +960,7 @@ const planSplit = (
     ...typeRenames.issues,
     ...(Arr.isReadonlyArrayNonEmpty(typeRenames.issues) ? [] : attributeRenames.issues),
   ];
-  if (Arr.isReadonlyArrayNonEmpty(hintIssues)) {
-    return { statements: [], blocking: hintIssues, refused: [] };
-  }
+  if (Arr.isReadonlyArrayNonEmpty(hintIssues)) return blocked(prev, hintIssues);
   const extensions = planKind(
     prev.extensions,
     next.extensions,
@@ -661,29 +985,57 @@ const planSplit = (
     statementsOnly(alterCompositeType),
     (each) => `DROP TYPE ${qualified(each)};`,
   );
+  const mid = midState(
+    { ...prev, domains: domainRenames.items, compositeTypes: attributeRenames.items },
+    next,
+  );
+  // Drops come from prev against mid; creates and replaces from mid against next.
+  const functions = planKind(
+    mid.functions,
+    next.functions,
+    functionKey,
+    createFunction,
+    replaceIfChanged(createFunction),
+    dropFunction,
+  ).upserts;
+  const triggers = planKind(
+    mid.triggers,
+    next.triggers,
+    triggerKey,
+    createTrigger,
+    replaceIfChanged(createTrigger),
+    dropTrigger,
+  ).upserts;
   return {
-    statements: [
+    before: [
       ...extensions.upserts.statements,
       ...domainRenames.statements,
       ...domains.upserts.statements,
       ...typeRenames.statements,
       ...attributeRenames.statements,
       ...types.upserts.statements,
+      ...dropsOf(prev.triggers, mid.triggers, triggerKey, dropTrigger),
+      ...dropsOf(prev.functions, mid.functions, functionKey, dropFunction),
+    ],
+    after: [
+      ...functions.statements,
+      ...triggers.statements,
       ...types.drops,
       ...domains.drops,
       ...extensions.drops,
     ],
+    mid,
     blocking: [],
     refused: [...extensions.upserts.issues, ...domains.upserts.issues, ...types.upserts.issues],
   };
 };
 
 /**
- * The SQL that moves the database from `prev` to `next`: creates and alters
- * of extensions, then domains, then composite types, then the drops in the
- * reverse order. A recorded domain or composite type (or an attribute) that
- * `renames` names is renamed in place before its kind's alters, instead of
- * dropped and re-created. Pure; a non-empty `issues` blocks the plan.
+ * The SQL that moves the database from `prev` to `next`, split around
+ * drizzle-kit's migration (see {@link ExtrasPlan}). A recorded domain or
+ * composite type (or an attribute) that `renames` names is renamed in place
+ * in the before phase, ahead of its kind's alters, instead of dropped and
+ * re-created. Pure; a non-empty `issues` blocks the plan.
  *
  * @example
  * ```ts
@@ -692,8 +1044,8 @@ const planSplit = (
  * const prev = toExtrasState({ domains: [domain("mail", "text")] });
  * const next = toExtrasState({ domains: [domain("email", "text")] });
  * const plan = planExtras(prev, next, [["domain", "mail", "email"]]);
- * // plan.statements: ['ALTER DOMAIN "public"."mail" RENAME TO "email";']
- * console.log(plan.statements, planExtras(emptyExtrasState, next).statements);
+ * // plan.before: ['ALTER DOMAIN "public"."mail" RENAME TO "email";']
+ * console.log(plan.before, planExtras(emptyExtrasState, next).before);
  * ```
  */
 export const planExtras = (
@@ -702,11 +1054,23 @@ export const planExtras = (
   renames: ReadonlyArray<ExtrasRename> = [],
 ): ExtrasPlan => {
   const plan = planSplit(prev, next, renames);
-  return {
-    statements: Arr.isReadonlyArrayNonEmpty(plan.blocking) ? [] : plan.statements,
-    issues: [...plan.blocking, ...plan.refused],
-  };
+  return { before: plan.before, after: plan.after, issues: [...plan.blocking, ...plan.refused] };
 };
+
+/**
+ * The state between the two phases: what exists once the
+ * {@link ExtrasPlan.before} statements ran, and what the before-phase
+ * migration records. Extensions, domains and composite types are the declared
+ * ones plus the removed ones the after phase drops; functions and triggers are
+ * the recorded ones the before phase didn't drop (a function that is removed
+ * or can't be replaced in place, and every trigger that calls one). `prev`
+ * when the plan is blocked.
+ */
+export const intermediateExtrasState = (
+  prev: ExtrasState,
+  next: ExtrasState,
+  renames: ReadonlyArray<ExtrasRename> = [],
+): ExtrasState => planSplit(prev, next, renames).mid;
 
 /** The extras plan as the contents of a `migration.sql`, statements split by `--> statement-breakpoint`. */
 export const renderExtrasMigration = (statements: ReadonlyArray<string>): string =>
@@ -717,12 +1081,12 @@ export const renderExtrasMigration = (statements: ReadonlyArray<string>): string
 
 // ── drizzle-kit ─────────────────────────────────────────────────────────
 
-/** `drizzle-kit generate` didn't report `ok`; `output` is what it printed. */
+/** `drizzle-kit generate` failed; `output` is what it printed, or how it exited. */
 export class DrizzleKitError extends Schema.TaggedError<DrizzleKitError>()("DrizzleKitError", {
   output: Schema.String,
 }) {
   override get message(): string {
-    return `drizzle-kit generate --custom failed:\n${this.output}`;
+    return `drizzle-kit generate failed:\n${this.output}`;
   }
 }
 
@@ -737,33 +1101,44 @@ export type DrizzleKitTarget =
   /** A schema path drizzle-kit loads (relative to `cwd`), with `out` set to the `migrationsDir`. */
   | { readonly schema: string };
 
-/** The inputs {@link generateExtrasMigration} takes. */
-export interface GenerateExtrasOptions {
-  /** The declared extras. */
-  readonly extras: Extras;
+/** How drizzle-kit is run: the inputs every generator here shares. */
+export interface DrizzleKitOptions {
   /** The drizzle-kit migrations directory. */
   readonly migrationsDir: string;
-  /** The migration's slug, drizzle-kit's `--name`. */
-  readonly name: string;
   /** How drizzle-kit is configured. */
   readonly drizzleKit: DrizzleKitTarget;
   /** The command that runs drizzle-kit; `["drizzle-kit"]` (resolved on `PATH`) when absent. */
   readonly command?: Arr.NonEmptyReadonlyArray<string>;
   /** The directory drizzle-kit runs in; the process's own when absent. */
   readonly cwd?: string;
+}
+
+/** The one-off choices a before-phase migration takes. */
+export interface BeforePhaseOptions {
   /**
    * Renames to apply in place of a drop and a create, e.g.
    * `[["domain", "old", "new"], ["attribute", "money", "currency", "code"]]`.
-   * They are used once, for this migration: leave them out afterwards.
+   * They are used once, for this migration: leave them out afterwards. The
+   * after phase ignores them.
    */
   readonly renames?: ReadonlyArray<ExtrasRename>;
   /**
-   * Record the declared state without generating SQL: the migration's
+   * Record the phase's state without generating SQL: the migration's
    * `migration.sql` is left for you to write, for a change the generator
    * refuses (a domain's base type). It still fails on duplicate declarations
    * and bad rename hints.
    */
   readonly recordOnly?: boolean;
+}
+
+/** The inputs {@link generateExtrasMigration} takes. */
+export interface GenerateExtrasOptions extends DrizzleKitOptions, BeforePhaseOptions {
+  /** The declared extras. */
+  readonly extras: Extras;
+  /** Which side of drizzle-kit's migration this one runs on. */
+  readonly phase: ExtrasPhase;
+  /** The migration's slug, drizzle-kit's `--name`. */
+  readonly name: string;
 }
 
 /** The migration {@link generateExtrasMigration} wrote. */
@@ -787,9 +1162,12 @@ const commented = (text: string): string =>
  * The placeholder `migration.sql` of a `recordOnly` migration: what to write,
  * and, as comments, what the generator refused and what it would have run.
  */
-export const renderRecordOnlyMigration = (plan: ExtrasPlan): string =>
+export const renderRecordOnlyMigration = (plan: {
+  readonly statements: ReadonlyArray<string>;
+  readonly issues: ReadonlyArray<string>;
+}): string =>
   [
-    `-- Hand-written extras migration. ${EXTRAS_STATE_FILE} beside it records the declared state;`,
+    `-- Hand-written extras migration. ${EXTRAS_STATE_FILE} beside it records the state after it;`,
     "-- write the SQL that moves the database there below, with `--> statement-breakpoint`",
     "-- between statements.",
     ...(Arr.isReadonlyArrayNonEmpty(plan.issues)
@@ -801,34 +1179,73 @@ export const renderRecordOnlyMigration = (plan: ExtrasPlan): string =>
     "",
   ].join("\n");
 
-const runDrizzleKit = Effect.fn("Tooling.runDrizzleKit")(function* (
-  options: GenerateExtrasOptions,
-): Effect.fn.Return<string, DrizzleKitError | PlatformError, ChildProcessSpawner> {
-  const spawner = yield* ChildProcessSpawner;
+/** drizzle-kit's folder-name timestamp (`YYYYMMDDHHMMSS`, UTC), in milliseconds. */
+const folderTime = (name: string): Option.Option<number> =>
+  Option.fromNullishOr(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/.exec(name)).pipe(
+    Option.flatMap(([, y, mo, d, h, mi, sec]) =>
+      DateTime.make(`${y}-${mo}-${d}T${h}:${mi}:${sec}Z`),
+    ),
+    Option.map(DateTime.toEpochMillis),
+  );
+
+/**
+ * Wait until drizzle-kit's next folder name (stamped to the second) sorts
+ * after every existing one: two generates in the same second would otherwise
+ * order by slug.
+ */
+const awaitFreshFolderTime = Effect.fn("Tooling.awaitFreshFolderTime")(function* (
+  migrationsDir: string,
+): Effect.fn.Return<void, PlatformError, FileSystem.FileSystem> {
+  const fs = yield* FileSystem.FileSystem;
+  const names = (yield* fs.exists(migrationsDir)) ? yield* fs.readDirectory(migrationsDir) : [];
+  const latest = Arr.reduce(Arr.getSomes(Arr.map(names, folderTime)), 0, Math.max);
+  const now = yield* Clock.currentTimeMillis;
+  if (now < latest + 1000) yield* Effect.sleep(Duration.millis(latest + 1000 - now));
+});
+
+/** The arguments that point drizzle-kit at the schema and the migrations directory. */
+const targetArgs = (options: DrizzleKitOptions): ReadonlyArray<string> =>
+  "config" in options.drizzleKit
+    ? ["--config", options.drizzleKit.config]
+    : [
+        "--dialect",
+        "postgresql",
+        "--schema",
+        options.drizzleKit.schema,
+        "--out",
+        options.migrationsDir,
+      ];
+
+const drizzleKitCommand = (
+  options: DrizzleKitOptions,
+  args: ReadonlyArray<string>,
+  io: ChildProcess.CommandOptions = {},
+) => {
   const [bin, ...prefix] = options.command ?? ["drizzle-kit"];
-  const target =
-    "config" in options.drizzleKit
-      ? ["--config", options.drizzleKit.config]
-      : [
-          "--dialect",
-          "postgresql",
-          "--schema",
-          options.drizzleKit.schema,
-          "--out",
-          options.migrationsDir,
-        ];
-  const args = [
-    ...prefix,
-    "generate",
-    "--custom",
-    "--name",
-    options.name,
-    ...target,
-    "--output",
-    "json",
-  ];
+  return ChildProcess.make(
+    bin,
+    [...prefix, "generate", ...args, ...targetArgs(options)],
+    options.cwd === undefined ? io : { ...io, cwd: options.cwd },
+  );
+};
+
+/** The migrations directory, resolved against `cwd`. */
+const resolvedMigrationsDir = (options: DrizzleKitOptions, path: Path.Path): string =>
+  path.resolve(options.cwd ?? path.resolve("."), options.migrationsDir);
+
+const runDrizzleKitCustom = Effect.fn("Tooling.runDrizzleKitCustom")(function* (
+  options: DrizzleKitOptions,
+  name: string,
+): Effect.fn.Return<
+  string,
+  DrizzleKitError | PlatformError,
+  ChildProcessSpawner | FileSystem.FileSystem | Path.Path
+> {
+  const spawner = yield* ChildProcessSpawner;
+  const path = yield* Path.Path;
+  yield* awaitFreshFolderTime(resolvedMigrationsDir(options, path));
   const output = yield* spawner.string(
-    ChildProcess.make(bin, args, options.cwd === undefined ? {} : { cwd: options.cwd }),
+    drizzleKitCommand(options, ["--custom", "--name", name, "--output", "json"]),
     { includeStderr: false },
   );
   // `--output json` prints one JSON envelope line, last.
@@ -836,25 +1253,37 @@ const runDrizzleKit = Effect.fn("Tooling.runDrizzleKit")(function* (
     Arr.findLast(output.split("\n"), (line) => Str.isNonEmpty(line.trim())),
     () => "",
   );
-  return yield* Schema.decodeEffect(GenerateOk)(envelope).pipe(
+  const migrationPath = yield* Schema.decodeEffect(GenerateOk)(envelope).pipe(
     Effect.map((ok) => ok.migration_path),
     Effect.mapError(() => new DrizzleKitError({ output })),
   );
+  const dir = path.dirname(path.resolve(options.cwd ?? path.resolve("."), migrationPath));
+  if (path.dirname(dir) !== resolvedMigrationsDir(options, path)) {
+    return yield* new DrizzleKitError({
+      output: `drizzle-kit wrote ${migrationPath}, outside the migrations directory ${options.migrationsDir}; its config's \`out\` must be that directory.`,
+    });
+  }
+  return dir;
 });
 
 /**
- * Plan the declared extras against the recorded state and, when the plan has
- * statements, write them as a new drizzle-kit custom migration with its
- * {@link EXTRAS_STATE_FILE}. Succeeds with `Option.none()` when there is
- * nothing to migrate (and writes nothing); fails with {@link ExtrasError}
- * when the plan has issues, or {@link DrizzleKitError} when drizzle-kit
- * doesn't create the directory (or creates it outside `migrationsDir`).
- * `renames` turns a drop plus a create into a rename; `recordOnly` writes the
- * state with a `migration.sql` for you to fill in, for a change it refuses.
+ * Plan the declared extras against the recorded state and, when the `phase`
+ * has statements, write them as a new drizzle-kit custom migration with its
+ * {@link EXTRAS_STATE_FILE}: the `before` phase records the
+ * {@link intermediateExtrasState}, the `after` phase the declared state.
+ * Succeeds with `Option.none()` when the phase has nothing to migrate (and
+ * writes nothing); fails with {@link ExtrasError} when the plan has issues
+ * (or the `after` phase runs while the `before` one is still pending), or
+ * {@link DrizzleKitError} when drizzle-kit doesn't create the directory (or
+ * creates it outside `migrationsDir`). In the before phase, `renames` turns a
+ * drop plus a create into a rename, and `recordOnly` writes the state with a
+ * `migration.sql` for you to fill in, for a change it refuses.
+ * {@link generateMigrations} runs both phases around drizzle-kit's own
+ * migration.
  *
  * @example
  * ```ts
- * // An application's `db:generate-extras` task, run with `NodeRuntime.runMain`.
+ * // One phase on its own, run with `NodeRuntime.runMain`.
  * import * as NodeServices from "@effect/platform-node/NodeServices";
  * import { domain, extension, generateExtrasMigration } from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";
  * import * as Effect from "effect/Effect";
@@ -864,6 +1293,7 @@ const runDrizzleKit = Effect.fn("Tooling.runDrizzleKit")(function* (
  *     extensions: [extension("citext")],
  *     domains: [domain("email", "citext", { notNull: true })],
  *   },
+ *   phase: "before",
  *   migrationsDir: "packages/database/migrations",
  *   name: "email-domain",
  *   drizzleKit: { config: "packages/database/drizzle.config.ts" },
@@ -879,34 +1309,123 @@ export const generateExtrasMigration = Effect.fn("Tooling.generateExtrasMigratio
 > {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const { state } = yield* readExtrasState(options.migrationsDir);
-  const next = toExtrasState(options.extras);
-  const recordOnly = options.recordOnly ?? false;
-  const plan = planSplit(state, next, options.renames ?? []);
+  const { state } = yield* readExtrasState(resolvedMigrationsDir(options, path));
+  const declared = toExtrasState(options.extras);
+  const before = options.phase === "before";
+  const recordOnly = before && (options.recordOnly ?? false);
+  const plan = planSplit(state, declared, before ? (options.renames ?? []) : []);
   const issues = recordOnly ? plan.blocking : [...plan.blocking, ...plan.refused];
   if (Arr.isReadonlyArrayNonEmpty(issues)) return yield* new ExtrasError({ issues });
-  if (!Arr.isReadonlyArrayNonEmpty(plan.statements) && !Arr.isReadonlyArrayNonEmpty(plan.refused)) {
-    return Option.none();
-  }
-  const migrationPath = yield* runDrizzleKit(options);
-  const base = options.cwd ?? path.resolve(".");
-  const dir = path.dirname(path.resolve(base, migrationPath));
-  if (path.dirname(dir) !== path.resolve(base, options.migrationsDir)) {
-    return yield* new DrizzleKitError({
-      output: `drizzle-kit wrote ${migrationPath}, outside the migrations directory ${options.migrationsDir}; its config's \`out\` must be that directory.`,
+  if (!before && Arr.isReadonlyArrayNonEmpty(plan.before)) {
+    return yield* new ExtrasError({
+      issues: [
+        `The before-phase extras migration is pending (${plan.before.length} statement(s)); generate it, then drizzle-kit's, before the after phase.`,
+      ],
     });
   }
+  const statements = before ? plan.before : plan.after;
+  const refused = before ? plan.refused : [];
+  if (!Arr.isReadonlyArrayNonEmpty(statements) && !Arr.isReadonlyArrayNonEmpty(refused)) {
+    return Option.none();
+  }
+  const dir = yield* runDrizzleKitCustom(options, options.name);
   yield* fs.writeFileString(
     path.join(dir, "migration.sql"),
     recordOnly
-      ? renderRecordOnlyMigration({ statements: plan.statements, issues: plan.refused })
-      : renderExtrasMigration(plan.statements),
+      ? renderRecordOnlyMigration({ statements, issues: refused })
+      : renderExtrasMigration(statements),
   );
   yield* fs.writeFileString(
     path.join(dir, EXTRAS_STATE_FILE),
-    `${yield* Schema.encodeEffect(Schema.fromJsonString(ExtrasState, { space: 2 }))(next).pipe(Effect.orDie)}\n`,
+    `${yield* Schema.encodeEffect(Schema.fromJsonString(ExtrasState, { space: 2 }))(before ? plan.mid : declared).pipe(Effect.orDie)}\n`,
   );
-  return Option.some({ dir, statements: recordOnly ? [] : plan.statements, recordOnly });
+  return Option.some({ dir, statements: recordOnly ? [] : statements, recordOnly });
+});
+
+/** The inputs {@link generateMigrations} takes. */
+export interface GenerateMigrationsOptions extends DrizzleKitOptions, BeforePhaseOptions {
+  /** The declared extras. */
+  readonly extras: Extras;
+  /**
+   * The slug of drizzle-kit's migration (its own random name when absent);
+   * the extras migrations are `<name>-extras-before` and `<name>-extras-after`
+   * (`extras-before` and `extras-after` when absent).
+   */
+  readonly name?: string;
+}
+
+/** The migrations {@link generateMigrations} wrote, by phase; none where there was nothing to migrate. */
+export interface GeneratedMigrations {
+  readonly before: Option.Option<GeneratedExtrasMigration>;
+  readonly after: Option.Option<GeneratedExtrasMigration>;
+}
+
+/**
+ * Generate the whole change: the `before` extras migration, then
+ * drizzle-kit's own (`drizzle-kit generate`, with the terminal attached so its
+ * rename prompts work), then the `after` extras migration. `renames` and
+ * `recordOnly` apply to the before phase. Fails as
+ * {@link generateExtrasMigration} does, and with {@link DrizzleKitError} when
+ * drizzle-kit exits non-zero; the extras plan is checked before anything is
+ * written.
+ *
+ * @example
+ * ```ts
+ * import * as NodeServices from "@effect/platform-node/NodeServices";
+ * import { fn, generateMigrations, trigger } from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";
+ * import * as Effect from "effect/Effect";
+ *
+ * const touch = fn({
+ *   name: "touch_updated_at",
+ *   returns: "trigger",
+ *   language: "plpgsql",
+ *   body: "BEGIN NEW.updated_at := now(); RETURN NEW; END;",
+ * });
+ *
+ * export const program = generateMigrations({
+ *   extras: {
+ *     functions: [touch],
+ *     triggers: [trigger({ table: "article", name: "article_touch", timing: "BEFORE", events: ["UPDATE"], fn: touch })],
+ *   },
+ *   name: "article-touch",
+ *   migrationsDir: "packages/database/migrations",
+ *   drizzleKit: { config: "packages/database/drizzle.config.ts" },
+ * }).pipe(Effect.provide(NodeServices.layer));
+ * ```
+ */
+export const generateMigrations = Effect.fn("Tooling.generateMigrations")(function* (
+  options: GenerateMigrationsOptions,
+): Effect.fn.Return<
+  GeneratedMigrations,
+  ExtrasError | MalformedExtrasState | DrizzleKitError | PlatformError,
+  FileSystem.FileSystem | Path.Path | ChildProcessSpawner
+> {
+  const path = yield* Path.Path;
+  const spawner = yield* ChildProcessSpawner;
+  const { state } = yield* readExtrasState(resolvedMigrationsDir(options, path));
+  const plan = planSplit(state, toExtrasState(options.extras), options.renames ?? []);
+  const issues = options.recordOnly ? plan.blocking : [...plan.blocking, ...plan.refused];
+  if (Arr.isReadonlyArrayNonEmpty(issues)) return yield* new ExtrasError({ issues });
+  const slug = (phase: ExtrasPhase): string =>
+    options.name === undefined ? `extras-${phase}` : `${options.name}-extras-${phase}`;
+  const before = yield* generateExtrasMigration({
+    ...options,
+    phase: "before",
+    name: slug("before"),
+  });
+  yield* awaitFreshFolderTime(resolvedMigrationsDir(options, path));
+  const exitCode = yield* spawner.exitCode(
+    drizzleKitCommand(options, options.name === undefined ? [] : ["--name", options.name], {
+      stdin: "inherit",
+      stdout: "inherit",
+      stderr: "inherit",
+    }),
+  );
+  if (exitCode !== 0) {
+    return yield* new DrizzleKitError({ output: `drizzle-kit generate exited with ${exitCode}.` });
+  }
+  const after = yield* generateExtrasMigration({ ...options, phase: "after", name: slug("after") });
+  return { before, after };
 });
 
 // ── The gate ────────────────────────────────────────────────────────────
@@ -925,7 +1444,7 @@ export class ExtrasDriftError extends Schema.TaggedError<ExtrasDriftError>()("Ex
       `Extras drift detected against the recorded state (${where}): ` +
       `${this.statements.length} statement(s) would be generated:\n\n` +
       this.statements.map((statement) => `  ${statement}`).join("\n") +
-      "\n\nFix: run generateExtrasMigration and commit the migration it writes " +
+      "\n\nFix: run generateMigrations (effect-drizzle-kit generate) and commit what it writes " +
       "(with renames for a renamed domain, type or attribute, or recordOnly for a change it refuses)."
     );
   }
@@ -969,11 +1488,9 @@ export const checkExtrasDrift = Effect.fn("Tooling.checkExtrasDrift")(function* 
   if (Arr.isReadonlyArrayNonEmpty(plan.issues)) {
     return yield* new ExtrasError({ issues: plan.issues });
   }
-  if (Arr.isReadonlyArrayNonEmpty(plan.statements)) {
-    return yield* new ExtrasDriftError({
-      recordedIn: recorded.dir,
-      statements: plan.statements,
-    });
+  const statements = [...plan.before, ...plan.after];
+  if (Arr.isReadonlyArrayNonEmpty(statements)) {
+    return yield* new ExtrasDriftError({ recordedIn: recorded.dir, statements });
   }
   return recorded.dir;
 });

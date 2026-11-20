@@ -52,7 +52,7 @@ The [overview](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/d
 | `./Testing` | The sentinel-rollback test runner, test-database provisioning and the connect-seam retry. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/testing.md) |
 | `./Tin` | Typed helpers for PlanetScale's TIN full-text search: `matches` (`==>`), `score`, `highlight`, `tinIndex` and `phrase`. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tin.md) |
 | `./VersionedRow` | Optimistic concurrency over a flat table: `versionColumn` and `makeVersionedRow`'s `load`, `insert`, `update` and `delete`. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/versioned-row.md) |
-| `./Tooling` | The migration-drift and view-dependency schema guards, and migrations for the extensions, domains and composite types drizzle-kit doesn't manage (optional peer `drizzle-kit`). | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tooling.md) |
+| `./Tooling` | The migration-drift and view-dependency schema guards, and migrations for the extensions, domains, composite types, functions and triggers drizzle-kit doesn't manage (optional peer `drizzle-kit`). | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tooling.md) |
 
 ## Links
 

@@ -1,6 +1,6 @@
 # `@thomasfosterau/effect-drizzle-ext-kit`
 
-`effect-drizzle-kit`, a command-line companion to drizzle-kit. It migrates the Postgres objects drizzle-kit doesn't manage (extensions, domains and composite types) into drizzle-kit's own custom migrations, and gates extras drift and schema drift in one `check`.
+`effect-drizzle-kit`, a command-line companion to drizzle-kit. It migrates the Postgres objects drizzle-kit doesn't manage (extensions, domains, composite types, functions and triggers) into custom migrations around drizzle-kit's own, and gates extras drift and schema drift in one `check`.
 
 [![npm version](https://img.shields.io/npm/v/@thomasfosterau/effect-drizzle-ext-kit.svg)](https://www.npmjs.com/package/@thomasfosterau/effect-drizzle-ext-kit)
 
