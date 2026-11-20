@@ -11,8 +11,9 @@
  *   must catch it via the connect/acquire seam `operation` label while still
  *   refusing to retry a genuine per-test query failure.
  *
- * - **the runner's control flow** — `runInTestTransaction` against a fake
- *   handle that records every boundary it opens and how it closed. That is
+ * - **the runner's control flow** — `runInTestTransaction` and
+ *   `inTestTransaction` against a fake handle that records every boundary it
+ *   opens and how it closed. That is
  *   what pins the always-rollback, the sentinel walk (`causeContainsRollback`
  *   — the sentinel must never reach the caller, and a NON-sentinel outer
  *   failure must be reported), the legible-failure projection and both retry
@@ -23,7 +24,9 @@
  * @module packages/pg/tests/testing
  */
 
+import { it } from "@effect/vitest";
 import type { PgTransactionConfig } from "drizzle-orm/pg-core";
+import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
@@ -40,7 +43,7 @@ import {
   UnknownError,
 } from "effect/sql/SqlError";
 import { makeDatabaseServices } from "@thomasfosterau/effect-drizzle-ext/database";
-import { describe, expect, it } from "vite-plus/test";
+import { assert, describe, expect } from "vite-plus/test";
 import {
   isRetryableConnectFailure,
   makeTestTransaction,
@@ -182,6 +185,7 @@ interface Fake {
   readonly events: ReadonlyArray<string>;
   /** How many times the OUTER boundary was attempted (the retry counter). */
   readonly attempts: () => number;
+  readonly handle: FakeHandle;
   readonly database: typeof services & { readonly layer: Layer.Layer<"Fake"> };
   readonly runtime: ManagedRuntime.ManagedRuntime<"Fake", never>;
 }
@@ -253,6 +257,7 @@ const makeFake = (options: {
   return {
     events,
     attempts: () => attempts,
+    handle,
     database: { ...services, layer: Layer.succeed(services.Database, handle) },
     runtime: ManagedRuntime.make(Layer.succeed(services.Database, handle)),
   };
@@ -369,6 +374,40 @@ describe("runInTestTransaction", () => {
       /outer transaction failed/,
     );
     expect(fake.attempts()).toBe(1);
+  });
+});
+
+describe("inTestTransaction", () => {
+  it.effect("rolls the outer boundary back and returns the spec's value", () => {
+    const fake = makeFake({});
+    const { inTestTransaction } = makeTestTransaction(fake.database);
+    return Effect.gen(function* () {
+      expect(yield* inTestTransaction(Effect.succeed("answer"))).toBe("answer");
+      expect(fake.events).toEqual(["open:1", "open:2", "commit:2", "rollback:1"]);
+    }).pipe(Effect.provideService(services.Database, fake.handle));
+  });
+
+  it.effect("re-raises the spec's own typed failure unchanged", () => {
+    const fake = makeFake({});
+    const { inTestTransaction } = makeTestTransaction(fake.database);
+    return Effect.gen(function* () {
+      const failure = yield* Effect.flip(
+        inTestTransaction(Effect.fail(new TestFault({ message: "the spec's own failure" }))),
+      );
+      expect(failure).toBeInstanceOf(TestFault);
+      expect(fake.events).toContain("rollback:1");
+    }).pipe(Effect.provideService(services.Database, fake.handle));
+  });
+
+  it.effect("dies with the harness's failure when the outer transaction fails", () => {
+    const fake = makeFake({ failOpen: () => Option.some(queryFailure()) });
+    const { inTestTransaction } = makeTestTransaction(fake.database);
+    return Effect.gen(function* () {
+      const exit = yield* Effect.exit(inTestTransaction(Effect.succeed(1)));
+      assert(Exit.isFailure(exit), "unreachable: the outer transaction should have failed");
+      expect(Cause.hasDies(exit.cause)).toBe(true);
+      expect(String(Cause.squash(exit.cause))).toMatch(/outer transaction failed/);
+    }).pipe(Effect.provideService(services.Database, fake.handle));
   });
 });
 

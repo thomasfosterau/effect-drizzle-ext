@@ -30,9 +30,8 @@ import { sql } from "drizzle-orm";
 import { integer, pgTable } from "drizzle-orm/pg-core";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import * as ManagedRuntime from "effect/ManagedRuntime";
-import { describe, expect, it } from "vite-plus/test";
-import { integrationDatabaseLayer } from "./database-url.ts";
+import { describe, expect } from "vite-plus/test";
+import { integrationLayer } from "./database-url.ts";
 import { makePgDatabase } from "../../src/index.ts";
 import { makeTestTransaction } from "../../src/testing.ts";
 
@@ -42,10 +41,7 @@ const relations = {};
 const database = makePgDatabase({ relations, key: "Database" });
 const { Database, CurrentTransaction, transact, readHandle } = database;
 
-/** The global setup resolved this; `provisioning.test.ts` proves it is set. */
-
-const runtime = ManagedRuntime.make(integrationDatabaseLayer(database));
-const { runInTestTransaction } = makeTestTransaction(database);
+const { inTestTransaction } = makeTestTransaction(database);
 
 /**
  * A Drizzle view of the probe table, so the SELECT-only {@link readHandle} —
@@ -77,100 +73,99 @@ const insert = Effect.fn("probe.insert")(function* (n: number) {
 });
 
 /** The sentinel an intentionally-rolled-back body fails with. */
-class ProbeRollback {
-  readonly _tag = "ProbeRollback";
-}
+class ProbeRollback extends Schema.TaggedError<ProbeRollback>()("ProbeRollback", {}) {}
 
-describe("makePgDatabase against a live database", () => {
-  it("answers a query through the Database service", async () => {
-    const rows = await runtime.runPromise(
-      Effect.flatMap(Database, (db) =>
-        executeRows(db, sql`SELECT 1::int AS one`, Schema.Struct({ one: Schema.Finite })),
-      ),
-    );
-    expect(rows.map((row) => Number(row.one))).toEqual([1]);
-  });
-
-  it("provides the open transaction as CurrentTransaction, and its writes land", async () => {
-    await runInTestTransaction(
-      runtime,
+integrationLayer(database)((it) => {
+  describe("makePgDatabase against a live database", () => {
+    it.effect("answers a query through the Database service", () =>
       Effect.gen(function* () {
-        yield* createProbeTable();
-        yield* transact(insert(1));
-        expect(yield* probeRows()).toEqual([1]);
-      }),
-    );
-  });
-
-  it("opens a NESTED transaction rather than joining the ambient one", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* createProbeTable();
-
-        const outcome = yield* Effect.exit(
-          transact(
-            Effect.gen(function* () {
-              yield* insert(10);
-              // The inner `transact` is a real, separate boundary: its
-              // failure rolls back only its own write. Under a
-              // join-if-present helper there would be no inner boundary, so
-              // this failure would take the outer write with it.
-              const inner = yield* Effect.exit(
-                transact(
-                  Effect.gen(function* () {
-                    yield* insert(11);
-                    return yield* Effect.fail(new ProbeRollback());
-                  }),
-                ),
-              );
-              expect(inner._tag).toBe("Failure");
-              yield* insert(12);
-            }),
-          ),
+        const db = yield* Database;
+        const rows = yield* executeRows(
+          db,
+          sql`SELECT 1::int AS one`,
+          Schema.Struct({ one: Schema.Finite }),
         );
-
-        expect(outcome._tag).toBe("Success");
-        expect(yield* probeRows()).toEqual([10, 12]);
+        expect(rows.map((row) => Number(row.one))).toEqual([1]);
       }),
     );
-  });
 
-  it("shadows the outer handle with the inner one inside a nested transact", async () => {
-    await runInTestTransaction(
-      runtime,
-      transact(
+    it.effect("provides the open transaction as CurrentTransaction, and its writes land", () =>
+      inTestTransaction(
         Effect.gen(function* () {
-          const outer = yield* CurrentTransaction;
-          yield* transact(
-            Effect.gen(function* () {
-              const inner = yield* CurrentTransaction;
-              expect(inner).not.toBe(outer);
-            }),
-          );
-          // …and the outer handle is restored once the inner boundary closes.
-          expect(yield* CurrentTransaction).toBe(outer);
+          yield* createProbeTable();
+          yield* transact(insert(1));
+          expect(yield* probeRows()).toEqual([1]);
         }),
       ),
     );
-  });
 
-  it("readHandle inside a transaction sees that transaction's uncommitted row", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* createProbeTable();
-        yield* transact(
+    it.effect("opens a NESTED transaction rather than joining the ambient one", () =>
+      inTestTransaction(
+        Effect.gen(function* () {
+          yield* createProbeTable();
+
+          const outcome = yield* Effect.exit(
+            transact(
+              Effect.gen(function* () {
+                yield* insert(10);
+                // The inner `transact` is a real, separate boundary: its
+                // failure rolls back only its own write. Under a
+                // join-if-present helper there would be no inner boundary, so
+                // this failure would take the outer write with it.
+                const inner = yield* Effect.exit(
+                  transact(
+                    Effect.gen(function* () {
+                      yield* insert(11);
+                      return yield* new ProbeRollback();
+                    }),
+                  ),
+                );
+                expect(inner._tag).toBe("Failure");
+                yield* insert(12);
+              }),
+            ),
+          );
+
+          expect(outcome._tag).toBe("Success");
+          expect(yield* probeRows()).toEqual([10, 12]);
+        }),
+      ),
+    );
+
+    it.effect("shadows the outer handle with the inner one inside a nested transact", () =>
+      inTestTransaction(
+        transact(
           Effect.gen(function* () {
-            yield* insert(42);
-            // Nothing has committed; the row exists only inside this
-            // transaction, and `readHandle` prefers it over the client.
-            const handle = yield* readHandle;
-            const rows = yield* handle.select({ n: probe.n }).from(probe);
-            expect(rows.map((row) => Number(row.n))).toEqual([42]);
+            const outer = yield* CurrentTransaction;
+            yield* transact(
+              Effect.gen(function* () {
+                const inner = yield* CurrentTransaction;
+                expect(inner).not.toBe(outer);
+              }),
+            );
+            // …and the outer handle is restored once the inner boundary closes.
+            expect(yield* CurrentTransaction).toBe(outer);
           }),
-        );
-      }),
+        ),
+      ),
+    );
+
+    it.effect("readHandle inside a transaction sees that transaction's uncommitted row", () =>
+      inTestTransaction(
+        Effect.gen(function* () {
+          yield* createProbeTable();
+          yield* transact(
+            Effect.gen(function* () {
+              yield* insert(42);
+              // Nothing has committed; the row exists only inside this
+              // transaction, and `readHandle` prefers it over the client.
+              const handle = yield* readHandle;
+              const rows = yield* handle.select({ n: probe.n }).from(probe);
+              expect(rows.map((row) => Number(row.n))).toEqual([42]);
+            }),
+          );
+        }),
+      ),
     );
   });
 });

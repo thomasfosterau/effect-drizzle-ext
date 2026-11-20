@@ -1,13 +1,13 @@
 import * as PgClient from "@effect/sql-pg/PgClient";
+import { layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import type { SqlError } from "effect/sql/SqlError";
-import { afterAll, describe, expect, it } from "vite-plus/test";
+import { describe, expect } from "vite-plus/test";
 import { splitStatements } from "../../src/migrations.ts";
 import {
   compositeType,
@@ -30,10 +30,9 @@ import { testDatabaseUrl } from "./database-url.ts";
  * both a local server and CI's `pgvector/pgvector:pg17` image carry.
  */
 
-const runtime = ManagedRuntime.make(
-  Layer.unwrap(Effect.map(testDatabaseUrl, (url) => PgClient.layer({ url, maxConnections: 1 }))),
+const pgClient = Layer.unwrap(
+  Effect.map(testDatabaseUrl, (url) => PgClient.layer({ url, maxConnections: 1 })),
 );
-afterAll(() => runtime.dispose());
 
 /** The sentinel the spec's transaction fails with, so nothing it wrote survives. */
 class Rollback extends Schema.TaggedError<Rollback>()("Rollback", {}) {}
@@ -42,29 +41,27 @@ class Rollback extends Schema.TaggedError<Rollback>()("Rollback", {}) {}
 const inRolledBackTransaction = <A>(
   steps: ReadonlyArray<readonly [ExtrasState, ExtrasState]>,
   probe: (sql: PgClient.PgClient) => Effect.Effect<A, SqlError>,
-): Promise<A> =>
-  runtime.runPromise(
-    Effect.gen(function* () {
-      const sql = yield* PgClient.PgClient;
-      const seen = yield* Ref.make(Option.none<A>());
-      const statements = steps.flatMap(([prev, next]) =>
-        splitStatements(renderExtrasMigration(planExtras(prev, next).statements)),
-      );
-      yield* sql
-        .withTransaction(
-          Effect.gen(function* () {
-            yield* Effect.forEach(statements, (statement) => sql.unsafe(statement), {
-              concurrency: 1,
-              discard: true,
-            });
-            yield* Ref.set(seen, Option.some(yield* probe(sql)));
-            return yield* new Rollback();
-          }),
-        )
-        .pipe(Effect.catchTag("Rollback", () => Effect.void));
-      return yield* Effect.fromOption(yield* Ref.get(seen)).pipe(Effect.orDie);
-    }),
-  );
+): Effect.Effect<A, SqlError, PgClient.PgClient> =>
+  Effect.gen(function* () {
+    const sql = yield* PgClient.PgClient;
+    const seen = yield* Ref.make(Option.none<A>());
+    const statements = steps.flatMap(([prev, next]) =>
+      splitStatements(renderExtrasMigration(planExtras(prev, next).statements)),
+    );
+    yield* sql
+      .withTransaction(
+        Effect.gen(function* () {
+          yield* Effect.forEach(statements, (statement) => sql.unsafe(statement), {
+            concurrency: 1,
+            discard: true,
+          });
+          yield* Ref.set(seen, Option.some(yield* probe(sql)));
+          return yield* new Rollback();
+        }),
+      )
+      .pipe(Effect.catchTag("Rollback", () => Effect.void));
+    return yield* Effect.fromOption(yield* Ref.get(seen)).pipe(Effect.orDie);
+  });
 
 const created = toExtrasState({
   extensions: [extension("citext")],
@@ -100,60 +97,73 @@ const altered = toExtrasState({
   ],
 });
 
-describe("extras plan on Postgres", () => {
-  it("plans both steps without issues", () => {
-    expect(planExtras(emptyExtrasState, created).issues).toEqual([]);
-    expect(planExtras(created, altered).issues).toEqual([]);
-  });
-
-  it("creates an extension, a domain over its type and a composite type over the domain", async () => {
-    const result = await inRolledBackTransaction(
-      [[emptyExtrasState, created]],
-      (sql) => sql<{ email: string }>`select (('A@B.example', 'x')::fixture.extras_contact).email`,
+layer(pgClient, { excludeTestServices: true })((it) => {
+  describe("extras plan on Postgres", () => {
+    it.effect("plans both steps without issues", () =>
+      Effect.sync(() => {
+        expect(planExtras(emptyExtrasState, created).issues).toEqual([]);
+        expect(planExtras(created, altered).issues).toEqual([]);
+      }),
     );
-    expect(result).toEqual([{ email: "A@B.example" }]);
-  });
 
-  it("applies the in-place alters, and the domain's new check holds", async () => {
-    const result = await inRolledBackTransaction(
-      [
-        [emptyExtrasState, created],
-        [created, altered],
-      ],
-      (sql) =>
+    it.effect(
+      "creates an extension, a domain over its type and a composite type over the domain",
+      () =>
         Effect.gen(function* () {
-          const attributes = yield* sql<{ attname: string }>`
+          const result = yield* inRolledBackTransaction(
+            [[emptyExtrasState, created]],
+            (sql) =>
+              sql<{ email: string }>`select (('A@B.example', 'x')::fixture.extras_contact).email`,
+          );
+          expect(result).toEqual([{ email: "A@B.example" }]);
+        }),
+    );
+
+    it.effect("applies the in-place alters, and the domain's new check holds", () =>
+      Effect.gen(function* () {
+        const result = yield* inRolledBackTransaction(
+          [
+            [emptyExtrasState, created],
+            [created, altered],
+          ],
+          (sql) =>
+            Effect.gen(function* () {
+              const attributes = yield* sql<{ attname: string }>`
             select attname from pg_attribute
             where attrelid = 'fixture.extras_contact'::regclass and attnum > 0 and not attisdropped
             order by attnum`;
-          const constraints = yield* sql<{ conname: string }>`
+              const constraints = yield* sql<{ conname: string }>`
             select conname from pg_constraint
             where contypid = 'public.extras_email'::regtype order by conname`;
-          const tooLong = yield* Effect.result(sql`select repeat('a', 300)::extras_email`);
-          return {
-            attributes: attributes.map((row) => row.attname),
-            constraints: constraints.map((row) => row.conname),
-            rejectsTooLong: Result.isFailure(tooLong),
-          };
-        }),
+              const tooLong = yield* Effect.result(sql`select repeat('a', 300)::extras_email`);
+              return {
+                attributes: attributes.map((row) => row.attname),
+                constraints: constraints.map((row) => row.conname),
+                rejectsTooLong: Result.isFailure(tooLong),
+              };
+            }),
+        );
+        expect(result).toEqual({
+          attributes: ["email", "priority"],
+          constraints: ["extras_email_short"],
+          rejectsTooLong: true,
+        });
+      }),
     );
-    expect(result).toEqual({
-      attributes: ["email", "priority"],
-      constraints: ["extras_email_short"],
-      rejectsTooLong: true,
-    });
-  });
 
-  it("drops everything it created, in dependency order", async () => {
-    const result = await inRolledBackTransaction(
-      [
-        [emptyExtrasState, created],
-        [created, emptyExtrasState],
-      ],
-      (sql) => sql<{ n: number }>`
+    it.effect("drops everything it created, in dependency order", () =>
+      Effect.gen(function* () {
+        const result = yield* inRolledBackTransaction(
+          [
+            [emptyExtrasState, created],
+            [created, emptyExtrasState],
+          ],
+          (sql) => sql<{ n: number }>`
         select count(*)::int as n from pg_type
         where typname in ('extras_email', 'extras_contact', 'citext')`,
+        );
+        expect(result).toEqual([{ n: 0 }]);
+      }),
     );
-    expect(result).toEqual([{ n: 0 }]);
   });
 });

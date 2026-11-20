@@ -32,6 +32,7 @@
  * @module packages/pg/tests/integration/tree-branch-views
  */
 
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext";
 import {
   makeTreeTables,
@@ -43,13 +44,11 @@ import { getTableName, sql, type SQL } from "drizzle-orm";
 import { pgSchema, text, type PgSchema, type PgTable, type PgView } from "drizzle-orm/pg-core";
 import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
-import * as ManagedRuntime from "effect/ManagedRuntime";
-import * as Option from "effect/Option";
 import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
-import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
-import { integrationDatabaseLayer } from "./database-url.ts";
-import { aggregates, viewOracle, viewsBefore } from "./view-oracle.ts";
+import { describe, expect } from "vite-plus/test";
+import { integrationLayerWith } from "./database-url.ts";
+import { aggregates, viewOf, viewOracle, viewsBefore } from "./view-oracle.ts";
 import { makePgDatabase } from "../../src/index.ts";
 import { makeTestTransaction } from "../../src/testing.ts";
 
@@ -57,23 +56,13 @@ const database = makePgDatabase({ relations: {}, key: "Database" });
 const { CurrentTransaction } = database;
 const { difference, execAll, explain, explainJoined } = viewOracle(database);
 
-const runtime = ManagedRuntime.make(integrationDatabaseLayer(database));
-const { runInTestTransaction } = makeTestTransaction(database);
+const { inTestTransaction } = makeTestTransaction(database);
 
 /** The migration that replaced each branch view's `UNION ALL` with one driver. */
 const SINGLE_DRIVER_MIGRATION = "20261112164138_branch-view-single-driver";
 
-/** Each fixture view's definition before {@link SINGLE_DRIVER_MIGRATION}. */
-let unionViews: Readonly<Record<string, string>> = {};
-
-beforeAll(async () => {
-  unionViews = await viewsBefore(SINGLE_DRIVER_MIGRATION);
-});
-
-afterAll(() => runtime.dispose());
-
-/** A branch view's `UNION ALL` definition; empty for one the chain never defined. */
-const unionView = (name: string): string => Option.getOrElse(R.get(unionViews, name), () => "");
+/** Each fixture view's definition before {@link SINGLE_DRIVER_MIGRATION}: the branch views' `UNION ALL` form. */
+const unionViews = viewsBefore(SINGLE_DRIVER_MIGRATION);
 
 /** One row of a raw query here: every column these specs read is a non-null scalar. */
 type Row = Readonly<Record<string, string | number>>;
@@ -253,168 +242,11 @@ const columnsOf = Effect.fn("branchViews.columnsOf")(function* (schema: string, 
   return Arr.map(rows, (r) => `${String(r["column_name"])} ${String(r["data_type"])}`);
 });
 
-describe("branch views: one driver returns exactly the UNION ALL form's rows", () => {
-  it("for every fixture branch view at the head, with the same columns in the same order", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seedHistories;
-        yield* seedStale;
-        yield* seedUnknown;
-        const results = yield* Effect.forEach(
-          BRANCH_VIEWS,
-          (view) =>
-            Effect.gen(function* () {
-              const oracle = unionView(view);
-              const definition = yield* rowsOf(
-                sql.raw(`SELECT pg_get_viewdef('ontology.${view}') AS d`),
-              );
-              // The oracle as a view of its own, for its column names and types.
-              yield* execAll([`CREATE TEMPORARY VIEW ${view}_oracle AS ${oracle}`]);
-              const [oracleSchema] = yield* rowsOf(
-                sql.raw(`SELECT nspname FROM pg_namespace WHERE oid = pg_my_temp_schema()`),
-              );
-              return {
-                view,
-                oracle,
-                definition: String(definition[0]?.["d"]),
-                columns: yield* columnsOf("ontology", view),
-                oracleColumns: yield* columnsOf(
-                  String(oracleSchema?.["nspname"]),
-                  `${view}_oracle`,
-                ),
-                ...(yield* difference(sql.raw(`select * from ontology.${view}`), oracle)),
-                extraIds: yield* idsOf(`(${oracle}) except all select * from ontology.${view}`),
-              };
-            }),
-          { concurrency: 1 },
-        );
-        Arr.forEach(results, (result) => {
-          const { view, rows, missing, extra } = result;
-          // The oracle really is the union of per-leaf arms; the view is not.
-          expect(result.oracle, `${view}: the oracle`).toContain(") union all (");
-          expect(result.definition, `${view}: the definition`).not.toContain("UNION ALL");
-          // The single driver's tightening, kept by
-          // the CASE: the union showed work's
-          // stale-type and unknown-type rows, the view shows neither; every
-          // other row is equal both ways.
-          const tightened = view === "work_view" ? [STALE, UNKNOWN] : [];
-          expect({ view, missing, extra, ids: result.extraIds }).toEqual({
-            view,
-            missing: 0,
-            extra: tightened.length,
-            ids: tightened,
-          });
-          expect(rows, `${view} is non-empty, so the check is not vacuous`).toBeGreaterThan(0);
-          expect(result.columns, `${view}: the columns`).toEqual(result.oracleColumns);
-        });
-      }),
-    );
-  });
-});
-
-describe("branch views: fail closed", () => {
-  it("yields no row for a head with the branch row but no leaf row, as the union did", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seedHistories;
-        expect(yield* headsOf("ontology.work_view", W4)).toEqual([]);
-        expect(yield* headsOf(`(${unionView("work_view")})`, W4)).toEqual([]);
-        expect(yield* headsOf("ontology.collection_view", C5)).toEqual([]);
-        expect(yield* headsOf("ontology.series_view", C5)).toEqual([]);
-        expect(yield* headsOf(`(${unionView("collection_view")})`, C5)).toEqual([]);
-        expect(yield* headsOf(`(${unionView("series_view")})`, C5)).toEqual([]);
-        // The node's earlier, complete head is superseded, not resurfaced.
-        expect(yield* countOf(`select id from ontology.book_view where id = '${W4}'`)).toBe(0);
-      }),
-    );
-  });
-
-  it("yields no row for a head whose marker below the branch is missing, as the union did", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seedHistories;
-        expect(yield* headsOf("ontology.collection_view", C4)).toEqual([]);
-        expect(yield* headsOf(`(${unionView("collection_view")})`, C4)).toEqual([]);
-        expect(yield* countOf(`select id from ontology.volume_view where id = '${C4}'`)).toBe(0);
-        // A complete volume head does show.
-        expect(yield* headsOf("ontology.collection_view", C1)).toEqual([[1, "update", "volume"]]);
-      }),
-    );
-  });
-
-  it("yields no row for a node whose type names a leaf with no row at the head", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seedStale;
-        expect(yield* headsOf("ontology.work_view", STALE)).toEqual([]);
-        // The union's essay arm never read `type`, so it showed the essay row
-        // under type book; the single driver requires the named leaf's row.
-        expect(yield* headsOf(`(${unionView("work_view")})`, STALE)).toEqual([
-          [0, "create", "book"],
-        ]);
-        // The leaf views are unchanged: the essay view still reads its own row.
-        expect(yield* countOf(`select id from ontology.essay_view where id = '${STALE}'`)).toBe(1);
-      }),
-    );
-  });
-
-  it("yields no row for a node whose type names no subtree leaf: the CASE's ELSE false", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seedUnknown;
-        expect(yield* headsOf("ontology.work_view", UNKNOWN)).toEqual([]);
-        // The union's book arm showed the book row under the foreign type.
-        expect(yield* headsOf(`(${unionView("work_view")})`, UNKNOWN)).toEqual([
-          [0, "create", "pamphlet"],
-        ]);
-        // The CASE's last arm is `ELSE false`, not a fall-through to NULL.
-        const [definition] = yield* rowsOf(
-          sql.raw(`SELECT pg_get_viewdef('ontology.work_view') AS d`),
-        );
-        expect(String(definition?.["d"])).toContain("ELSE false");
-      }),
-    );
-  });
-});
-
-describe("branch views: per-leaf projection", () => {
-  it("projects each leaf's own label through the CASE on type, for every row", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seedHistories;
-        const leaves = `select id, version, label from ontology.volume_view union all select id, version, label from ontology.supplement_view union all select id, version, label from ontology.pamphlet_view`;
-        const branchRows = yield* countOf(`select * from ontology.collection_view`);
-        expect(branchRows).toBeGreaterThan(0);
-        expect(yield* countOf(leaves)).toBe(branchRows);
-        // Every branch row matches its leaf view's row, label included: no
-        // CASE arm falls through to NULL.
-        expect(
-          yield* countOf(
-            `select c.id from ontology.collection_view c left join (${leaves}) l on l.id = c.id and l.version = c.version where l.id is null or c.label is distinct from l.label`,
-          ),
-        ).toBe(0);
-        // The one NULL label is the leaf's own.
-        expect(yield* countOf(`select id from ontology.collection_view where label is null`)).toBe(
-          yield* countOf(`select id from (${leaves}) l where label is null`),
-        );
-        expect(yield* countOf(`select id from ontology.collection_view where label is null`)).toBe(
-          1,
-        );
-      }),
-    );
-  });
-});
-
 // ── Plans on the fixture ─────────────────────────────────────────────────
-
 const WORK_INDEX = "work_title_probe";
+
 const WORK_NODES = 4000;
+
 const workId = (g: string) => `('00000000-0000-4000-b000-' || lpad(${g}::text, 12, '0'))::uuid`;
 
 /** 4,000 works at two versions, alternating book and essay, and an index on the branch level. */
@@ -432,33 +264,11 @@ const seedWorks = execAll([
   `ANALYZE`,
 ]);
 
-describe("branch views: the fixture page plan", () => {
-  it("pages work_view through the branch level's index, joining no leaf", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seedWorks;
-        expect(yield* countOf(`select * from ontology.work_view`)).toBe(WORK_NODES);
-        const query = "SELECT * FROM ontology.work_view ORDER BY title, id LIMIT 20";
-        const page = yield* explain(query);
-        expect(aggregates(page)).toEqual([]);
-        expect(Arr.some(page, (n) => n["Index Name"] === WORK_INDEX)).toBe(true);
-        expect(Arr.some(page, (n) => n["Node Type"] === "Sort")).toBe(false);
-        // The leaves are probed by the CASE's EXISTS subplans, never joined.
-        const joined = Arr.flatMap(yield* explainJoined(query), (n) =>
-          Arr.fromNullishOr(n["Relation Name"]),
-        );
-        expect(joined).toContain("work_version");
-        expect(Arr.intersection(joined, ["book_version", "essay_version"])).toEqual([]);
-      }),
-    );
-  });
-});
-
 // ── Generated wide branches ──────────────────────────────────────────────
-
 const empty = {};
+
 const wideBuilders = { text: (column: string) => text(column) };
+
 const hubColumns = {
   title: dbColumn(Schema.String, { column: "title", pg: "text", notNull: true }),
 };
@@ -570,8 +380,11 @@ const wideBranch = (
 });
 
 const wide12 = pgSchema("wide_branch");
+
 const wide12Tables = makeTreeTables(wide12Tree, { schema: wide12, builders: wideBuilders });
+
 const wide30 = pgSchema("wide_branch_30");
+
 const wide30Tables = makeTreeTables(wide30Tree, { schema: wide30, builders: wideBuilders });
 
 const WIDE_BRANCHES = [
@@ -598,20 +411,27 @@ class WideSchemaError extends Schema.TaggedError<WideSchemaError>()("WideSchemaE
 const inList = (names: ReadonlyArray<string>) => names.map((name) => `'${name}'`).join(", ");
 
 const WIDE_INDEX = "wide_hub_title_probe";
+
 const WIDE_NODES = 6000;
+
 /**
  * The plan spec's node count. Below it the planner costs the hash joins'
  * fail-closed CASE as near free and prefers a full scan and a Sort (seen at
  * 6,000 nodes for twelve leaves and at 40,000 for thirty).
  */
 const PLAN_NODES = 40000;
+
 const wideId = (g: string) => `('00000000-0000-4000-a000-' || lpad(${g}::text, 12, '0'))::uuid`;
 
 /** `n`th of a wide branch's irregular nodes, clear of the generated ones. */
 const oddId = (n: number) => `00000000-0000-4000-a000-1000000000${String(n).padStart(2, "0")}`;
+
 const WIDE_NO_LEAF = oddId(1); // a1: hub, ma, maa at the head, no a1 row
+
 const WIDE_NO_MARKER = oddId(2); // a1: hub, ma, a1 at the head, no maa row
+
 const WIDE_STALE = oddId(3); // type a1; only b1's chain at the head
+
 const WIDE_UNKNOWN = oddId(4); // type names no level; b1's chain at the head
 
 /**
@@ -676,76 +496,274 @@ const wideOracle = Effect.fn("branchViews.wideOracle")(function* (branch: WideBr
   return `select * from (${arms.join(" union all ")}) oracle`;
 });
 
-describe("branch views: generated wide branches", () => {
-  it.each(WIDE_BRANCHES)(
-    "$schema returns the UNION ALL form's rows, less the stale- and unknown-type ones",
-    async (branch) => {
-      await runInTestTransaction(
-        runtime,
-        Effect.gen(function* () {
-          yield* seedWide(branch, WIDE_NODES);
-          const view = `select * from ${branch.schema}.hub_view`;
-          const oracle = yield* wideOracle(branch);
-          expect(yield* countOf(view)).toBe(WIDE_NODES);
-          expect(yield* difference(sql.raw(view), oracle)).toEqual({
-            rows: WIDE_NODES,
-            missing: 0,
-            extra: 2,
-          });
-          // The tightening, explicitly: only the stale- and unknown-type
-          // nodes are the union's alone; the missing leaf and marker show in
-          // neither.
-          expect(yield* idsOf(`${oracle} except all ${view}`)).toEqual([WIDE_STALE, WIDE_UNKNOWN]);
-          expect(
-            yield* countOf(
-              `${view} where id in ('${WIDE_NO_LEAF}', '${WIDE_NO_MARKER}', '${WIDE_STALE}', '${WIDE_UNKNOWN}')`,
-            ),
-          ).toBe(0);
-          expect(
-            yield* countOf(
-              `select * from (${oracle}) o where id in ('${WIDE_NO_LEAF}', '${WIDE_NO_MARKER}')`,
-            ),
-          ).toBe(0);
-        }),
-      );
-    },
-  );
+integrationLayerWith(
+  database,
+  NodeServices.layer,
+)((it) => {
+  describe("branch views: one driver returns exactly the UNION ALL form's rows", () => {
+    it.effect(
+      "for every fixture branch view at the head, with the same columns in the same order",
+      () =>
+        inTestTransaction(
+          Effect.gen(function* () {
+            const views = yield* unionViews;
+            yield* seedHistories;
+            yield* seedStale;
+            yield* seedUnknown;
+            const results = yield* Effect.forEach(
+              BRANCH_VIEWS,
+              (view) =>
+                Effect.gen(function* () {
+                  const oracle = viewOf(views, view);
+                  const definition = yield* rowsOf(
+                    sql.raw(`SELECT pg_get_viewdef('ontology.${view}') AS d`),
+                  );
+                  // The oracle as a view of its own, for its column names and types.
+                  yield* execAll([`CREATE TEMPORARY VIEW ${view}_oracle AS ${oracle}`]);
+                  const [oracleSchema] = yield* rowsOf(
+                    sql.raw(`SELECT nspname FROM pg_namespace WHERE oid = pg_my_temp_schema()`),
+                  );
+                  return {
+                    view,
+                    oracle,
+                    definition: String(definition[0]?.["d"]),
+                    columns: yield* columnsOf("ontology", view),
+                    oracleColumns: yield* columnsOf(
+                      String(oracleSchema?.["nspname"]),
+                      `${view}_oracle`,
+                    ),
+                    ...(yield* difference(sql.raw(`select * from ontology.${view}`), oracle)),
+                    extraIds: yield* idsOf(`(${oracle}) except all select * from ontology.${view}`),
+                  };
+                }),
+              { concurrency: 1 },
+            );
+            Arr.forEach(results, (result) => {
+              const { view, rows, missing, extra } = result;
+              // The oracle really is the union of per-leaf arms; the view is not.
+              expect(result.oracle, `${view}: the oracle`).toContain(") union all (");
+              expect(result.definition, `${view}: the definition`).not.toContain("UNION ALL");
+              // The single driver's tightening, kept by
+              // the CASE: the union showed work's
+              // stale-type and unknown-type rows, the view shows neither; every
+              // other row is equal both ways.
+              const tightened = view === "work_view" ? [STALE, UNKNOWN] : [];
+              expect({ view, missing, extra, ids: result.extraIds }).toEqual({
+                view,
+                missing: 0,
+                extra: tightened.length,
+                ids: tightened,
+              });
+              expect(rows, `${view} is non-empty, so the check is not vacuous`).toBeGreaterThan(0);
+              expect(result.columns, `${view}: the columns`).toEqual(result.oracleColumns);
+            });
+          }),
+        ),
+    );
+  });
 
-  it.each([WIDE_BRANCHES[0]])(
-    "$schema pages through the branch level's index with no Sort, no aggregate and no leaf join",
-    async (branch) => {
-      await runInTestTransaction(
-        runtime,
+  describe("branch views: fail closed", () => {
+    it.effect(
+      "yields no row for a head with the branch row but no leaf row, as the union did",
+      () =>
+        inTestTransaction(
+          Effect.gen(function* () {
+            const views = yield* unionViews;
+            yield* seedHistories;
+            expect(yield* headsOf("ontology.work_view", W4)).toEqual([]);
+            expect(yield* headsOf(`(${viewOf(views, "work_view")})`, W4)).toEqual([]);
+            expect(yield* headsOf("ontology.collection_view", C5)).toEqual([]);
+            expect(yield* headsOf("ontology.series_view", C5)).toEqual([]);
+            expect(yield* headsOf(`(${viewOf(views, "collection_view")})`, C5)).toEqual([]);
+            expect(yield* headsOf(`(${viewOf(views, "series_view")})`, C5)).toEqual([]);
+            // The node's earlier, complete head is superseded, not resurfaced.
+            expect(yield* countOf(`select id from ontology.book_view where id = '${W4}'`)).toBe(0);
+          }),
+        ),
+    );
+
+    it.effect(
+      "yields no row for a head whose marker below the branch is missing, as the union did",
+      () =>
+        inTestTransaction(
+          Effect.gen(function* () {
+            const views = yield* unionViews;
+            yield* seedHistories;
+            expect(yield* headsOf("ontology.collection_view", C4)).toEqual([]);
+            expect(yield* headsOf(`(${viewOf(views, "collection_view")})`, C4)).toEqual([]);
+            expect(yield* countOf(`select id from ontology.volume_view where id = '${C4}'`)).toBe(
+              0,
+            );
+            // A complete volume head does show.
+            expect(yield* headsOf("ontology.collection_view", C1)).toEqual([
+              [1, "update", "volume"],
+            ]);
+          }),
+        ),
+    );
+
+    it.effect("yields no row for a node whose type names a leaf with no row at the head", () =>
+      inTestTransaction(
         Effect.gen(function* () {
-          yield* seedWide(branch, PLAN_NODES);
-          const query = `SELECT * FROM ${branch.schema}.hub_view ORDER BY title, id LIMIT 20`;
+          const views = yield* unionViews;
+          yield* seedStale;
+          expect(yield* headsOf("ontology.work_view", STALE)).toEqual([]);
+          // The union's essay arm never read `type`, so it showed the essay row
+          // under type book; the single driver requires the named leaf's row.
+          expect(yield* headsOf(`(${viewOf(views, "work_view")})`, STALE)).toEqual([
+            [0, "create", "book"],
+          ]);
+          // The leaf views are unchanged: the essay view still reads its own row.
+          expect(yield* countOf(`select id from ontology.essay_view where id = '${STALE}'`)).toBe(
+            1,
+          );
+        }),
+      ),
+    );
+
+    it.effect(
+      "yields no row for a node whose type names no subtree leaf: the CASE's ELSE false",
+      () =>
+        inTestTransaction(
+          Effect.gen(function* () {
+            const views = yield* unionViews;
+            yield* seedUnknown;
+            expect(yield* headsOf("ontology.work_view", UNKNOWN)).toEqual([]);
+            // The union's book arm showed the book row under the foreign type.
+            expect(yield* headsOf(`(${viewOf(views, "work_view")})`, UNKNOWN)).toEqual([
+              [0, "create", "pamphlet"],
+            ]);
+            // The CASE's last arm is `ELSE false`, not a fall-through to NULL.
+            const [definition] = yield* rowsOf(
+              sql.raw(`SELECT pg_get_viewdef('ontology.work_view') AS d`),
+            );
+            expect(String(definition?.["d"])).toContain("ELSE false");
+          }),
+        ),
+    );
+  });
+
+  describe("branch views: per-leaf projection", () => {
+    it.effect("projects each leaf's own label through the CASE on type, for every row", () =>
+      inTestTransaction(
+        Effect.gen(function* () {
+          yield* seedHistories;
+          const leaves = `select id, version, label from ontology.volume_view union all select id, version, label from ontology.supplement_view union all select id, version, label from ontology.pamphlet_view`;
+          const branchRows = yield* countOf(`select * from ontology.collection_view`);
+          expect(branchRows).toBeGreaterThan(0);
+          expect(yield* countOf(leaves)).toBe(branchRows);
+          // Every branch row matches its leaf view's row, label included: no
+          // CASE arm falls through to NULL.
+          expect(
+            yield* countOf(
+              `select c.id from ontology.collection_view c left join (${leaves}) l on l.id = c.id and l.version = c.version where l.id is null or c.label is distinct from l.label`,
+            ),
+          ).toBe(0);
+          // The one NULL label is the leaf's own.
+          expect(
+            yield* countOf(`select id from ontology.collection_view where label is null`),
+          ).toBe(yield* countOf(`select id from (${leaves}) l where label is null`));
+          expect(
+            yield* countOf(`select id from ontology.collection_view where label is null`),
+          ).toBe(1);
+        }),
+      ),
+    );
+  });
+
+  describe("branch views: the fixture page plan", () => {
+    it.effect("pages work_view through the branch level's index, joining no leaf", () =>
+      inTestTransaction(
+        Effect.gen(function* () {
+          yield* seedWorks;
+          expect(yield* countOf(`select * from ontology.work_view`)).toBe(WORK_NODES);
+          const query = "SELECT * FROM ontology.work_view ORDER BY title, id LIMIT 20";
           const page = yield* explain(query);
           expect(aggregates(page)).toEqual([]);
-          expect(Arr.some(page, (n) => n["Index Name"] === WIDE_INDEX)).toBe(true);
+          expect(Arr.some(page, (n) => n["Index Name"] === WORK_INDEX)).toBe(true);
           expect(Arr.some(page, (n) => n["Node Type"] === "Sort")).toBe(false);
+          // The leaves are probed by the CASE's EXISTS subplans, never joined.
           const joined = Arr.flatMap(yield* explainJoined(query), (n) =>
             Arr.fromNullishOr(n["Relation Name"]),
           );
-          const below = Arr.filter(
-            Arr.map(branch.levels, (level) => `${level.name}_version`),
-            (table) => table !== "hub_version",
-          );
-          expect(joined).toContain("hub_version");
-          expect(Arr.intersection(joined, below)).toEqual([]);
-          const byId = yield* explain(
-            `SELECT * FROM ${branch.schema}.hub_view WHERE id = '00000000-0000-4000-a000-000000000042'`,
-          );
-          expect(aggregates(byId)).toEqual([]);
-          expect(
-            Arr.filter(
-              byId,
-              (n) =>
-                n["Node Type"] === "Seq Scan" &&
-                (n["Relation Name"] === branch.rootVersion || n["Relation Name"] === "hub_version"),
-            ),
-          ).toEqual([]);
+          expect(joined).toContain("work_version");
+          expect(Arr.intersection(joined, ["book_version", "essay_version"])).toEqual([]);
         }),
-      );
-    },
-  );
+      ),
+    );
+  });
+
+  describe("branch views: generated wide branches", () => {
+    it.effect.each(WIDE_BRANCHES)(
+      "$schema returns the UNION ALL form's rows, less the stale- and unknown-type ones",
+      (branch) =>
+        inTestTransaction(
+          Effect.gen(function* () {
+            yield* seedWide(branch, WIDE_NODES);
+            const view = `select * from ${branch.schema}.hub_view`;
+            const oracle = yield* wideOracle(branch);
+            expect(yield* countOf(view)).toBe(WIDE_NODES);
+            expect(yield* difference(sql.raw(view), oracle)).toEqual({
+              rows: WIDE_NODES,
+              missing: 0,
+              extra: 2,
+            });
+            // The tightening, explicitly: only the stale- and unknown-type
+            // nodes are the union's alone; the missing leaf and marker show in
+            // neither.
+            expect(yield* idsOf(`${oracle} except all ${view}`)).toEqual([
+              WIDE_STALE,
+              WIDE_UNKNOWN,
+            ]);
+            expect(
+              yield* countOf(
+                `${view} where id in ('${WIDE_NO_LEAF}', '${WIDE_NO_MARKER}', '${WIDE_STALE}', '${WIDE_UNKNOWN}')`,
+              ),
+            ).toBe(0);
+            expect(
+              yield* countOf(
+                `select * from (${oracle}) o where id in ('${WIDE_NO_LEAF}', '${WIDE_NO_MARKER}')`,
+              ),
+            ).toBe(0);
+          }),
+        ),
+    );
+
+    it.effect.each([WIDE_BRANCHES[0]])(
+      "$schema pages through the branch level's index with no Sort, no aggregate and no leaf join",
+      (branch) =>
+        inTestTransaction(
+          Effect.gen(function* () {
+            yield* seedWide(branch, PLAN_NODES);
+            const query = `SELECT * FROM ${branch.schema}.hub_view ORDER BY title, id LIMIT 20`;
+            const page = yield* explain(query);
+            expect(aggregates(page)).toEqual([]);
+            expect(Arr.some(page, (n) => n["Index Name"] === WIDE_INDEX)).toBe(true);
+            expect(Arr.some(page, (n) => n["Node Type"] === "Sort")).toBe(false);
+            const joined = Arr.flatMap(yield* explainJoined(query), (n) =>
+              Arr.fromNullishOr(n["Relation Name"]),
+            );
+            const below = Arr.filter(
+              Arr.map(branch.levels, (level) => `${level.name}_version`),
+              (table) => table !== "hub_version",
+            );
+            expect(joined).toContain("hub_version");
+            expect(Arr.intersection(joined, below)).toEqual([]);
+            const byId = yield* explain(
+              `SELECT * FROM ${branch.schema}.hub_view WHERE id = '00000000-0000-4000-a000-000000000042'`,
+            );
+            expect(aggregates(byId)).toEqual([]);
+            expect(
+              Arr.filter(
+                byId,
+                (n) =>
+                  n["Node Type"] === "Seq Scan" &&
+                  (n["Relation Name"] === branch.rootVersion ||
+                    n["Relation Name"] === "hub_version"),
+              ),
+            ).toEqual([]);
+          }),
+        ),
+    );
+  });
 });

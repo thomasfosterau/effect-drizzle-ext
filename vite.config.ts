@@ -74,7 +74,7 @@ export default defineConfig({
       // is inside a test.
       "vitest/no-standalone-expect": [
         "error",
-        { additionalTestBlockFunctions: ["it.effect", "it.live", "it.layer"] },
+        { additionalTestBlockFunctions: ["it.effect", "it.effect.each", "it.live", "it.layer"] },
       ],
 
       // ---- type-aware rules (oxlint-tsgolint) -------------------------------

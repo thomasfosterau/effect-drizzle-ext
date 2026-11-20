@@ -8,6 +8,9 @@ An always-rollback test transaction runner: every spec runs inside a real databa
 export const isRetryableConnectFailure: (cause: unknown) => boolean;
 
 export interface TestTransaction<Key extends string> {
+  readonly inTestTransaction: <A, E, R>(
+    effect: Effect.Effect<A, E, R>,
+  ) => Effect.Effect<A, E | SqlError, Exclude<R, `${Key}/CurrentTransaction`> | Key>;
   readonly runInTestTransaction: <R, A, E>(
     runtime: ManagedRuntime.ManagedRuntime<R, SqlError>,
     effect: Effect.Effect<A, E, R | `${Key}/CurrentTransaction`>,
@@ -83,14 +86,37 @@ describe("widgets", () => {
 });
 ```
 
+A suite on `@effect/vitest` uses the Effect form instead: `inTestTransaction(effect)` is the same always-rollback run as an Effect, needing only the `Database` key, which a `layer(...)` block provides once for all its specs. The spec's own failure comes back unchanged in the error channel, so `Effect.flip` / `Effect.exit` assert on it; a failure of the harness transaction itself is a defect. A live database runs on the live clock, so leave the test services out:
+
+```ts
+import { layer } from "@effect/vitest";
+
+const { inTestTransaction } = makeTestTransaction(database);
+
+layer(testDatabaseLayer(database, { url }), { excludeTestServices: true })("widgets", (it) => {
+  it.effect("creates a widget", () =>
+    inTestTransaction(
+      Effect.gen(function* () {
+        const db = yield* Database;
+        yield* db.execute(sql`CREATE TEMPORARY TABLE widget (id integer PRIMARY KEY)`);
+        yield* transact(
+          Effect.flatMap(CurrentTransaction, (tx) =>
+            tx.execute(sql`INSERT INTO widget (id) VALUES (1)`),
+          ),
+        );
+      }),
+    ),
+  );
+});
+```
+
 `withTestTransaction(runtime)` is `runInTestTransaction` with the runtime bound once — the form a suite exports as its own helper. Both wrap the spec's effect in the application's own `transact`, so the spec opens its write boundary exactly as a request handler does in production; binding `CurrentTransaction` straight from the harness instead would make specs the one place in the system where a write runs without anything having called `transact`.
 
 **A constraint-rejection assertion needs `attemptInSavepoint`, not a bare `Effect.exit`.** A statement that raises aborts the _whole_ PostgreSQL transaction, so `Effect.exit(tx.insert(...))` alone captures the expected failure but then poisons every later statement in the test with `current transaction is aborted, commands ignored until end of transaction block` — surfacing several assertions away from the real cause, on whatever query runs next. `attemptInSavepoint` nests the attempt in a SAVEPOINT on the same pinned connection, so the driver rolls back to it on failure and the enclosing transaction — and every fixture the test already wrote — carries on:
 
 ```ts
-it("rejects a duplicate slug without poisoning the rest of the test", async () => {
-  await runInTestTransaction(
-    runtime,
+it.effect("rejects a duplicate slug without poisoning the rest of the test", () =>
+  inTestTransaction(
     Effect.gen(function* () {
       yield* transact(insertWidget({ slug: "cog" }));
 
@@ -101,8 +127,8 @@ it("rejects a duplicate slug without poisoning the rest of the test", async () =
       // "current transaction is aborted" instead of running.
       yield* transact(insertWidget({ slug: "sprocket" }));
     }),
-  );
-});
+  ),
+);
 ```
 
 ### Provisioning the test database

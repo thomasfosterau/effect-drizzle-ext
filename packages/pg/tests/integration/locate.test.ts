@@ -15,10 +15,9 @@ import { defineRelations, sql } from "drizzle-orm";
 import { check, integer, pgSchema, text, unique } from "drizzle-orm/pg-core";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
-import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
-import { assert, describe, expect, it } from "vite-plus/test";
-import { integrationDatabaseLayer } from "./database-url.ts";
+import { assert, describe, expect } from "vite-plus/test";
+import { integrationLayer } from "./database-url.ts";
 import { makePgDatabase } from "../../src/index.ts";
 import { makeTestTransaction } from "../../src/testing.ts";
 
@@ -49,8 +48,7 @@ const relations = defineRelations({ owners, pets });
 const database = makePgDatabase({ relations, key: "Database" });
 const { insert } = database.queries;
 
-const runtime = ManagedRuntime.make(integrationDatabaseLayer(database));
-const { runInTestTransaction, attemptInSavepoint } = makeTestTransaction(database);
+const { inTestTransaction, attemptInSavepoint } = makeTestTransaction(database);
 
 /** The tables, as `drizzle-kit export` writes them for the declarations above. */
 const seed = Effect.fn("locate.seed")(function* () {
@@ -93,74 +91,82 @@ const locateRejection = Effect.fn("locate.rejection")(function* <A, E>(
 const located = <A>(option: Option.Option<A>): A =>
   Option.getOrElse(option, () => expect.unreachable("locate found no table"));
 
-describe("locate against the live driver", () => {
-  it("resolves a column-level unique violation (Postgres' own constraint name)", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seed();
-        const location = located(
-          yield* locateRejection(insert(owners).values({ id: 2, handle: "ada" })),
-        );
-        expect(location.table).toBe(owners);
-        expect(location.columns).toStrictEqual([owners.handle]);
-      }),
+integrationLayer(database)((it) => {
+  describe("locate against the live driver", () => {
+    it.effect("resolves a column-level unique violation (Postgres' own constraint name)", () =>
+      inTestTransaction(
+        Effect.gen(function* () {
+          yield* seed();
+          const location = located(
+            yield* locateRejection(insert(owners).values({ id: 2, handle: "ada" })),
+          );
+          expect(location.table).toBe(owners);
+          expect(location.columns).toStrictEqual([owners.handle]);
+        }),
+      ),
     );
-  });
 
-  it("resolves a composite unique violation and a primary key violation", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seed();
-        const composite = located(
-          yield* locateRejection(insert(pets).values({ id: 2, ownerId: 1, name: "Rex", legs: 3 })),
-        );
-        expect(composite.table).toBe(pets);
-        expect(composite.columns).toStrictEqual([pets.ownerId, pets.name]);
-
-        const primary = located(
-          yield* locateRejection(insert(pets).values({ id: 1, ownerId: 1, name: "Fido", legs: 4 })),
-        );
-        expect(primary.columns).toStrictEqual([pets.id]);
-      }),
-    );
-  });
-
-  it("resolves a foreign key violation to the referencing column", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seed();
-        const location = located(
-          yield* locateRejection(insert(pets).values({ id: 3, ownerId: 99, name: "Tom", legs: 4 })),
-        );
-        expect(location.table).toBe(pets);
-        expect(location.columns).toStrictEqual([pets.ownerId]);
-      }),
-    );
-  });
-
-  it("resolves a NOT NULL violation to its column, and a CHECK violation to its table", async () => {
-    await runInTestTransaction(
-      runtime,
-      Effect.gen(function* () {
-        yield* seed();
-        const notNull = located(
-          yield* locateRejection(
-            database.queries.execute(
-              sql`INSERT INTO "edx_locate"."pets" (id, owner_id, legs) VALUES (4, 1, 4)`,
+    it.effect("resolves a composite unique violation and a primary key violation", () =>
+      inTestTransaction(
+        Effect.gen(function* () {
+          yield* seed();
+          const composite = located(
+            yield* locateRejection(
+              insert(pets).values({ id: 2, ownerId: 1, name: "Rex", legs: 3 }),
             ),
-          ),
-        );
-        expect(notNull.columns).toStrictEqual([pets.name]);
+          );
+          expect(composite.table).toBe(pets);
+          expect(composite.columns).toStrictEqual([pets.ownerId, pets.name]);
 
-        const checked = located(
-          yield* locateRejection(insert(pets).values({ id: 5, ownerId: 1, name: "Odd", legs: -1 })),
-        );
-        expect(checked.table).toBe(pets);
-        expect(checked.columns).toStrictEqual([]);
-      }),
+          const primary = located(
+            yield* locateRejection(
+              insert(pets).values({ id: 1, ownerId: 1, name: "Fido", legs: 4 }),
+            ),
+          );
+          expect(primary.columns).toStrictEqual([pets.id]);
+        }),
+      ),
+    );
+
+    it.effect("resolves a foreign key violation to the referencing column", () =>
+      inTestTransaction(
+        Effect.gen(function* () {
+          yield* seed();
+          const location = located(
+            yield* locateRejection(
+              insert(pets).values({ id: 3, ownerId: 99, name: "Tom", legs: 4 }),
+            ),
+          );
+          expect(location.table).toBe(pets);
+          expect(location.columns).toStrictEqual([pets.ownerId]);
+        }),
+      ),
+    );
+
+    it.effect(
+      "resolves a NOT NULL violation to its column, and a CHECK violation to its table",
+      () =>
+        inTestTransaction(
+          Effect.gen(function* () {
+            yield* seed();
+            const notNull = located(
+              yield* locateRejection(
+                database.queries.execute(
+                  sql`INSERT INTO "edx_locate"."pets" (id, owner_id, legs) VALUES (4, 1, 4)`,
+                ),
+              ),
+            );
+            expect(notNull.columns).toStrictEqual([pets.name]);
+
+            const checked = located(
+              yield* locateRejection(
+                insert(pets).values({ id: 5, ownerId: 1, name: "Odd", legs: -1 }),
+              ),
+            );
+            expect(checked.table).toBe(pets);
+            expect(checked.columns).toStrictEqual([]);
+          }),
+        ),
     );
   });
 });

@@ -14,14 +14,14 @@
  */
 
 import * as PgTypes from "@effect/sql-pg/PgTypes";
+import { layer } from "@effect/vitest";
 import { sql } from "drizzle-orm";
 import { bigint, integer, pgEnum, pgTable, timestamp } from "drizzle-orm/pg-core";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Result from "effect/Result";
-import { describe, expect, it, onTestFinished } from "vite-plus/test";
+import { describe, expect } from "vite-plus/test";
 import { makePgDatabase, pgClientFromUrl } from "../../src/index.ts";
 import { makeTestTransaction } from "../../src/testing.ts";
 import { testDatabaseUrl } from "./database-url.ts";
@@ -70,35 +70,42 @@ const roundTrip = Effect.fn("roundTrip")(function* () {
   return yield* db.select().from(probe);
 });
 
-const makeRuntime = (types?: PgTypes.Registry) =>
-  ManagedRuntime.make(
-    database.layer.pipe(
-      Layer.provide(
-        Layer.unwrap(
-          Effect.map(testDatabaseUrl, (url) =>
-            pgClientFromUrl({ url, maxConnections: 1, types, prepare: false }),
-          ),
+const { inTestTransaction } = makeTestTransaction(database);
+
+/** Each spec's own single-connection pool, so the two registries never share one. */
+const databaseLayer = (types?: PgTypes.Registry) =>
+  database.layer.pipe(
+    Layer.provide(
+      Layer.unwrap(
+        Effect.map(testDatabaseUrl, (url) =>
+          pgClientFromUrl({ url, maxConnections: 1, types, prepare: false }),
         ),
       ),
     ),
   );
 
 describe("Drizzle round trip over the binary driver", () => {
-  it("round-trips an enum, a string-mode bigint and a timestamptz with a forwarded types registry", async () => {
-    const runtime = makeRuntime(withTypes());
-    onTestFinished(() => runtime.dispose());
-    const { runInTestTransaction } = makeTestTransaction(database);
-    const rows = await runInTestTransaction(runtime, roundTrip());
-    expect(rows).toEqual([{ id: 1, mood: "happy", big: BIG, at: AT }]);
+  layer(databaseLayer(withTypes()), { excludeTestServices: true })((it) => {
+    it.effect(
+      "round-trips an enum, a string-mode bigint and a timestamptz with a forwarded types registry",
+      () =>
+        Effect.gen(function* () {
+          const rows = yield* inTestTransaction(roundTrip());
+          expect(rows).toEqual([{ id: 1, mood: "happy", big: BIG, at: AT }]);
+        }),
+    );
   });
 
-  it("round-trips the same row without a registry (drizzle-orm 1.0.0-rc.5's own codecs)", async () => {
-    const runtime = makeRuntime();
-    onTestFinished(() => runtime.dispose());
-    const { runInTestTransaction } = makeTestTransaction(database);
-    const rows = await runInTestTransaction(runtime, roundTrip());
-    // The commit build handed `big` back as a JS bigint here, against
-    // drizzle's `string` type; the published rc.5 returns the decimal string.
-    expect(rows).toEqual([{ id: 1, mood: "happy", big: BIG, at: AT }]);
+  layer(databaseLayer(), { excludeTestServices: true })((it) => {
+    it.effect(
+      "round-trips the same row without a registry (drizzle-orm 1.0.0-rc.5's own codecs)",
+      () =>
+        Effect.gen(function* () {
+          const rows = yield* inTestTransaction(roundTrip());
+          // The commit build handed `big` back as a JS bigint here, against
+          // drizzle's `string` type; the published rc.5 returns the decimal string.
+          expect(rows).toEqual([{ id: 1, mood: "happy", big: BIG, at: AT }]);
+        }),
+    );
   });
 });

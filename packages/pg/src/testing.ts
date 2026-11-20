@@ -190,9 +190,9 @@ const connectRetrySchedule = Schedule.max([
 /**
  * A failure of the runner itself rather than of the spec it ran: the outer
  * transaction failed before the spec's `Exit` was captured, or failed with
- * something other than the rollback sentinel. Thrown (rejecting the runner's
- * Promise), never put in an Effect error channel — the runner is the test
- * harness's boundary.
+ * something other than the rollback sentinel. A defect (rejecting the
+ * runner's Promise), never put in an Effect error channel — the runner is the
+ * test harness's boundary.
  */
 class TestTransactionError extends Schema.TaggedError<TestTransactionError>()(
   "TestTransactionError",
@@ -208,6 +208,19 @@ class TestTransactionError extends Schema.TaggedError<TestTransactionError>()(
  * string alone.
  */
 export interface TestTransaction<Key extends string> {
+  /**
+   * Runs `effect` inside a transaction that is always rolled back, as an
+   * Effect: the form an `@effect/vitest` spec returns from `it.effect`, with
+   * the `Database` key provided by the suite's `layer(...)`.
+   *
+   * `effect` is wrapped in `transact`, so its `${Key}/CurrentTransaction`
+   * requirement is discharged here. Its own failure is re-raised unchanged; a
+   * failure of the harness transaction itself is a defect.
+   */
+  readonly inTestTransaction: <A, E, R>(
+    effect: Effect.Effect<A, E, R>,
+  ) => Effect.Effect<A, E | SqlError, Exclude<R, `${Key}/CurrentTransaction`> | Key>;
+
   /**
    * Runs `effect` inside a transaction that is always rolled back once the
    * test completes, against a caller-supplied runtime.
@@ -269,7 +282,7 @@ export interface TestTransaction<Key extends string> {
  *
  * The services carry the key strings and the `transact` boundary, so the
  * runner needs nothing else: a suite calls this once next to its
- * {@link makePgDatabase} call and exports the three helpers.
+ * {@link makePgDatabase} call and exports the helpers.
  */
 export const makeTestTransaction = <
   Key extends string,
@@ -282,85 +295,91 @@ export const makeTestTransaction = <
     readonly Database: Context.Service<Key, Db>;
   },
 ): TestTransaction<Key> => {
+  const inTestTransaction = <A, E, R>(
+    effect: Effect.Effect<A, E, R>,
+  ): Effect.Effect<A, E | SqlError, Exclude<R, `${Key}/CurrentTransaction`> | Key> =>
+    Effect.suspend(() => {
+      // Write-once: set inside the transaction body, so `none` after the run
+      // means the body never ran.
+      const captured = MutableRef.make(Option.none<Exit.Exit<A, E | SqlError>>());
+
+      const program = Effect.gen(function* () {
+        const db = yield* database.Database;
+        return yield* db.transaction(() =>
+          Effect.gen(function* () {
+            MutableRef.set(captured, Option.some(yield* Effect.exit(database.transact(effect))));
+            return yield* Effect.fail(rollback);
+          }),
+        );
+      }).pipe(
+        // Retry ONLY a connect-time transient failure — never test logic.
+        //
+        // Two guards keep this honest:
+        //  1. `isRetryableConnectFailure(e)` — fires for a `SqlError` that
+        //     failed at the connect/acquire seam (the retryable
+        //     `ConnectionError`, plus the misclassified `UnknownError` an
+        //     acquisition-timeout / `ECONNRESET` flake surfaces as) but NOT for a `UniqueViolation` / `ConstraintError` /
+        //     `SqlSyntaxError` raised by a test's own query. The rollback
+        //     sentinel that the body always forces is a plain object, not a
+        //     `SqlError`, so a *successful* test and a *genuinely failing* test
+        //     (whose Exit is captured before the rollback) both fail the
+        //     program with `rollback` and never retry.
+        //  2. `captured` is still `none` — the inner test body never ran. A
+        //     connect-seam `SqlError` can in principle surface *after* the body
+        //     has executed and been captured (e.g. the connection drops on the
+        //     rollback raise); re-running then would double-execute the test's
+        //     side effects, so we refuse to retry once any test work has
+        //     happened. The connect flake by construction fails before the
+        //     transaction body opens, so `captured` is still `none` then —
+        //     exactly the case we retry.
+        Effect.retry({
+          schedule: connectRetrySchedule,
+          while: (e) => Option.isNone(MutableRef.get(captured)) && isRetryableConnectFailure(e),
+        }),
+      );
+
+      return Effect.flatMap(Effect.exit(program), (outer) =>
+        Option.match(MutableRef.get(captured), {
+          onNone: () =>
+            Effect.die(
+              new TestTransactionError({
+                message: Exit.isFailure(outer)
+                  ? `runInTestTransaction: outer transaction failed: ${String(outer.cause)}`
+                  : "runInTestTransaction: inner Exit was never captured",
+              }),
+            ),
+          // The outer Exit should be the rollback failure we forced. Anything
+          // else is a transaction-level failure we didn't expect (e.g. the
+          // connection dropped between the inner result and the rollback raise).
+          onSome: (inner) =>
+            Exit.isFailure(outer) && !causeContainsRollback(outer.cause)
+              ? Effect.die(
+                  new TestTransactionError({
+                    message: `runInTestTransaction: unexpected outer failure: ${String(outer.cause)}`,
+                  }),
+                )
+              : inner,
+        }),
+      );
+    });
+
   const runInTestTransaction = async <R, A, E>(
     runtime: ManagedRuntime.ManagedRuntime<R | Key, SqlError>,
     effect: Effect.Effect<A, E, R | Key | `${Key}/CurrentTransaction`>,
   ): Promise<A> => {
-    // Write-once: set inside the transaction body, so `none` after the run
-    // means the body never ran.
-    const captured = MutableRef.make(Option.none<Exit.Exit<A, E | SqlError>>());
-
-    const program = Effect.gen(function* () {
-      const db = yield* database.Database;
-      return yield* db.transaction(() =>
-        Effect.gen(function* () {
-          MutableRef.set(captured, Option.some(yield* Effect.exit(database.transact(effect))));
-          return yield* Effect.fail(rollback);
-        }),
-      );
-    }).pipe(
-      // Retry ONLY a connect-time transient failure — never test logic.
-      //
-      // Two guards keep this honest:
-      //  1. `isRetryableConnectFailure(e)` — fires for a `SqlError` that
-      //     failed at the connect/acquire seam (the retryable
-      //     `ConnectionError`, plus the misclassified `UnknownError` an
-      //     acquisition-timeout / `ECONNRESET` flake surfaces as) but NOT for a `UniqueViolation` / `ConstraintError` /
-      //     `SqlSyntaxError` raised by a test's own query. The rollback
-      //     sentinel that the body always forces is a plain object, not a
-      //     `SqlError`, so a *successful* test and a *genuinely failing* test
-      //     (whose Exit is captured before the rollback) both fail the
-      //     program with `rollback` and never retry.
-      //  2. `captured` is still `none` — the inner test body never ran. A
-      //     connect-seam `SqlError` can in principle surface *after* the body
-      //     has executed and been captured (e.g. the connection drops on the
-      //     rollback raise); re-running then would double-execute the test's
-      //     side effects, so we refuse to retry once any test work has
-      //     happened. The connect flake by construction fails before the
-      //     transaction body opens, so `captured` is still `none` then —
-      //     exactly the case we retry.
-      Effect.retry({
-        schedule: connectRetrySchedule,
-        while: (e) => Option.isNone(MutableRef.get(captured)) && isRetryableConnectFailure(e),
-      }),
-    );
-
-    const outer = await runtime.runPromiseExit(program);
-
-    const innerExit = MutableRef.get(captured);
-    if (Option.isNone(innerExit)) {
-      if (Exit.isFailure(outer)) {
-        throw new TestTransactionError({
-          message: `runInTestTransaction: outer transaction failed: ${String(outer.cause)}`,
-        });
-      }
-      throw new TestTransactionError({
-        message: "runInTestTransaction: inner Exit was never captured",
-      });
-    }
-
-    // The outer Exit should be the rollback failure we forced. Anything
-    // else is a transaction-level failure we didn't expect (e.g. the
-    // connection dropped between the inner result and the rollback raise).
-    if (Exit.isFailure(outer) && !causeContainsRollback(outer.cause)) {
-      throw new TestTransactionError({
-        message: `runInTestTransaction: unexpected outer failure: ${String(outer.cause)}`,
-      });
-    }
-
-    if (Exit.isSuccess(innerExit.value)) return innerExit.value.value;
-    // Project the captured `Cause` to something a test can assert on.
-    // Throwing the raw `Cause` makes vitest serialise it as `{ _tag: 'Die',
-    // defect: [Object] }` with an empty `.message`, so `.rejects.toThrow(/…/)`
-    // never matches and a defect's real error is invisible. `Cause.squash`
-    // collapses the cause to its underlying value — a typed `Fail`'s error
-    // (keeps `_tag` + message) or a `Die`'s thrown defect (a real `Error` with
-    // a message + stack) — so the actual failure surfaces in vitest output
-    // and `.rejects.toThrow(/…/)` matches.
-    throw Cause.squash(innerExit.value.cause);
+    const exit = await runtime.runPromiseExit(inTestTransaction(effect));
+    if (Exit.isSuccess(exit)) return exit.value;
+    // Project the `Cause` to something a test can assert on. Throwing the raw
+    // `Cause` makes vitest serialise it as `{ _tag: 'Die', defect: [Object] }`
+    // with an empty `.message`, so `.rejects.toThrow(/…/)` never matches and a
+    // defect's real error is invisible. `Cause.squash` collapses the cause to
+    // its underlying value — a typed `Fail`'s error (keeps `_tag` + message)
+    // or a `Die`'s thrown defect (a real `Error` with a message + stack).
+    throw Cause.squash(exit.cause);
   };
 
   return {
+    inTestTransaction,
     runInTestTransaction,
     withTestTransaction:
       <R>(runtime: ManagedRuntime.ManagedRuntime<R | Key, SqlError>) =>
