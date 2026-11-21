@@ -12,7 +12,13 @@ import type {
   Extras,
   SchemaModule,
 } from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";
-import { CompositeType, Domain, Extension } from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";
+import {
+  CompositeType,
+  Domain,
+  Extension,
+  SqlFunction,
+  Trigger,
+} from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";
 import type * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -30,7 +36,7 @@ export interface KitConfig {
   readonly migrationsDir: string;
   /** How drizzle-kit is configured: a `drizzle.config.ts` whose `out` is `migrationsDir`, or a schema path. */
   readonly drizzleKit: DrizzleKitTarget;
-  /** The extensions, domains and composite types drizzle-kit doesn't manage. */
+  /** The extensions, domains, composite types, functions and triggers drizzle-kit doesn't manage. */
   readonly extras?: Extras;
   /**
    * The Drizzle schema module (`import * as schema from "./src/schema.ts"`);
@@ -73,6 +79,8 @@ const CheckedKitConfig = Schema.Struct({
       extensions: Schema.optionalKey(Schema.Array(Schema.toType(Extension))),
       domains: Schema.optionalKey(Schema.Array(Schema.toType(Domain))),
       compositeTypes: Schema.optionalKey(Schema.Array(Schema.toType(CompositeType))),
+      functions: Schema.optionalKey(Schema.Array(Schema.toType(SqlFunction))),
+      triggers: Schema.optionalKey(Schema.Array(Schema.toType(Trigger))),
     }),
   ),
   schema: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),

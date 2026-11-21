@@ -68,7 +68,7 @@ const scratchProject = Effect.fn("scratchProject")(function* (body: string) {
     file,
     [
       'import { defineConfig } from "@thomasfosterau/effect-drizzle-ext-kit";',
-      'import { domain, extension } from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";',
+      'import { domain, extension, fn, trigger } from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";',
       `import * as schema from "${PG_FIXTURES}/schema.ts";`,
       "",
       "export default defineConfig({",
@@ -83,7 +83,16 @@ const scratchProject = Effect.fn("scratchProject")(function* (body: string) {
   return file;
 });
 
-const EXTRAS = `  extras: { extensions: [extension("citext")], domains: [domain("email", "citext")] },`;
+const EXTRAS = `  extras: {
+    extensions: [extension("citext")],
+    domains: [domain("email", "citext")],
+    functions: [
+      fn({ schema: "fixture", name: "noop", returns: "trigger", language: "plpgsql", body: "BEGIN RETURN NEW; END;" }),
+    ],
+    triggers: [
+      trigger({ schema: "fixture", table: "widget", name: "widget_noop", timing: "BEFORE", events: ["INSERT"], fn: { schema: "fixture", name: "noop" } }),
+    ],
+  },`;
 
 describe("defineConfig", () => {
   it("returns the config unchanged", () => {
@@ -160,7 +169,7 @@ describe("generate and check", () => {
         yield* runCli(["generate", "--config", file, "--name", "email"]);
         yield* runCli(["check", "--config", file]);
         const names = yield* fs.readDirectory(path.join(path.dirname(file), "migrations"));
-        const again = yield* generate(yield* loadConfig(file), "again");
+        const again = yield* generate(yield* loadConfig(file), Option.some("again"));
         return { before, names, again };
       }),
     );
@@ -168,8 +177,10 @@ describe("generate and check", () => {
     assert(result.before instanceof CliError.UserError);
     expect(result.before.cause).toBeInstanceOf(ExtrasDriftError);
     expect(result.before.message).toMatch(/Extras drift detected/);
-    expect(result.names.filter((name) => name.endsWith("_email"))).toHaveLength(1);
-    expect(Option.isNone(result.again)).toBe(true);
+    expect(result.names.filter((name) => /_email-extras-(before|after)$/.test(name))).toHaveLength(
+      2,
+    );
+    expect(Option.isNone(result.again.before) && Option.isNone(result.again.after)).toBe(true);
   });
 
   it("also gates schema drift when the config names its schema module", async () => {
@@ -247,8 +258,8 @@ describe("generate and check", () => {
         return {
           badHint,
           refused,
-          renameSql: yield* read("_rename"),
-          retypeSql: yield* read("_retype"),
+          renameSql: yield* read("_rename-extras-before"),
+          retypeSql: yield* read("_retype-extras-before"),
         };
       }),
     );

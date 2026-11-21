@@ -1,7 +1,7 @@
 /**
- * **The `effect-drizzle-kit` commands**: `generate` writes the extras
- * migration, and `check` gates extras drift (and schema drift, when the
- * config names its schema module) in one run. Each is an Effect over a
+ * **The `effect-drizzle-kit` commands**: `generate` writes drizzle-kit's
+ * migration between the two extras migrations, and `check` gates extras
+ * drift (and schema drift, when the config names its schema module) in one run. Each is an Effect over a
  * {@link LoadedConfig} ({@link generate}, {@link check}) and a subcommand of
  * {@link cli}, which `bin.ts` runs.
  *
@@ -12,7 +12,7 @@ import {
   checkExtrasDrift,
   checkMigrationDrift,
   type ExtrasRename,
-  generateExtrasMigration,
+  generateMigrations,
   type GitBase,
   resolveBaseRef,
 } from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";
@@ -45,35 +45,34 @@ const migrationsDirOf = (loaded: LoadedConfig, path: Path.Path): string =>
 
 /** The one-off choices a `generate` run takes beside its config. */
 export interface GenerateOptions {
-  /** Renames to apply in place of a drop and a create, as `generateExtrasMigration` takes them. */
+  /** Renames to apply in the before migration in place of a drop and a create, as `generateMigrations` takes them. */
   readonly renames?: ReadonlyArray<ExtrasRename>;
-  /** Record the declared state with a `migration.sql` to write by hand. */
+  /** Record the before migration's state with a `migration.sql` to write by hand. */
   readonly recordOnly?: boolean;
 }
 
 /**
- * Write the extras migration a config's declarations need, as
- * `generateExtrasMigration` does, with drizzle-kit run in the config's
- * directory. Succeeds with the directory written, or `Option.none()` when
- * there was nothing to migrate.
+ * Generate the whole change a config's declarations and schema need, as
+ * `generateMigrations` does: the before-phase extras migration, drizzle-kit's
+ * own, then the after-phase extras migration, with drizzle-kit run in the
+ * config's directory. `name` is drizzle-kit's slug, and prefixes the extras ones.
  */
 export const generate = Effect.fn("Commands.generate")(function* (
   loaded: LoadedConfig,
-  name: string,
+  name: Option.Option<string>,
   options: GenerateOptions = {},
 ) {
   const path = yield* Path.Path;
-  const written = yield* generateExtrasMigration({
+  return yield* generateMigrations({
     extras: loaded.config.extras ?? {},
     migrationsDir: migrationsDirOf(loaded, path),
-    name,
+    ...Option.match(name, { onNone: () => ({}), onSome: (slug) => ({ name: slug }) }),
     drizzleKit: loaded.config.drizzleKit,
     cwd: loaded.dir,
     command: loaded.config.command ?? ["drizzle-kit"],
     renames: options.renames ?? [],
     recordOnly: options.recordOnly ?? false,
   });
-  return Option.map(written, (migration) => migration.dir);
 });
 
 /**
@@ -174,8 +173,10 @@ const generateCommand = Command.make(
     config: configFlag,
     name: Flag.String("name").pipe(
       Flag.withAlias("n"),
-      Flag.withDescription("The migration's slug, drizzle-kit's --name"),
-      Flag.withDefault("extras"),
+      Flag.withDescription(
+        "drizzle-kit's migration slug; the extras migrations are <name>-extras-before and -after",
+      ),
+      Flag.optional,
     ),
     renames: Flag.String("rename").pipe(
       Flag.withDescription(
@@ -190,7 +191,7 @@ const generateCommand = Command.make(
     recordOnly: Flag.Boolean("record-only").pipe(
       Flag.withDefault(false),
       Flag.withDescription(
-        "Record the declared state and leave migration.sql to write by hand, for a change the generator refuses",
+        "Record the before migration's state and leave its migration.sql to write by hand, for a change the generator refuses",
       ),
     ),
   },
@@ -200,15 +201,23 @@ const generateCommand = Command.make(
         generate(loaded, name, { renames, recordOnly }),
       ),
     );
-    yield* Option.match(written, {
-      onNone: () => Console.log("No extras changes: nothing to migrate."),
-      onSome: (dir) =>
-        Console.log(recordOnly ? `Wrote ${dir}: write its migration.sql by hand.` : `Wrote ${dir}`),
-    });
+    const extras = Arr.getSomes([written.before, written.after]);
+    yield* Arr.isReadonlyArrayNonEmpty(extras)
+      ? Effect.forEach(
+          extras,
+          (migration) =>
+            Console.log(
+              migration.recordOnly
+                ? `Wrote ${migration.dir}: write its migration.sql by hand.`
+                : `Wrote ${migration.dir}`,
+            ),
+          { concurrency: 1, discard: true },
+        )
+      : Console.log("No extras changes.");
   }),
 ).pipe(
   Command.withDescription(
-    "Write the extensions, domains and composite types the config declares into a drizzle-kit custom migration. Run it before drizzle-kit generate.",
+    "Write the extras the config declares around drizzle-kit's own migration: extensions, domains and composite types before it, functions and triggers after it. Run it instead of drizzle-kit generate.",
   ),
 );
 

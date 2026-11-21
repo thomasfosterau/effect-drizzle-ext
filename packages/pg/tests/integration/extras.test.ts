@@ -17,6 +17,8 @@ import {
   extension,
   type ExtrasRename,
   type ExtrasState,
+  fn,
+  trigger,
   planExtras,
   renderExtrasMigration,
   toExtrasState,
@@ -52,11 +54,11 @@ const inRolledBackTransaction = <A>(
   Effect.gen(function* () {
     const sql = yield* PgClient.PgClient;
     const seen = yield* Ref.make(Option.none<A>());
-    const statements = steps.flatMap((step) =>
-      P.isString(step)
-        ? [step]
-        : splitStatements(renderExtrasMigration(planExtras(...step).statements)),
-    );
+    const statements = steps.flatMap((step) => {
+      if (P.isString(step)) return [step];
+      const plan = planExtras(...step);
+      return splitStatements(renderExtrasMigration([...plan.before, ...plan.after]));
+    });
     yield* sql
       .withTransaction(
         Effect.gen(function* () {
@@ -215,6 +217,88 @@ layer(pgClient, { excludeTestServices: true })((it) => {
           );
           expect(result).toEqual([{ column: "extras_mail", mail: "A@B.example" }]);
         }),
+    );
+  });
+});
+
+const slugify = fn({
+  schema: "fixture",
+  name: "extras_slugify",
+  args: { input: "text" },
+  returns: "text",
+  language: "sql",
+  body: "SELECT lower(input)",
+  volatility: "IMMUTABLE",
+});
+const lowerSlug = fn({
+  schema: "fixture",
+  name: "extras_lower_slug",
+  returns: "trigger",
+  language: "plpgsql",
+  body: "BEGIN NEW.slug := fixture.extras_slugify(NEW.slug); RETURN NEW; END;",
+});
+const widgetSlug = trigger({
+  schema: "fixture",
+  table: "widget",
+  name: "extras_lower_slug",
+  timing: "BEFORE",
+  events: ["INSERT"],
+  fn: lowerSlug,
+});
+const withTrigger = toExtrasState({ functions: [slugify, lowerSlug], triggers: [widgetSlug] });
+
+const insertedSlug = (sql: PgClient.PgClient) =>
+  sql<{ slug: string }>`insert into fixture.widget (slug) values ('Extras-Slug') returning slug`;
+
+layer(pgClient, { excludeTestServices: true })((it) => {
+  describe("extras functions and triggers on Postgres", () => {
+    it.effect("creates a function and a trigger that fires on the fixture's table", () =>
+      Effect.gen(function* () {
+        expect(
+          yield* inRolledBackTransaction([[emptyExtrasState, withTrigger]], insertedSlug),
+        ).toEqual([{ slug: "extras-slug" }]);
+      }),
+    );
+
+    it.effect(
+      "replaces a body in place, and drops and re-creates a function whose return type changes",
+      () =>
+        Effect.gen(function* () {
+          const next = toExtrasState({
+            functions: [
+              { ...slugify, body: "SELECT upper(input)" },
+              { ...lowerSlug, returns: "TRIGGER" },
+            ],
+            triggers: [widgetSlug],
+          });
+          expect(
+            yield* inRolledBackTransaction(
+              [
+                [emptyExtrasState, withTrigger],
+                [withTrigger, next],
+              ],
+              insertedSlug,
+            ),
+          ).toEqual([{ slug: "EXTRAS-SLUG" }]);
+        }),
+    );
+
+    it.effect("drops the trigger and both functions", () =>
+      Effect.gen(function* () {
+        const result = yield* inRolledBackTransaction(
+          [
+            [emptyExtrasState, withTrigger],
+            [withTrigger, emptyExtrasState],
+          ],
+          (sql) =>
+            Effect.gen(function* () {
+              const functions = yield* sql<{ n: number }>`
+                select count(*)::int as n from pg_proc where proname like 'extras\\_%'`;
+              return { functions, slug: yield* insertedSlug(sql) };
+            }),
+        );
+        expect(result).toEqual({ functions: [{ n: 0 }], slug: [{ slug: "Extras-Slug" }] });
+      }),
     );
   });
 });
