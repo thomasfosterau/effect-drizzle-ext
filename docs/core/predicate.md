@@ -2,7 +2,7 @@
 
 _A guide to [`@thomasfosterau/effect-drizzle-ext`](../../packages/core/README.md). The API reference is the doc comments on each export (your editor's hover, or `vp run docgen`)._
 
-A **neutral row predicate**: plain data that every filter language an application speaks compiles to once, and that renders to SQL and evaluates in memory with the same answer. A JSON:API `Filter.Ast` compiles to it (`predicateFromFilter` in `./jsonapi`); a list filter or a query language can do the same.
+A **neutral row predicate**: plain data that every filter language an application speaks compiles to once, and that renders to SQL and evaluates in memory with the same answer. A JSON:API `Filter.Ast` compiles to it (`predicateFromFilter` in `./JsonApi`); a list filter or a query language can do the same.
 
 `./Predicate` is Drizzle-free, so a client bundle can build predicates. `./Where` renders one over a table's or view's columns.
 
@@ -33,7 +33,7 @@ These hold in both `Where.render` and `Predicate.evaluate`, and the integration 
 ```ts
 import * as Predicate from "@thomasfosterau/effect-drizzle-ext/Predicate";
 import * as Where from "@thomasfosterau/effect-drizzle-ext/Where";
-import { predicateFromFilter } from "@thomasfosterau/effect-drizzle-ext/jsonapi";
+import { predicateFromFilter } from "@thomasfosterau/effect-drizzle-ext/JsonApi";
 
 const scope = Predicate.or(Predicate.eq("visibility", "public"), Predicate.eq("ownerId", viewer));
 const predicate = Predicate.and(scope, predicateFromFilter(query.filter));

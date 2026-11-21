@@ -15,7 +15,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import {
   ExtrasDriftError,
   MigrationDriftError,
-} from "@thomasfosterau/effect-drizzle-ext-pg/tooling";
+} from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as ManagedRuntime from "effect/ManagedRuntime";
@@ -68,7 +68,7 @@ const scratchProject = Effect.fn("scratchProject")(function* (body: string) {
     file,
     [
       'import { defineConfig } from "@thomasfosterau/effect-drizzle-ext-kit";',
-      'import { domain, extension } from "@thomasfosterau/effect-drizzle-ext-pg/tooling";',
+      'import { domain, extension } from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";',
       `import * as schema from "${PG_FIXTURES}/schema.ts";`,
       "",
       "export default defineConfig({",

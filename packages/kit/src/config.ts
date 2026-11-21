@@ -11,8 +11,8 @@ import type {
   DrizzleKitTarget,
   Extras,
   SchemaModule,
-} from "@thomasfosterau/effect-drizzle-ext-pg/tooling";
-import { CompositeType, Domain, Extension } from "@thomasfosterau/effect-drizzle-ext-pg/tooling";
+} from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";
+import { CompositeType, Domain, Extension } from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";
 import type * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -47,7 +47,7 @@ export interface KitConfig {
  * @example
  * ```ts
  * import { defineConfig } from "@thomasfosterau/effect-drizzle-ext-kit";
- * import { domain, extension } from "@thomasfosterau/effect-drizzle-ext-pg/tooling";
+ * import { domain, extension } from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";
  *
  * export default defineConfig({
  *   migrationsDir: "migrations",

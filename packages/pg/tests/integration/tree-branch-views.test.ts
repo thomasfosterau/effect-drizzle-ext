@@ -33,12 +33,12 @@
  */
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext";
+import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext/Annotation";
 import {
   makeTreeTables,
   makeTreeViews,
   type AnyTreeTables,
-} from "@thomasfosterau/effect-drizzle-ext/versioned-chain";
+} from "@thomasfosterau/effect-drizzle-ext/VersionedChain";
 import { generateDrizzleJson, generateMigration } from "drizzle-kit/api-postgres";
 import { getTableName, sql, type SQL } from "drizzle-orm";
 import { pgSchema, text, type PgSchema, type PgTable, type PgView } from "drizzle-orm/pg-core";
@@ -49,8 +49,8 @@ import * as Schema from "effect/Schema";
 import { describe, expect } from "vite-plus/test";
 import { integrationLayerWith } from "./database-url.ts";
 import { aggregates, viewOf, viewOracle, viewsBefore } from "./view-oracle.ts";
-import { makePgDatabase } from "../../src/index.ts";
-import { makeTestTransaction } from "../../src/testing.ts";
+import { makePgDatabase } from "../../src/PgDatabase.ts";
+import { makeTestTransaction } from "../../src/Testing.ts";
 
 const database = makePgDatabase({ relations: {}, key: "Database" });
 const { CurrentTransaction } = database;

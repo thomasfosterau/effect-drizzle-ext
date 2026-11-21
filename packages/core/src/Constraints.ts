@@ -3,7 +3,7 @@
  * `extraConstraints`. See the
  * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/constraints.md).
  *
- * @module constraints
+ * @module Constraints
  */
 
 import { sql } from "drizzle-orm";

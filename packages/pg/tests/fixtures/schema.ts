@@ -12,14 +12,14 @@
  * tests/fixtures/drizzle.config.ts --name <slug>` from `packages/pg`) and
  * never hand-edited: the integration suite's global setup provisions its
  * database by applying it through `provisionTestDatabase`, and the
- * `./tooling` guards assert zero drift and no view-on-view edge against it.
+ * `./Tooling` guards assert zero drift and no view-on-view edge against it.
  *
  * @module packages/pg/tests/fixtures/schema
  */
 
-import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext";
-import type { ColumnBuilders } from "@thomasfosterau/effect-drizzle-ext/derive";
-import { makeTreeTables, makeTreeViews } from "@thomasfosterau/effect-drizzle-ext/versioned-chain";
+import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext/Annotation";
+import type { ColumnBuilders } from "@thomasfosterau/effect-drizzle-ext/Derive";
+import { makeTreeTables, makeTreeViews } from "@thomasfosterau/effect-drizzle-ext/VersionedChain";
 import { eq } from "drizzle-orm";
 import {
   bigint,

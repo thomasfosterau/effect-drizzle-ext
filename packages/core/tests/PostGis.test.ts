@@ -1,5 +1,5 @@
 /**
- * Unit tests for `./postgis` — the typed spatial helpers. No database: SQL
+ * Unit tests for `./PostGis` — the typed spatial helpers. No database: SQL
  * is rendered through `PgDialect` and its text and parameters inspected, and
  * the kind rules (no geometry/geography mix, geometry-only functions) are
  * pinned on the operand types.

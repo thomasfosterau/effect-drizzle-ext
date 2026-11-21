@@ -1,4 +1,4 @@
-# `./migrations`
+# `./Migrations`
 
 _A guide to [`@thomasfosterau/effect-drizzle-ext-pg`](../../packages/pg/README.md). The API reference is the doc comments on each export (your editor's hover, or `vp run docgen`)._
 

@@ -9,7 +9,7 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import type { SqlError } from "effect/sql/SqlError";
 import { describe, expect } from "vite-plus/test";
-import { splitStatements } from "../../src/migrations.ts";
+import { splitStatements } from "../../src/Migrations.ts";
 import {
   compositeType,
   domain,
@@ -20,13 +20,13 @@ import {
   planExtras,
   renderExtrasMigration,
   toExtrasState,
-} from "../../src/tooling/index.ts";
+} from "../../src/Tooling.ts";
 import { testDatabaseUrl } from "./database-url.ts";
 
 /**
  * The extras plan against a real Postgres: every statement `planExtras`
  * emits for a create, an alter and a drop runs, through the rendered
- * `migration.sql` split the way `./migrations` splits it, inside one
+ * `migration.sql` split the way `./Migrations` splits it, inside one
  * transaction the spec always rolls back, so the shared database is left as
  * the global setup migrated it. `citext` ships in Postgres's contrib, which
  * both a local server and CI's `pgvector/pgvector:pg17` image carry.

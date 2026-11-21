@@ -1,4 +1,4 @@
-# `./postgis`
+# `./PostGis`
 
 _A guide to [`@thomasfosterau/effect-drizzle-ext`](../../packages/core/README.md). The API reference is the doc comments on each export (your editor's hover, or `vp run docgen`)._
 
@@ -38,7 +38,7 @@ import {
   stAsGeoJSON,
   stDWithin,
   stPoint,
-} from "@thomasfosterau/effect-drizzle-ext/postgis";
+} from "@thomasfosterau/effect-drizzle-ext/PostGis";
 
 export const venue = pgTable("venue", {
   id: uuid("id").primaryKey(),
@@ -56,7 +56,7 @@ export const nearestFirst = asc(knnDistance(venue.location, here));
 
 ## The extension
 
-PostGIS must be installed before the first table that uses it. Declare it with the pg package's extras, `extension("postgis")` from `@thomasfosterau/effect-drizzle-ext-pg/tooling` ([guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tooling.md)), and generate that migration before `drizzle-kit generate`. `stPoint`'s SRID form needs PostGIS 3.2 or newer.
+PostGIS must be installed before the first table that uses it. Declare it with the pg package's extras, `extension("postgis")` from `@thomasfosterau/effect-drizzle-ext-pg/Tooling` ([guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tooling.md)), and generate that migration before `drizzle-kit generate`. `stPoint`'s SRID form needs PostGIS 3.2 or newer.
 
 ```ts
 export type Geometry = Brand.Branded<string, "PostGIS/Geometry">;

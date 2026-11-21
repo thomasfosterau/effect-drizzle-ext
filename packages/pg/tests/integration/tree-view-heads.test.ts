@@ -42,8 +42,8 @@ import {
   viewOracle,
   viewsBefore,
 } from "./view-oracle.ts";
-import { makePgDatabase } from "../../src/index.ts";
-import { makeTestTransaction } from "../../src/testing.ts";
+import { makePgDatabase } from "../../src/PgDatabase.ts";
+import { makeTestTransaction } from "../../src/Testing.ts";
 import { ontologyViews } from "../fixtures/schema.ts";
 
 const database = makePgDatabase({ relations: {}, key: "Database" });

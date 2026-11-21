@@ -4,7 +4,7 @@
  * `Database` when yielded. See the
  * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/query-functions.md).
  *
- * @module query-functions
+ * @module QueryFunctions
  */
 
 import * as Arr from "effect/Array";
@@ -14,7 +14,7 @@ import * as Effectable from "effect/Effectable";
 import * as Option from "effect/Option";
 import * as P from "effect/Predicate";
 import * as Schema from "effect/Schema";
-import type { DatabaseServices, ReadSurface } from "./database.ts";
+import type { DatabaseServices, ReadSurface } from "./Database.ts";
 
 /**
  * A deferred query was used for something only a real builder can do: render
@@ -160,7 +160,7 @@ export interface QueryFunctionsOptions {
   /**
    * Wraps the real query a deferred one replays to, just before it runs —
    * the pg binding classifies the driver's failures here (core's
-   * `./errors` `classifyErrors`).
+   * `./Errors` `classifyErrors`).
    *
    * Its types are erased, as the surface's are: the binding's `Surface`
    * type is what states the result, so a `mapQuery` that changes the error
@@ -195,8 +195,8 @@ export interface QueryFunctionsOptions {
  *
  * @example
  * ```ts
- * import { makeDatabaseServices } from "@thomasfosterau/effect-drizzle-ext/database";
- * import { makeQueryFunctions } from "@thomasfosterau/effect-drizzle-ext/query-functions";
+ * import { makeDatabaseServices } from "@thomasfosterau/effect-drizzle-ext/Database";
+ * import { makeQueryFunctions } from "@thomasfosterau/effect-drizzle-ext/QueryFunctions";
  * import * as Effect from "effect/Effect";
  *
  * // A stand-in handle: any Effect-native driver's database fits.

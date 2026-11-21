@@ -14,8 +14,8 @@ import * as Exit from "effect/Exit";
 import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
-import { makePgDatabase } from "../../src/index.ts";
-import { makeTestTransaction } from "../../src/testing.ts";
+import { makePgDatabase } from "../../src/PgDatabase.ts";
+import { makeTestTransaction } from "../../src/Testing.ts";
 import { makeVersionedRow, versionColumn } from "../../src/VersionedRow.ts";
 import { integrationDatabaseLayer } from "./database-url.ts";
 

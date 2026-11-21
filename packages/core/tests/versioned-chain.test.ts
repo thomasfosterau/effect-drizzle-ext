@@ -29,7 +29,7 @@ import {
   type VersionChainEntry,
   type VersionSnapshot,
   versionTimestamps,
-} from "../src/versioned-chain.ts";
+} from "../src/VersionedChain.ts";
 
 const app = pgSchema("app");
 

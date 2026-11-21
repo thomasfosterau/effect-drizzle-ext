@@ -4,15 +4,15 @@
  * `CurrentTransaction`. See the
  * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/chain.md).
  *
- * @module chain
+ * @module Chain
  */
 
-import { DerivationError } from "@thomasfosterau/effect-drizzle-ext/derive";
-import { classifyError } from "@thomasfosterau/effect-drizzle-ext/errors";
+import { DerivationError } from "@thomasfosterau/effect-drizzle-ext/Derive";
+import { classifyError } from "@thomasfosterau/effect-drizzle-ext/Errors";
 import type {
   VersionAction,
   VersionChainEntry,
-} from "@thomasfosterau/effect-drizzle-ext/versioned-chain";
+} from "@thomasfosterau/effect-drizzle-ext/VersionedChain";
 import {
   and,
   asc,
@@ -33,7 +33,7 @@ import * as Option from "effect/Option";
 import * as P from "effect/Predicate";
 import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
-import type { PgTransaction } from "./index.ts";
+import type { PgTransaction } from "./PgDatabase.ts";
 
 // ── Errors (pulpit's names and fields) ────────────────────────────────
 
@@ -750,10 +750,10 @@ const onUniqueViolation =
  *
  * @example
  * ```ts
- * import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext";
- * import { makeTreeTables } from "@thomasfosterau/effect-drizzle-ext/versioned-chain";
- * import { makePgDatabase } from "@thomasfosterau/effect-drizzle-ext-pg";
- * import { makeVersionChain } from "@thomasfosterau/effect-drizzle-ext-pg/chain";
+ * import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext/Annotation";
+ * import { makeTreeTables } from "@thomasfosterau/effect-drizzle-ext/VersionedChain";
+ * import { makePgDatabase } from "@thomasfosterau/effect-drizzle-ext-pg/PgDatabase";
+ * import { makeVersionChain } from "@thomasfosterau/effect-drizzle-ext-pg/Chain";
  * import { integer, pgSchema, text } from "drizzle-orm/pg-core";
  * import * as Schema from "effect/Schema";
  *

@@ -1,5 +1,5 @@
 /**
- * Unit tests for `src/query-functions.ts`, the context-bound query functions.
+ * Unit tests for `src/QueryFunctions.ts`, the context-bound query functions.
  *
  * Driven against sentinel handles whose builders report which handle ran
  * them, so an assertion can say WHERE a deferred query ran (the open
@@ -17,8 +17,8 @@ import * as Exit from "effect/Exit";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { describe, expect } from "vite-plus/test";
-import { makeDatabaseServices } from "../src/database.ts";
-import { DeferredQueryError, makeQueryFunctions } from "../src/query-functions.ts";
+import { makeDatabaseServices } from "../src/Database.ts";
+import { DeferredQueryError, makeQueryFunctions } from "../src/QueryFunctions.ts";
 
 /** A builder whose every link is recorded, and which runs as an Effect. */
 interface StubBuilder extends Effect.Effect<string> {

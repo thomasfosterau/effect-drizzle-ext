@@ -6,7 +6,7 @@
  * @module packages/pg/tests/ExternalIds
  */
 
-import { DerivationError } from "@thomasfosterau/effect-drizzle-ext/derive";
+import { DerivationError } from "@thomasfosterau/effect-drizzle-ext/Derive";
 import { getTableConfig, jsonb, pgSchema, pgTable, text, uuid } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vite-plus/test";
 import {
@@ -15,7 +15,7 @@ import {
   makeExternalIdStore,
   makeExternalIdTable,
 } from "../src/ExternalIds.ts";
-import { makePgDatabase } from "../src/index.ts";
+import { makePgDatabase } from "../src/PgDatabase.ts";
 
 const { CurrentTransaction } = makePgDatabase({ relations: {}, key: "Database" });
 const node = pgTable("node", { id: uuid("id").primaryKey() });

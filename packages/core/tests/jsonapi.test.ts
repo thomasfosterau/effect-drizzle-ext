@@ -4,7 +4,7 @@
  * `Resource.attribute` descriptors and the `resource: "optional"` wrapper), the
  * table annotation round-trips on a resource, and `deriveResourceColumnsWith` /
  * `deriveCheckConstraints` produce exactly the DDL the equivalent
- * `Schema.Struct` produces through `./derive`.
+ * `Schema.Struct` produces through `./Derive`.
  *
  * @module tests/jsonapi
  */
@@ -18,13 +18,13 @@ import * as Order from "effect/Order";
 import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
 import { getTableConfig, integer, PgDialect, pgTable, text, uuid } from "drizzle-orm/pg-core";
-import { dbColumn, type DbColumn } from "../src/index.ts";
+import { dbColumn, type DbColumn } from "../src/Annotation.ts";
 import {
   DerivationError,
   deriveFieldCheckConstraints,
   deriveColumnsWith,
   type ColumnBuilders,
-} from "../src/derive.ts";
+} from "../src/Derive.ts";
 import {
   dbTable,
   dbTableFor,
@@ -33,8 +33,8 @@ import {
   resourceColumnBounds,
   resourceColumns,
   type ResourceColumnsMetaOf,
-} from "../src/jsonapi/index.ts";
-import { deriveCheckConstraints, deriveResourceColumnsWith } from "../src/jsonapi/derive.ts";
+} from "../src/JsonApi.ts";
+import { deriveCheckConstraints, deriveResourceColumnsWith } from "../src/JsonApiDerive.ts";
 
 const builders = {
   text: (c: string) => text(c),

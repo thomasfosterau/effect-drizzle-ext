@@ -17,8 +17,8 @@ import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import * as Effect from "effect/Effect";
 import { describe, expect } from "vite-plus/test";
 import { integrationLayer } from "./database-url.ts";
-import { makePgDatabase } from "../../src/index.ts";
-import { makeTestTransaction } from "../../src/testing.ts";
+import { makePgDatabase } from "../../src/PgDatabase.ts";
+import { makeTestTransaction } from "../../src/Testing.ts";
 
 const probe = pgTable("query_functions_probe", {
   n: integer("n").notNull(),

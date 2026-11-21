@@ -1,5 +1,5 @@
 /**
- * Unit tests for `./query` — the total-count page shape, the filter
+ * Unit tests for `./Query` — the total-count page shape, the filter
  * combinator, the bounded pagination input schema, and the raw-SQL rows
  * wrapper. No database: SQL is rendered and inspected through `PgDialect`
  * exactly as the derivation tests do, and `executeRows` is driven against a
@@ -22,7 +22,7 @@ import {
   pageOf,
   pageWithTotal,
   TOTAL_COUNT_ALIAS,
-} from "../src/query.ts";
+} from "../src/Query.ts";
 
 describe("pageOf", () => {
   it("maps rows to resources and reads the total off the alias", () => {

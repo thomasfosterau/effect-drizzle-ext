@@ -22,8 +22,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Result from "effect/Result";
 import { describe, expect } from "vite-plus/test";
-import { makePgDatabase, pgClientFromUrl } from "../../src/index.ts";
-import { makeTestTransaction } from "../../src/testing.ts";
+import { makePgDatabase, pgClientFromUrl } from "../../src/PgDatabase.ts";
+import { makeTestTransaction } from "../../src/Testing.ts";
 import { testDatabaseUrl } from "./database-url.ts";
 
 const mood = pgEnum("rt_mood", ["sad", "ok", "happy"]);

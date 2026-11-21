@@ -14,7 +14,7 @@ export const documentTable = pgTable("document", documentColumns());
 
 | Column | Meaning |
 | --- | --- |
-| `hash` | `bytea`, the primary key, generated: `digest(document::text, 'sha256')`. Needs `pgcrypto` (declare it with `./tooling`'s `extension("pgcrypto")`). |
+| `hash` | `bytea`, the primary key, generated: `digest(document::text, 'sha256')`. Needs `pgcrypto` (declare it with `./Tooling`'s `extension("pgcrypto")`). |
 | `document` | `jsonb`. |
 
 Because the hash is the database's own digest of `jsonb`'s canonical text, two documents that differ only in key order or whitespace are the same document.

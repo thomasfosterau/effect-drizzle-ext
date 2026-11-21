@@ -1,11 +1,11 @@
 /**
  * The construction-time failure every module-load derivation throws. Kept in a
  * module of its own that imports nothing from Drizzle, so the Drizzle-free
- * entry (`.`, which `defineTree` lives in) and `./derive` share one class: a
+ * entry (`.`, which `defineTree` lives in) and `./Derive` share one class: a
  * consumer matching on it structurally, or with `instanceof`, sees the same
  * error from either. Not a published subpath.
  *
- * @module derivation-error
+ * @module internal/derivationError
  */
 import * as Schema from "effect/Schema";
 

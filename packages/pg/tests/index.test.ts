@@ -1,5 +1,5 @@
 /**
- * Unit coverage for `@thomasfosterau/effect-drizzle-ext-pg` (`src/index.ts`).
+ * Unit coverage for `@thomasfosterau/effect-drizzle-ext-pg` (`src/PgDatabase.ts`).
  *
  * Nothing here touches a database: the service keys, the shape of `make` /
  * `layer`, and the one difference between the two client constructors that
@@ -23,7 +23,7 @@ import {
   type PgDatabaseClient,
   pgClientFromPool,
   pgClientFromUrl,
-} from "../src/index.ts";
+} from "../src/PgDatabase.ts";
 
 /** The library is relations-agnostic; an empty graph is enough for the unit gate. */
 const relations = {};

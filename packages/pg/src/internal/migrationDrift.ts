@@ -3,7 +3,7 @@
  * snapshot, and base ancestry, without a database. See the
  * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tooling.md).
  *
- * @module tooling/migration-drift
+ * @module internal/migrationDrift
  */
 
 import { generateDrizzleJson, generateMigration, reconstruct } from "drizzle-kit/api-postgres";
@@ -570,7 +570,7 @@ export interface MigrationDriftReport {
  * ```ts
  * // An application's `db:migration-drift` task, run with `NodeRuntime.runMain`.
  * import * as NodeServices from "@effect/platform-node/NodeServices";
- * import { checkMigrationDrift, resolveBaseRef } from "@thomasfosterau/effect-drizzle-ext-pg/tooling";
+ * import { checkMigrationDrift, resolveBaseRef } from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";
  * import { integer, pgTable } from "drizzle-orm/pg-core";
  * import * as Effect from "effect/Effect";
  * import * as Option from "effect/Option";

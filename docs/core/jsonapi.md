@@ -1,8 +1,8 @@
-# `./jsonapi` and `./jsonapi/derive`
+# `./JsonApi` and `./JsonApiDerive`
 
 _A guide to [`@thomasfosterau/effect-drizzle-ext`](../../packages/core/README.md). The API reference is the doc comments on each export (your editor's hover, or `vp run docgen`)._
 
-For a consumer whose models are `@thomasfosterau/effect-jsonapi` `Resource.make` definitions, whose `dbColumn` annotations sit behind an extra layer — the `Resource.attribute` descriptor, and the `optionalKey` wrapper a `resource: "optional"` attribute takes. `./jsonapi` is the reader for that shape (the resource-shaped counterpart of `fieldColumns` / `fieldColumnBounds`); `./jsonapi/derive` is the Drizzle-emitting half, a thin join over `./derive`'s generic interpreter — no failure modes, CHECK naming or `resolveReference` semantics of its own.
+For a consumer whose models are `@thomasfosterau/effect-jsonapi` `Resource.make` definitions, whose `dbColumn` annotations sit behind an extra layer — the `Resource.attribute` descriptor, and the `optionalKey` wrapper a `resource: "optional"` attribute takes. `./JsonApi` is the reader for that shape (the resource-shaped counterpart of `fieldColumns` / `fieldColumnBounds`); `./JsonApiDerive` is the Drizzle-emitting half, a thin join over `./Derive`'s generic interpreter — no failure modes, CHECK naming or `resolveReference` semantics of its own.
 
 ```ts
 import { Resource } from "@thomasfosterau/effect-jsonapi";
@@ -17,7 +17,7 @@ dbTable(Article, { name: "article", level: "work" });
 ```
 
 ```ts
-import { deriveResourceColumnsWith } from "@thomasfosterau/effect-drizzle-ext/jsonapi/derive";
+import { deriveResourceColumnsWith } from "@thomasfosterau/effect-drizzle-ext/JsonApiDerive";
 
 const deriveResourceColumns = deriveResourceColumnsWith(builders, {
   resolveReference: references.resolve,

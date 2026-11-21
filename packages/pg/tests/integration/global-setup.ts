@@ -1,11 +1,11 @@
 /**
  * Vitest global setup for the integration suite: provision this run's
  * database through the package's own export, `provisionTestDatabase` from
- * `./testing` — an explicit `DATABASE_URL_TEST` / `DATABASE_URL` (from the
+ * `./Testing` — an explicit `DATABASE_URL_TEST` / `DATABASE_URL` (from the
  * environment, then `.env`) wins and is used as-is; otherwise a fresh
  * database on a reachable local server, or a `pgvector/pgvector:pg17`
  * container via Testcontainers, migrated with the committed fixture chain
- * (`tests/fixtures/migrations`) by `./migrations`' `applyMigrations`.
+ * (`tests/fixtures/migrations`) by `./Migrations`' `applyMigrations`.
  *
  * This runs ONCE in vitest's main process, before any project's worker forks
  * spawn, so the `DATABASE_URL_TEST` set here is inherited by every fork. The
@@ -19,7 +19,7 @@ import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Redacted from "effect/Redacted";
 import * as Scope from "effect/Scope";
 import { existsSync } from "node:fs";
-import { provisionTestDatabase } from "../../src/testing.ts";
+import { provisionTestDatabase } from "../../src/Testing.ts";
 
 /** The committed fixture chain; an absolute path, so the database name is per-checkout. */
 const MIGRATIONS_DIR = `${import.meta.dirname}/../fixtures/migrations`;

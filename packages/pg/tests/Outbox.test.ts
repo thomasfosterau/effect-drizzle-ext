@@ -6,10 +6,10 @@
  */
 
 import { getTableConfig, pgTable, text } from "drizzle-orm/pg-core";
-import { DerivationError } from "@thomasfosterau/effect-drizzle-ext/derive";
+import { DerivationError } from "@thomasfosterau/effect-drizzle-ext/Derive";
 import { describe, expect, it } from "vite-plus/test";
 import { makeOutbox, outboxColumns, outboxConstraints } from "../src/Outbox.ts";
-import { makePgDatabase } from "../src/index.ts";
+import { makePgDatabase } from "../src/PgDatabase.ts";
 
 const { CurrentTransaction } = makePgDatabase({ relations: {}, key: "Database" });
 

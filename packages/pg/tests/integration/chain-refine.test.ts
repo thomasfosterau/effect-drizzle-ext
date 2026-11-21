@@ -14,9 +14,9 @@ import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Option from "effect/Option";
 import * as R from "effect/Record";
 import { describe, expect, expectTypeOf, it } from "vite-plus/test";
-import { makeVersionChain, type ChainRefinement, type ChainRefinements } from "../../src/chain.ts";
-import { makePgDatabase } from "../../src/index.ts";
-import { makeTestTransaction } from "../../src/testing.ts";
+import { makeVersionChain, type ChainRefinement, type ChainRefinements } from "../../src/Chain.ts";
+import { makePgDatabase } from "../../src/PgDatabase.ts";
+import { makeTestTransaction } from "../../src/Testing.ts";
 import {
   bandView,
   member,

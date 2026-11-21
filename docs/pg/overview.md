@@ -19,7 +19,7 @@ export const { Database, CurrentTransaction, transact, readHandle } = database;
 export type Database = typeof database.Database.Identifier; // "Database"
 ```
 
-`Database`/`CurrentTransaction`/`transact`/`readHandle` are otherwise identical to the driver-agnostic surface documented in [the core package's `./database`](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/database.md) — this package adds nothing to their semantics, only the driver behind them.
+`Database`/`CurrentTransaction`/`transact`/`readHandle` are otherwise identical to the driver-agnostic surface documented in [the core package's `./Database`](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/database.md) — this package adds nothing to their semantics, only the driver behind them.
 
 Both `make` and `layer` carry `PgClient` in their requirement channel and nothing else: **where the pool comes from is the consuming application's decision**, made by providing one of:
 
@@ -69,13 +69,13 @@ Deployment topology stays with the consuming application: resolving a connection
 ## Limitations
 
 - **No Hyperdrive / Cloudflare layer.** Resolving a connection string from a platform binding, and degrading a failed binding to a proxy client, are deployment-topology decisions that stay in the consuming application.
-- **No migrator for a live database.** `./migrations` applies everything to a database that is always brand new; it keeps no ledger, so it is not a deploy-time migrator.
+- **No migrator for a live database.** `./Migrations` applies everything to a database that is always brand new; it keeps no ledger, so it is not a deploy-time migrator.
 - **Single driver.** This package binds `@effect/sql-pg` only; a different Postgres driver, or a different database entirely, needs its own binding package built the same way against the core package's `makeDatabaseServices`.
 
 ## Walk-through
 
 ```ts
-import { makePgDatabase, pgClientFromPool } from "@thomasfosterau/effect-drizzle-ext-pg";
+import { makePgDatabase, pgClientFromPool } from "@thomasfosterau/effect-drizzle-ext-pg/PgDatabase";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
@@ -143,4 +143,4 @@ const findWidget = (name: string) => select().from(widgets).where(eq(widgets.nam
 
 Every builder is Drizzle's own type with the database key in its requirement channel (`PgQueryFunctions<Relations, Key>`, over the `PgContextQueryEffectHKT<Key>` query-effect kind), so result types are inferred from the schema exactly as on the client, and a program missing the `Database` layer doesn't compile. Each query runs on the open `CurrentTransaction` when there is one and on the `Database` client otherwise, so `createWidget` above writes inside its own `transact`, and `findWidget` called inside it sees the uncommitted row.
 
-A deferred query is only for running: it can't render SQL (`toSQL`) or become a subquery (`as`). Build those with Drizzle's `QueryBuilder` or the handle itself. The mechanism and its limits are in [the core package's `./query-functions`](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/query-functions.md).
+A deferred query is only for running: it can't render SQL (`toSQL`) or become a subquery (`as`). Build those with Drizzle's `QueryBuilder` or the handle itself. The mechanism and its limits are in [the core package's `./QueryFunctions`](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/query-functions.md).

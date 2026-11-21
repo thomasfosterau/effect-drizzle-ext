@@ -28,8 +28,8 @@ import {
   timestamp,
   uuid,
 } from "drizzle-orm/pg-core";
+import { Annotation, PostGis } from "@thomasfosterau/effect-drizzle-ext";
 import {
-  PostGis,
   type DbColumnOf,
   dbColumn,
   dbColumnFor,
@@ -40,17 +40,17 @@ import {
   defineTree,
   type VersionChainEntry as RootVersionChainEntry,
   type VersionSnapshot as RootVersionSnapshot,
-} from "@thomasfosterau/effect-drizzle-ext";
+} from "@thomasfosterau/effect-drizzle-ext/Annotation";
 import {
   DerivationError,
   deriveFieldCheckConstraints,
   deriveColumnsWith,
-} from "@thomasfosterau/effect-drizzle-ext/derive";
-import { makeReferenceRegistry } from "@thomasfosterau/effect-drizzle-ext/references";
+} from "@thomasfosterau/effect-drizzle-ext/Derive";
+import { makeReferenceRegistry } from "@thomasfosterau/effect-drizzle-ext/References";
 import {
   enumCheck,
   discriminatorConstraintsFor,
-} from "@thomasfosterau/effect-drizzle-ext/constraints";
+} from "@thomasfosterau/effect-drizzle-ext/Constraints";
 import {
   bytea,
   byteaToHex,
@@ -58,14 +58,14 @@ import {
   jsonbSchema,
   timestamps,
   tsvector,
-} from "@thomasfosterau/effect-drizzle-ext/columns";
+} from "@thomasfosterau/effect-drizzle-ext/Columns";
 import {
   boundedPagination,
   combineFilters,
   executeRows,
   pageOf,
   totalCountColumn,
-} from "@thomasfosterau/effect-drizzle-ext/query";
+} from "@thomasfosterau/effect-drizzle-ext/Query";
 import {
   type ClassifiedError,
   catchUniqueViolation,
@@ -73,8 +73,8 @@ import {
   classifyErrors,
   findPgError,
   UniqueViolation,
-} from "@thomasfosterau/effect-drizzle-ext/errors";
-import { makeDatabaseServices } from "@thomasfosterau/effect-drizzle-ext/database";
+} from "@thomasfosterau/effect-drizzle-ext/Errors";
+import { makeDatabaseServices } from "@thomasfosterau/effect-drizzle-ext/Database";
 import {
   chronologicalOrder,
   type OrderTerm,
@@ -82,8 +82,8 @@ import {
   type SortableColumns,
   sortableColumnsFor,
   UnsupportedSortError,
-} from "@thomasfosterau/effect-drizzle-ext/sort";
-import { insertValues, updateSetMap } from "@thomasfosterau/effect-drizzle-ext/update";
+} from "@thomasfosterau/effect-drizzle-ext/Sort";
+import { insertValues, updateSetMap } from "@thomasfosterau/effect-drizzle-ext/Update";
 import {
   makeCurrentVersionView,
   makeSubtypeTables,
@@ -92,13 +92,13 @@ import {
   type VersionChainEntry,
   type VersionSnapshot,
   versionTimestamps,
-} from "@thomasfosterau/effect-drizzle-ext/versioned-chain";
+} from "@thomasfosterau/effect-drizzle-ext/VersionedChain";
 import {
   resourceAttributeProjections,
   resourceColumns,
   dbTable,
-} from "@thomasfosterau/effect-drizzle-ext/jsonapi";
-import { deriveResourceColumnsWith } from "@thomasfosterau/effect-drizzle-ext/jsonapi/derive";
+} from "@thomasfosterau/effect-drizzle-ext/JsonApi";
+import { deriveResourceColumnsWith } from "@thomasfosterau/effect-drizzle-ext/JsonApiDerive";
 import {
   asGeography,
   geographyColumn,
@@ -110,22 +110,22 @@ import {
   type Geometry,
   type SameKindOperand,
   type GeographyOperand,
-} from "@thomasfosterau/effect-drizzle-ext/postgis";
+} from "@thomasfosterau/effect-drizzle-ext/PostGis";
 import * as Predicate from "@thomasfosterau/effect-drizzle-ext/Predicate";
 import * as Search from "@thomasfosterau/effect-drizzle-ext/Search";
 import * as Where from "@thomasfosterau/effect-drizzle-ext/Where";
-import { predicateFromFilter } from "@thomasfosterau/effect-drizzle-ext/jsonapi";
+import { predicateFromFilter } from "@thomasfosterau/effect-drizzle-ext/JsonApi";
 import { Filter } from "@thomasfosterau/effect-jsonapi";
 import * as Pg from "@thomasfosterau/effect-drizzle-ext-pg";
-import * as PgChain from "@thomasfosterau/effect-drizzle-ext-pg/chain";
-import * as PgMigrations from "@thomasfosterau/effect-drizzle-ext-pg/migrations";
+import * as PgChain from "@thomasfosterau/effect-drizzle-ext-pg/Chain";
+import * as PgMigrations from "@thomasfosterau/effect-drizzle-ext-pg/Migrations";
 import * as PgDocuments from "@thomasfosterau/effect-drizzle-ext-pg/Documents";
 import * as PgVersionedRow from "@thomasfosterau/effect-drizzle-ext-pg/VersionedRow";
 import * as PgExternalIds from "@thomasfosterau/effect-drizzle-ext-pg/ExternalIds";
 import * as PgOutbox from "@thomasfosterau/effect-drizzle-ext-pg/Outbox";
-import * as PgTesting from "@thomasfosterau/effect-drizzle-ext-pg/testing";
+import * as PgTesting from "@thomasfosterau/effect-drizzle-ext-pg/Testing";
 import * as PgTin from "@thomasfosterau/effect-drizzle-ext-pg/Tin";
-import * as PgTooling from "@thomasfosterau/effect-drizzle-ext-pg/tooling";
+import * as PgTooling from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";
 import type * as FileSystem from "effect/FileSystem";
 import type * as Path from "effect/Path";
 import type { PlatformError } from "effect/PlatformError";
@@ -138,7 +138,7 @@ type Assert<T extends true> = T;
 type Equals<A, B> =
   (<X>() => X extends A ? 1 : 2) extends <X>() => X extends B ? 1 : 2 ? true : false;
 
-// ── annotation entry ──────────────────────────────────────────────────────
+// ── Annotation ────────────────────────────────────────────────────────────
 
 type PgKind = "text" | "integer" | "boolean" | "timestamp" | "uuid";
 const column = dbColumnFor<PgKind>();
@@ -220,7 +220,7 @@ type SiteRow = typeof site.$inferSelect;
 const here = asGeography(stPoint(151.2, -33.8, 4326));
 export const nearSite: SQL<boolean> = stDWithin(site.location, here, 500);
 export const siteDistance: SQL<number> = stDistance(site.location, here);
-// The root entry's `PostGis` namespace is the `./postgis` module itself.
+// The root entry's `PostGis` namespace is the `./PostGis` module itself.
 export const nearSiteFromRoot: SQL<boolean> = PostGis.stDWithin(site.location, here, 500);
 
 // ── query ─────────────────────────────────────────────────────────────────
@@ -356,7 +356,7 @@ export const novelAsOf = ontologyViews.asOf("novel", { version: 0n });
 
 // ── chain ─────────────────────────────────────────────────────────────────
 
-const chainDatabase = Pg.makePgDatabase({ relations: {}, key: "ChainDb" });
+const chainDatabase = Pg.PgDatabase.makePgDatabase({ relations: {}, key: "ChainDb" });
 export const chain = PgChain.makeVersionChain({
   tree: ontologyTree,
   tables: ontologyTables,
@@ -418,7 +418,7 @@ export const person = pgTable("person", {
 
 // ── pg ────────────────────────────────────────────────────────────────────
 
-const appDatabase = Pg.makePgDatabase({ relations: {}, key: "AppDb" });
+const appDatabase = Pg.PgDatabase.makePgDatabase({ relations: {}, key: "AppDb" });
 export type AppDb = typeof appDatabase.Database.Identifier;
 export const appWrite = appDatabase.transact(Effect.as(appDatabase.readHandle, "written"));
 export const appLayer: Layer.Layer<"AppDb", never, PgClient.PgClient> = appDatabase.layer;
@@ -430,15 +430,15 @@ export const appInserted = appDatabase.queries
   .insert(book)
   .values({ id: "b", title: "t", pages: null })
   .returning({ id: book.id });
-const locatingDatabase = Pg.makePgDatabase({
+const locatingDatabase = Pg.PgDatabase.makePgDatabase({
   relations: defineRelations({ book }),
   key: "LocatingDb",
 });
 export const located = locatingDatabase.locate({ code: "23505", table: "book" });
-export const pooled: Layer.Layer<PgClient.PgClient, SqlError> = Pg.pgClientFromPool({
+export const pooled: Layer.Layer<PgClient.PgClient, SqlError> = Pg.PgDatabase.pgClientFromPool({
   connectionString: Redacted.make("postgresql://postgres@127.0.0.1:5432/app"),
 });
-export const pinged: Layer.Layer<PgClient.PgClient, SqlError> = Pg.pgClientFromUrl({
+export const pinged: Layer.Layer<PgClient.PgClient, SqlError> = Pg.PgDatabase.pgClientFromUrl({
   url: Redacted.make("postgresql://postgres@127.0.0.1:5432/app"),
   maxConnections: 1,
 });
@@ -506,7 +506,7 @@ export const tinFromRoot = Pg.Tin.matches(post.body, "apple");
 
 // ── Outbox ────────────────────────────────────────────────────────────────
 
-const outboxDatabase = Pg.makePgDatabase({ relations: {}, key: "OutboxDb" });
+const outboxDatabase = Pg.PgDatabase.makePgDatabase({ relations: {}, key: "OutboxDb" });
 export const outboxTable = pgTable(
   "outbox",
   PgOutbox.outboxColumns(),
@@ -592,6 +592,7 @@ export type Checks = [
   /** _footprintIsGeometry */ Assert<Equals<SiteRow["footprint"], Geometry>>,
   /** _locationIsGeography */ Assert<Equals<SiteRow["location"], Geography>>,
   /** _rootPostGisIsSubpath */ Assert<Equals<typeof PostGis.stDWithin, typeof stDWithin>>,
+  /** _rootAnnotationIsSubpath */ Assert<Equals<typeof Annotation.dbColumn, typeof dbColumn>>,
   /** _sameKindIsGeography */ Assert<
     Equals<SameKindOperand<typeof site.location>, GeographyOperand>
   >,
@@ -687,8 +688,8 @@ export type Checks = [
   /** _entryAction */ Assert<Equals<VersionChainEntry["action"], "create" | "update" | "delete">>,
   /** _snapshotDraft */ Assert<Equals<Snapshot["draft"], boolean | undefined>>,
   /** _snapshotVersion */ Assert<Equals<Snapshot["version"], bigint>>,
-  // The root entry (Drizzle-free) exports the same read shapes as
-  // `./versioned-chain`.
+  // `./Annotation` (Drizzle-free) exports the same read shapes as
+  // `./VersionedChain`.
   /** _rootEntry */ Assert<Equals<RootVersionChainEntry, VersionChainEntry>>,
   /** _rootEntryAction */ Assert<
     Equals<RootVersionChainEntry<"publish">, VersionChainEntry<"publish">>

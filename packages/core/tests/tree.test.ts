@@ -14,14 +14,14 @@ import {
   type LeafName,
   type LevelName,
   type MarkerName,
-} from "../src/index.ts";
-import { DerivationError as DeriveDerivationError } from "../src/derive.ts";
+} from "../src/Annotation.ts";
+import { DerivationError as DeriveDerivationError } from "../src/Derive.ts";
 import {
   defineResourceTree,
   defineResourceTreeFor,
   type CheckedResourceTreeSpec,
-} from "../src/jsonapi/index.ts";
-import { buildTree } from "../src/tree.ts";
+} from "../src/JsonApi.ts";
+import { buildTree } from "../src/internal/tree.ts";
 import { bfoTree, flatTree, frbrTree } from "./fixtures/trees.ts";
 
 const text = (column: string) => dbColumn(Schema.String, { column, pg: "text", notNull: false });

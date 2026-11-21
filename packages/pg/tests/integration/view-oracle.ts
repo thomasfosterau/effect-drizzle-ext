@@ -6,7 +6,7 @@
  * @module packages/pg/tests/integration/view-oracle
  */
 
-import { executeRows } from "@thomasfosterau/effect-drizzle-ext/query";
+import { executeRows } from "@thomasfosterau/effect-drizzle-ext/Query";
 import { sql, type SQL } from "drizzle-orm";
 import * as Arr from "effect/Array";
 import * as Effect from "effect/Effect";
@@ -15,8 +15,8 @@ import * as R from "effect/Record";
 import * as Schema from "effect/Schema";
 import * as Str from "effect/String";
 import type { AnyRelations } from "drizzle-orm/relations";
-import type { PgDatabase } from "../../src/index.ts";
-import { readMigrations } from "../../src/migrations.ts";
+import type { PgDatabase } from "../../src/PgDatabase.ts";
+import { readMigrations } from "../../src/Migrations.ts";
 
 const FIXTURE_MIGRATIONS = `${import.meta.dirname}/../fixtures/migrations`;
 

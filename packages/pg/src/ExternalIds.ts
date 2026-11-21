@@ -24,7 +24,7 @@ import * as Effect from "effect/Effect";
 import * as HashMap from "effect/HashMap";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import type { PgTransaction } from "./index.ts";
+import type { PgTransaction } from "./PgDatabase.ts";
 import { columnOf as tableColumnOf, type QueryError } from "./internal/table.ts";
 
 /** The most external ids one {@link ExternalIdStore.lookup} reads. */
@@ -127,7 +127,7 @@ const decodeLinks = Schema.decodeUnknownEffect(Schema.Array(Link));
  * @example
  * ```ts
  * import { strictEqual } from "node:assert";
- * import { makePgDatabase } from "@thomasfosterau/effect-drizzle-ext-pg";
+ * import { makePgDatabase } from "@thomasfosterau/effect-drizzle-ext-pg/PgDatabase";
  * import { makeExternalIdStore, makeExternalIdTable } from "@thomasfosterau/effect-drizzle-ext-pg/ExternalIds";
  * import { pgTable, uuid } from "drizzle-orm/pg-core";
  *

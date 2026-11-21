@@ -9,7 +9,7 @@
  *
  * One exception: the root
  * re-exports the PostGIS helpers as the `PostGis` namespace, so the walk does
- * not enter the modules `publishConfig.exports["./postgis"]` itself imports
+ * not enter the modules `publishConfig.exports["./PostGis"]` itself imports
  * (its own chunk). Everything else those modules import is still walked
  * when the root reaches it, so Drizzle anywhere else still fails.
  *
@@ -47,7 +47,7 @@ const Manifest = Schema.Struct({
   publishConfig: Schema.Struct({
     exports: Schema.Struct({
       ".": Schema.Struct({ types: Schema.String, default: Schema.String }),
-      "./postgis": Schema.Struct({ types: Schema.String, default: Schema.String }),
+      "./PostGis": Schema.Struct({ types: Schema.String, default: Schema.String }),
     }),
   }),
 });
@@ -162,7 +162,7 @@ const checkRootEntry = Effect.fn("checkRootEntry")(function* () {
     .pipe(Effect.flatMap(Schema.decodeUnknownEffect(Schema.fromJsonString(Manifest))));
   const entry = manifest.publishConfig.exports["."];
   const starts = [entry.default, entry.types].map((file) => path.resolve(root, file));
-  const postGis = manifest.publishConfig.exports["./postgis"];
+  const postGis = manifest.publishConfig.exports["./PostGis"];
   const postGisFiles = [postGis.default, postGis.types].map((file) => path.resolve(root, file));
   const postGisChunks = yield* Effect.forEach(
     postGisFiles,

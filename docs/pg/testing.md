@@ -1,4 +1,4 @@
-# `./testing`
+# `./Testing`
 
 _A guide to [`@thomasfosterau/effect-drizzle-ext-pg`](../../packages/pg/README.md). The API reference is the doc comments on each export (your editor's hover, or `vp run docgen`)._
 
@@ -51,7 +51,7 @@ import { database } from "./database.ts"; // this application's makePgDatabase()
 import {
   makeTestTransaction,
   testDatabaseLayer,
-} from "@thomasfosterau/effect-drizzle-ext-pg/testing";
+} from "@thomasfosterau/effect-drizzle-ext-pg/Testing";
 
 const url = Redacted.make(process.env.DATABASE_URL_TEST!);
 const runtime = ManagedRuntime.make(testDatabaseLayer(database, { url }));
@@ -139,7 +139,7 @@ it.effect("rejects a duplicate slug without poisoning the rest of the test", () 
 1. **A reachable local server.** This is whatever the standard `PG*` variables point at, defaulting to a trust-auth `postgres@127.0.0.1:5432`. This checkout's database is dropped, recreated and migrated on it.
 2. **A Testcontainers container** when nothing answers and no `PG*` variable is set. It needs a Docker daemon and the optional peer `@testcontainers/postgresql`, which is imported only on this path. The container stops when the provisioning scope closes.
 
-An explicit `PG*` target that does not answer fails with `DatabaseUnreachable`; the run never falls back silently. The database name is `<dbNamePrefix>_test_<sha256(migrationsDir)[:8]>`, so parallel worktrees sharing one server never drop each other's database; pass `migrationsDir` as an absolute path. The container `image` and `dbNamePrefix` are parameters: `pgvector/pgvector:pg17` in website and gardeneria, `postgres:17` in preferenceflow. By default the database is migrated with `./migrations`' `applyMigrations` over `migrationsDir`; a harness whose migrations are not a drizzle-kit directory passes its own `applyMigrations: (url) => Effect<number, …>`.
+An explicit `PG*` target that does not answer fails with `DatabaseUnreachable`; the run never falls back silently. The database name is `<dbNamePrefix>_test_<sha256(migrationsDir)[:8]>`, so parallel worktrees sharing one server never drop each other's database; pass `migrationsDir` as an absolute path. The container `image` and `dbNamePrefix` are parameters: `pgvector/pgvector:pg17` in website and gardeneria, `postgres:17` in preferenceflow. By default the database is migrated with `./Migrations`' `applyMigrations` over `migrationsDir`; a harness whose migrations are not a drizzle-kit directory passes its own `applyMigrations: (url) => Effect<number, …>`.
 
 The resolution order is `resolveDatabaseSource(options)`. It is pure apart from one server probe, and the probe is injectable, so the order is unit-testable without a server. Fixture users and seed data stay with the application: the harness → database edge runs one way.
 

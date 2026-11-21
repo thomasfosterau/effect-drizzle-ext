@@ -15,8 +15,8 @@ import * as Arr from "effect/Array";
 import * as Option from "effect/Option";
 import * as P from "effect/Predicate";
 import { describe, expect, expectTypeOf, it } from "vite-plus/test";
-import type { ColumnBuilders } from "../src/derive.ts";
-import { makeTreeTables } from "../src/versioned-chain.ts";
+import type { ColumnBuilders } from "../src/Derive.ts";
+import { makeTreeTables } from "../src/VersionedChain.ts";
 import { bfoTree, flatTree, frbrTree } from "./fixtures/trees.ts";
 
 const builders = {

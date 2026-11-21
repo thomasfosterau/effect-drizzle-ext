@@ -15,8 +15,8 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import { describe, expect } from "vite-plus/test";
 import { integrationLayer } from "./database-url.ts";
-import { makePgDatabase } from "../../src/index.ts";
-import { makeTestTransaction } from "../../src/testing.ts";
+import { makePgDatabase } from "../../src/PgDatabase.ts";
+import { makeTestTransaction } from "../../src/Testing.ts";
 import {
   bookLiveView,
   essayLocaleLiveView,

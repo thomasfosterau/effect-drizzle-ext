@@ -1,5 +1,5 @@
 /**
- * The proof of `@thomasfosterau/effect-drizzle-ext/errors` against the live
+ * The proof of `@thomasfosterau/effect-drizzle-ext/Errors` against the live
  * driver: raise each constraint violation for real and assert `classifyError`
  * recovers the tagged class AND the facts.
  *
@@ -19,7 +19,7 @@
  * @module packages/pg/tests/integration/errors
  */
 
-import { classifyError } from "@thomasfosterau/effect-drizzle-ext/errors";
+import { classifyError } from "@thomasfosterau/effect-drizzle-ext/Errors";
 import { sql } from "drizzle-orm";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -27,8 +27,8 @@ import * as Option from "effect/Option";
 import * as P from "effect/Predicate";
 import { assert, describe, expect } from "vite-plus/test";
 import { integrationLayer } from "./database-url.ts";
-import { makePgDatabase } from "../../src/index.ts";
-import { makeTestTransaction } from "../../src/testing.ts";
+import { makePgDatabase } from "../../src/PgDatabase.ts";
+import { makeTestTransaction } from "../../src/Testing.ts";
 
 const relations = {};
 const database = makePgDatabase({ relations, key: "Database" });

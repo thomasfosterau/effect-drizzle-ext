@@ -4,7 +4,7 @@
  * `transact`, and `readHandle`. See the
  * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/database.md).
  *
- * @module database
+ * @module Database
  */
 
 import type { PgTransactionConfig } from "drizzle-orm/pg-core";
@@ -192,9 +192,9 @@ export interface DatabaseServices<Db, Tx extends ReadSurface, Key extends string
  *
  * @example
  * ```ts
- * import { makeDatabaseServices } from "@thomasfosterau/effect-drizzle-ext/database";
+ * import { makeDatabaseServices } from "@thomasfosterau/effect-drizzle-ext/Database";
  * // Any driver's handle types fit; these are the `@effect/sql-pg` binding's.
- * import type { PgDatabaseClient, PgTransaction } from "@thomasfosterau/effect-drizzle-ext-pg";
+ * import type { PgDatabaseClient, PgTransaction } from "@thomasfosterau/effect-drizzle-ext-pg/PgDatabase";
  *
  * const relations = {}; // the application's drizzle relations graph
  * type AppDatabase = PgDatabaseClient<typeof relations>;

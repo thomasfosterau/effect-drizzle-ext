@@ -1,9 +1,9 @@
 /**
  * The derivation entry's JSON:API projection (imports Drizzle): resource-shaped
- * wrappers over `./derive` for `Resource.make` definitions. See the
+ * wrappers over `./Derive` for `Resource.make` definitions. See the
  * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/jsonapi.md).
  *
- * @module jsonapi/derive
+ * @module JsonApiDerive
  */
 
 import type { ExtraConfigColumn, PgTableExtraConfigValue } from "drizzle-orm/pg-core";
@@ -13,13 +13,13 @@ import {
   type ColumnBuilders,
   type DerivedColumns,
   type DeriveOptions,
-} from "../derive.ts";
+} from "./Derive.ts";
 import {
   resourceColumnBounds,
   resourceColumns,
   type AnyResource,
   type ResourceColumnsMetaOf,
-} from "./index.ts";
+} from "./JsonApi.ts";
 
 /**
  * The Drizzle column builders a `Resource.make` definition's annotated

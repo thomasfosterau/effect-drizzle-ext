@@ -15,7 +15,7 @@ import {
   generateExtrasMigration,
   type GitBase,
   resolveBaseRef,
-} from "@thomasfosterau/effect-drizzle-ext-pg/tooling";
+} from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";
 import * as Arr from "effect/Array";
 import * as Config from "effect/Config";
 import * as Console from "effect/Console";

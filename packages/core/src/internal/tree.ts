@@ -3,14 +3,14 @@
  * checks a level tree at module load, throwing `DerivationError`. Not a
  * published subpath.
  *
- * @module tree
+ * @module internal/tree
  */
 import * as Arr from "effect/Array";
 import * as Option from "effect/Option";
 import * as R from "effect/Record";
 import type * as Schema from "effect/Schema";
-import { DerivationError } from "./derivation-error.ts";
-import type { DbColumn } from "./index.ts";
+import { DerivationError } from "./derivationError.ts";
+import type { DbColumn } from "../Annotation.ts";
 
 /**
  * How a level stores its columns. `"plain"` (the default): one version table

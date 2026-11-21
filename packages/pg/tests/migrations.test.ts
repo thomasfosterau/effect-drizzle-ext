@@ -1,5 +1,5 @@
 /**
- * The migration runner's reading half (`src/migrations.ts`), against the
+ * The migration runner's reading half (`src/Migrations.ts`), against the
  * committed fixture chain and a scratch directory: apply order, the
  * statement split, and what is skipped. Applying them is the integration
  * suite's job — its global setup provisions through the runner.
@@ -14,7 +14,7 @@ import * as ManagedRuntime from "effect/ManagedRuntime";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import { afterAll, describe, expect, it } from "vite-plus/test";
-import { MigrationError, readMigrations, splitStatements } from "../src/migrations.ts";
+import { MigrationError, readMigrations, splitStatements } from "../src/Migrations.ts";
 
 const FIXTURE_MIGRATIONS = `${import.meta.dirname}/fixtures/migrations`;
 

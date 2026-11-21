@@ -1,5 +1,5 @@
 /**
- * The update tri-state seam (`src/update.ts`), ported from the preferenceflow
+ * The update tri-state seam (`src/Update.ts`), ported from the preferenceflow
  * application's `apps/api/tests/update-fields.test.ts`.
  *
  * **Nothing here migrates to `Option`.** The nullable values in this file are
@@ -13,7 +13,7 @@
 import * as HashSet from "effect/HashSet";
 import * as Struct from "effect/Struct";
 import { describe, expect, expectTypeOf, it } from "vite-plus/test";
-import { insertValues, type UpdateSet, updateSetMap } from "../src/update.ts";
+import { insertValues, type UpdateSet, updateSetMap } from "../src/Update.ts";
 
 const writable = HashSet.make("name", "summary", "birthPlaceId", "slug");
 

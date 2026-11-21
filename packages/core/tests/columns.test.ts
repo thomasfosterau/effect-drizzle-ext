@@ -1,5 +1,5 @@
 /**
- * Unit tests for `./columns` — Drizzle column helpers and the hex codec, none
+ * Unit tests for `./Columns` — Drizzle column helpers and the hex codec, none
  * of which need a database: DDL shape and codec behaviour are inspected
  * through `getTableConfig` against a `pgTable` built in memory.
  *
@@ -20,7 +20,7 @@ import {
   jsonbSchema,
   timestamps,
   tsvector,
-} from "../src/columns.ts";
+} from "../src/Columns.ts";
 
 /** A minimal Effect Schema fixture for {@link jsonbSchema} tests. */
 const Fixture = Schema.Struct({ id: Schema.String, count: Schema.Finite });

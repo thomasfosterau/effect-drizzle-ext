@@ -1,5 +1,5 @@
 /**
- * The extras generator (`src/tooling/extras.ts`): the pure plan (create,
+ * The extras generator (`src/internal/extras.ts`): the pure plan (create,
  * alter and drop order; what it refuses), the recorded state, and the
  * generator and drift gate end to end against a scratch copy of the fixture
  * chain, with the real drizzle-kit binary writing the custom migration.
@@ -15,7 +15,7 @@ import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import { ChildProcessSpawner } from "effect/process/ChildProcessSpawner";
 import { afterAll, assert, describe, expect, it } from "vite-plus/test";
-import { readMigrations } from "../src/migrations.ts";
+import { readMigrations } from "../src/Migrations.ts";
 import {
   checkExtrasDrift,
   checkMigrationDrift,
@@ -36,7 +36,7 @@ import {
   renderExtrasMigration,
   renderRecordOnlyMigration,
   toExtrasState,
-} from "../src/tooling/index.ts";
+} from "../src/Tooling.ts";
 import * as fixtureSchema from "./fixtures/schema.ts";
 
 const PACKAGE_DIR = `${import.meta.dirname}/..`;

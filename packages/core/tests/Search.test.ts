@@ -2,7 +2,7 @@ import { getColumns, sql, type SQL } from "drizzle-orm";
 import { getTableConfig, PgDialect, pgTable, text, vector } from "drizzle-orm/pg-core";
 import * as Option from "effect/Option";
 import { describe, expect, it } from "vite-plus/test";
-import { tsvector } from "../src/columns.ts";
+import { tsvector } from "../src/Columns.ts";
 import * as Search from "../src/Search.ts";
 
 const dialect = new PgDialect();

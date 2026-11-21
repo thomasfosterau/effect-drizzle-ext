@@ -4,7 +4,7 @@
  * `defineResourceTree`. See the
  * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/jsonapi.md).
  *
- * @module jsonapi
+ * @module JsonApi
  */
 
 import * as Ast from "@thomasfosterau/effect-ext/Ast";
@@ -32,9 +32,9 @@ import {
   type EntryKeyedFields,
   type FieldColumnsMetaOf,
   fieldColumns,
-} from "../index.ts";
-import * as Predicate from "../Predicate.ts";
-import { buildTree, treeError, type LevelSpec, type Tree } from "../tree.ts";
+} from "./Annotation.ts";
+import * as Predicate from "./Predicate.ts";
+import { buildTree, treeError, type LevelSpec, type Tree } from "./internal/tree.ts";
 
 export type { DbTable, TableMeta };
 
@@ -97,7 +97,7 @@ export const resourceColumns = (resource: AnyResource): Record<string, DbColumn>
  * a `CHECK`-constraint derivation consumes: for each `dbColumn`-annotated
  * attribute whose schema carries numeric-bound checks, the bounds paired with
  * the column metadata. Attributes without a column, or without bounds, drop.
- * The Drizzle-emitting counterpart is the `./jsonapi/derive` entry's
+ * The Drizzle-emitting counterpart is the `./JsonApiDerive` entry's
  * `deriveCheckConstraints`.
  */
 export const resourceColumnBounds = (resource: AnyResource): Record<string, ColumnBounds> => {
@@ -297,8 +297,8 @@ export const defineResourceTreeFor =
  *
  * @example
  * ```ts
- * import { dbColumn } from "@thomasfosterau/effect-drizzle-ext";
- * import { defineResourceTree } from "@thomasfosterau/effect-drizzle-ext/jsonapi";
+ * import { dbColumn } from "@thomasfosterau/effect-drizzle-ext/Annotation";
+ * import { defineResourceTree } from "@thomasfosterau/effect-drizzle-ext/JsonApi";
  * import * as Ast from "@thomasfosterau/effect-ext/Ast";
 import { Resource } from "@thomasfosterau/effect-jsonapi";
  * import * as Schema from "effect/Schema";
@@ -361,7 +361,7 @@ export interface PredicateFromFilterOptions {
  * ```ts
  * import { deepStrictEqual } from "node:assert";
  * import { Filter } from "@thomasfosterau/effect-jsonapi";
- * import { predicateFromFilter } from "@thomasfosterau/effect-drizzle-ext/jsonapi";
+ * import { predicateFromFilter } from "@thomasfosterau/effect-drizzle-ext/JsonApi";
  * import * as Predicate from "@thomasfosterau/effect-drizzle-ext/Predicate";
  *
  * deepStrictEqual(

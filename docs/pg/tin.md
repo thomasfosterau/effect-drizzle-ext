@@ -18,11 +18,11 @@ Typed Drizzle helpers for [TIN](https://planetscale.com/docs/postgres/search), P
 
 ## Setup
 
-Declare the extension with `./tooling`'s extras so a fresh database gets it, and index each column you search. TIN indexes one column or expression per index, so cross-column search takes one index per column.
+Declare the extension with `./Tooling`'s extras so a fresh database gets it, and index each column you search. TIN indexes one column or expression per index, so cross-column search takes one index per column.
 
 ```ts
 import { tinIndex } from "@thomasfosterau/effect-drizzle-ext-pg/Tin";
-import { extension } from "@thomasfosterau/effect-drizzle-ext-pg/tooling";
+import { extension } from "@thomasfosterau/effect-drizzle-ext-pg/Tooling";
 import { pgTable, serial, text } from "drizzle-orm/pg-core";
 
 export const tin = extension("tin");

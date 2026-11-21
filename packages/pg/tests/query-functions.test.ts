@@ -15,11 +15,11 @@
 import { eq } from "drizzle-orm";
 import { defineRelations } from "drizzle-orm";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
-import type { ClassifiedError, UniqueViolation } from "@thomasfosterau/effect-drizzle-ext/errors";
+import type { ClassifiedError, UniqueViolation } from "@thomasfosterau/effect-drizzle-ext/Errors";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import { describe, expect, expectTypeOf, it } from "vite-plus/test";
-import { makePgDatabase } from "../src/index.ts";
+import { makePgDatabase } from "../src/PgDatabase.ts";
 
 const users = pgTable("users", {
   id: integer("id").primaryKey(),

@@ -1,0 +1,642 @@
+/**
+ * The annotation entry (no Drizzle): `dbColumn` / `dbTable` annotations that
+ * let one Effect Schema field declare its database column, plus `defineTree`.
+ * See the
+ * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/annotations.md).
+ *
+ * @module Annotation
+ */
+
+import * as Arr from "effect/Array";
+import type * as JsonSchema from "effect/JsonSchema";
+import * as Option from "effect/Option";
+import * as P from "effect/Predicate";
+import * as R from "effect/Record";
+import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
+import * as SchemaAST from "effect/SchemaAST";
+import type * as SchemaRepresentation from "effect/SchemaRepresentation";
+import { DerivationError } from "./internal/derivationError.ts";
+import { buildTree, type CheckedTreeSpec, type Tree } from "./internal/tree.ts";
+
+/**
+ * A construction-time derivation failure, thrown at module load when a table
+ * or a tree cannot be built from its declarations; never an Effect failure.
+ * The same class `./Derive` exports.
+ */
+export { DerivationError };
+
+export type {
+  AnyTreeColumnsMeta,
+  CheckedTreeSpec,
+  KeyedSpec,
+  LevelColumnsMeta,
+  LeafName,
+  LevelKind,
+  LevelName,
+  LevelSpec,
+  MarkerName,
+  Tree,
+  TreeLevel,
+} from "./internal/tree.ts";
+
+/**
+ * The version-chain read shapes — `VersionAction`, `VersionChainEntry` and
+ * `VersionSnapshot` — the same types `./VersionedChain` exports, here so a
+ * client-bundled package can name them without importing Drizzle.
+ */
+export type {
+  VersionAction,
+  VersionChainEntry,
+  VersionSnapshot,
+} from "./internal/versionChainTypes.ts";
+
+/**
+ * A referential action for a derived foreign-key column — the Drizzle
+ * `onDelete` / `onUpdate` vocabulary, restated as plain data so the annotation
+ * layer stays Drizzle-free.
+ */
+export type ReferentialAction = "cascade" | "restrict" | "no action" | "set null" | "set default";
+
+/*
+ * The optional members of the three metadata interfaces below are spelled
+ * `?: T | undefined`, not `Option`, because they are **Drizzle-facing config**:
+ * the derivation hands them to a Drizzle column builder, which reads `undefined`
+ * as "not supplied" and would emit an `Option` object as a literal DEFAULT —
+ * wrong DDL that no type error and no unit test catches. The boundary is stated
+ * once in ./derive.ts; the readers this module owns return `Option`.
+ */
+
+/**
+ * Reference / foreign-key metadata a column annotation may carry: the target
+ * relation + column the derived column foreign-keys to, plus its referential
+ * actions. Expressed as **names** (not Drizzle column thunks) so it survives in
+ * the Drizzle-free annotation layer; the derivation resolves the names to real
+ * columns via its own `resolveReference` hook (see the {@link ./derive.ts}
+ * entry).
+ *
+ * This is the metadata that lets an FK-backed attribute be derived rather than
+ * hand-authored as a table-only `references()` column and re-stated in the
+ * consuming application's operation value map.
+ */
+export interface DbColumnReference {
+  /** The referenced relation (table) name. */
+  readonly table: string;
+  /** The referenced column name. */
+  readonly column: string;
+  /** Referential action on delete of the referenced row. */
+  readonly onDelete?: ReferentialAction | undefined;
+  /** Referential action on update of the referenced row. */
+  readonly onUpdate?: ReferentialAction | undefined;
+}
+
+/**
+ * Column metadata a model attribute declares about the column it backs. Generic
+ * over the column-kind union `Kind` (open `string` by default) — a consumer pins
+ * it to its own kinds via {@link dbColumnFor}.
+ */
+export interface DbColumn<Kind extends string = string> {
+  /** The snake_case column name (e.g. `published_at`). */
+  readonly column: string;
+  /** The column kind (selects the Drizzle builder in the derivation). */
+  readonly pg: Kind;
+  /** Whether the column is `NOT NULL`. */
+  readonly notNull: boolean;
+  /** Optional SQL `DEFAULT`. */
+  readonly default?: boolean | number | string | undefined;
+  /** Optional foreign-key metadata (see {@link DbColumnReference}). */
+  readonly references?: DbColumnReference | undefined;
+  /**
+   * Optional explicit name for the CHECK constraint the column's numeric
+   * bounds derive — a migration-compat escape hatch for keeping a historical
+   * constraint name where the canonical `${table}_${column}_${suffix}` would
+   * rename it. Omit for new columns.
+   */
+  readonly checkName?: string | undefined;
+}
+
+/**
+ * The annotation key under which {@link dbColumn} stores its metadata.
+ * {@link dbColumn} writes it; {@link readDbColumn} and {@link fieldColumns}
+ * read it. Namespaced to the package so a consumer's own annotations never
+ * collide.
+ */
+export const DB_COLUMN_KEY = "effect-drizzle-ext/dbColumn";
+
+declare const DbColumnTypeId: unique symbol;
+
+/**
+ * A schema carrying db-column metadata `M` in a type-level phantom (the
+ * annotation value itself is erased from the type, so the phantom is what keeps
+ * the derived column map precise). The phantom property is **required for type
+ * matching** — a non-annotated schema must yield `never`, not `unknown`, so the
+ * column derivation can tell columns from plain / computed fields — but it is
+ * never present at runtime (the runtime reads the real annotation instead).
+ */
+export type Annotated<S extends Schema.Top, M extends DbColumn> = S & {
+  readonly [DbColumnTypeId]: M;
+};
+
+/** Recovers the db-column metadata phantom from a schema, or `never`. */
+export type DbColumnOf<S> = S extends { readonly [DbColumnTypeId]: infer M extends DbColumn }
+  ? M
+  : never;
+
+/**
+ * Annotate a base schema with the database column it backs. Attaches a genuine
+ * Effect annotation (the runtime reads it via {@link readDbColumn}) and carries
+ * the metadata literally in the type (so the column derivation stays precisely
+ * typed). Wrap the result in a model helper as usual — the helper's projection
+ * carries the annotation through to the table factory.
+ *
+ * Accepts any `pg` string; pin the kind union with {@link dbColumnFor} to catch
+ * unknown-kind typos at the annotation site.
+ */
+export const dbColumn = <S extends Schema.Top, const M extends DbColumn>(
+  schema: S,
+  meta: M,
+): Annotated<S, M> =>
+  // SAFETY: the phantom is type-only (never present at runtime), and the
+  // annotation just attached under DB_COLUMN_KEY is exactly `meta`.
+  schema.annotate({ [DB_COLUMN_KEY]: meta }) as Annotated<S, M>;
+
+/**
+ * A {@link dbColumn} constrained to a specific column-kind union `Kind`. A
+ * consumer pins its own kinds once — `const dbColumn = dbColumnFor<PgKind>()` —
+ * so an annotation naming a kind the derivation can't build is a type error at
+ * the annotation site rather than a runtime surprise.
+ */
+export const dbColumnFor =
+  <Kind extends string>() =>
+  <S extends Schema.Top, const M extends DbColumn<Kind>>(schema: S, meta: M): Annotated<S, M> =>
+    // SAFETY: as in `dbColumn` — the phantom is type-only and the annotation
+    // just attached under DB_COLUMN_KEY is exactly `meta`.
+    schema.annotate({ [DB_COLUMN_KEY]: meta }) as Annotated<S, M>;
+
+/**
+ * Whether a value is db-column metadata: an object whose `column` and `pg` are
+ * strings and whose `notNull` is a boolean. {@link readDbColumn} reads an
+ * annotation through it, so a foreign value under {@link DB_COLUMN_KEY} reads
+ * as no column rather than as a malformed one.
+ */
+export const isDbColumn = (value: unknown): value is DbColumn =>
+  P.isObject(value) &&
+  P.isString(value["column"]) &&
+  P.isString(value["pg"]) &&
+  P.isBoolean(value["notNull"]);
+
+/**
+ * Read the db-column annotation off a schema at runtime. `Option.none()` when
+ * the schema declares none, or when the value under {@link DB_COLUMN_KEY} is
+ * not {@link isDbColumn} metadata.
+ *
+ * Reads the schema's **own** annotations only: `Schema.resolveAnnotations` on a
+ * `Schema.optional(...)` / `Schema.NullOr(...)` wrapper does not see the inner
+ * schema's annotation. Use {@link fieldColumns} for a struct's fields, which
+ * peels those wrappers structurally.
+ */
+export const readDbColumn = (schema: Schema.Constraint): Option.Option<DbColumn> =>
+  Option.liftPredicate(Schema.resolveAnnotations(schema)?.[DB_COLUMN_KEY], isDbColumn);
+
+// ── Table-level annotation ────────────────────────────────────────────
+
+/**
+ * The base table metadata {@link dbTable} attaches: the SQL leaf name the
+ * annotated target backs (a versioned consumer's version table is
+ * `${name}_version`).
+ *
+ * `TableMeta` is the floor, not the whole vocabulary: {@link dbTable} accepts
+ * any `TableMeta`, so a **flat** consumer — one whose tables anchor at no
+ * hierarchy at all — annotates with `{ name }` and nothing else, instead of
+ * re-implementing `dbTable` locally just to drop a field it has no use for.
+ * A level-dispatching consumer pins {@link DbTable} via {@link dbTableFor}.
+ */
+export interface TableMeta {
+  /** The snake_case leaf table name (e.g. `podcast_series`). */
+  readonly name: string;
+}
+
+/**
+ * Table metadata that additionally names the hierarchy level the leaf anchors
+ * at (selecting the parent table pair in a level-dispatching consumer). Generic
+ * over the level union `Level` (open `string` by default) — a consumer pins it
+ * to its own levels via {@link dbTableFor}, so a leaf naming an unknown level is
+ * a type error at the annotation site.
+ */
+export interface DbTable<Level extends string = string> extends TableMeta {
+  /** The hierarchy level the leaf anchors at (selects the parent table pair). */
+  readonly level: Level;
+}
+
+declare const DbTableTypeId: unique symbol;
+
+/**
+ * A target object carrying db-table metadata `M` in a type-level phantom — the
+ * table-level counterpart of {@link Annotated}. The phantom keeps a consumer's
+ * level dispatch precise (a `"work"`-anchored leaf cannot be passed to a
+ * `"manifestation"` table factory); the runtime reads the real attached
+ * metadata via {@link readDbTable}.
+ */
+export type TableAnnotated<T extends object, M extends TableMeta> = T & {
+  readonly [DbTableTypeId]: M;
+};
+
+/** Recovers the db-table metadata phantom from a target, or `never`. */
+export type DbTableOf<T> = T extends { readonly [DbTableTypeId]: infer M extends TableMeta }
+  ? M
+  : never;
+
+/**
+ * The runtime key under which {@link dbTable} attaches its metadata. A symbol
+ * **property on the target object**, not an Effect Schema annotation — and that
+ * is the reason {@link dbTable} is generic over any `T extends object` rather
+ * than over `Schema.Top`.
+ *
+ * `annotate` does not annotate in place: it **rebuilds** the schema. For a
+ * target assembled as `Object.assign(struct, { … })` — the shape a resource /
+ * model definition in the consuming applications takes — a rebuild drops every
+ * assigned property, and it breaks the referential identity that family
+ * membership and registry lockstep checks compare by. A non-enumerable own
+ * symbol property annotates in place, preserving both, and works on a plain
+ * object just as well as on a schema.
+ */
+const DB_TABLE_KEY: unique symbol = Symbol.for("effect-drizzle-ext/dbTable");
+
+/**
+ * Annotate any object with the database table it backs. Attaches the metadata
+ * as a non-enumerable symbol property (see {@link DB_TABLE_KEY} for why not
+ * `annotate`) and carries it literally in the type, so a level-bound table
+ * factory can constrain its input to leaves anchored at its level. Returns the
+ * **same** object.
+ *
+ * Accepts any {@link TableMeta}; pin a level union with {@link dbTableFor}.
+ */
+export const dbTable = <T extends object, const M extends TableMeta>(
+  target: T,
+  meta: M,
+): TableAnnotated<T, M> => {
+  Object.defineProperty(target, DB_TABLE_KEY, { value: meta, enumerable: false });
+  // SAFETY: the phantom is type-only; the runtime metadata was just attached
+  // under DB_TABLE_KEY on this same object.
+  return target as TableAnnotated<T, M>;
+};
+
+/**
+ * A {@link dbTable} constrained to a specific level union `Level`, requiring the
+ * full {@link DbTable} metadata. A consumer pins its own levels once — `const
+ * dbTable = dbTableFor<LeafLevel>()` — so an annotation naming a level the
+ * derivation has no parent binding for is a type error at the annotation site
+ * rather than a runtime surprise.
+ */
+export const dbTableFor =
+  <Level extends string>() =>
+  <T extends object, const M extends DbTable<Level>>(target: T, meta: M): TableAnnotated<T, M> =>
+    dbTable(target, meta);
+
+/**
+ * Read the db-table metadata off a target at runtime. `Option.none()` when the
+ * target carries none.
+ *
+ * Typed to the {@link TableMeta} floor: a consumer that annotated with a
+ * {@link DbTable} recovers its `level` through the {@link DbTableOf} phantom,
+ * which is where the level is statically known.
+ */
+export const readDbTable = <T extends object>(target: T): Option.Option<TableMeta> =>
+  DB_TABLE_KEY in target ? Option.liftPredicate(target[DB_TABLE_KEY], isTableMeta) : Option.none();
+
+/** Whether a value is table metadata: an object whose `name` is a string. */
+const isTableMeta = (value: unknown): value is TableMeta =>
+  P.isObject(value) && P.isString(value["name"]);
+
+// ── Numeric bounds (schema checks → CHECK-constraint metadata) ────────
+
+/**
+ * Numeric bounds recovered from a schema's checks — the JSON-Schema bound
+ * vocabulary. The source of a derived SQL `CHECK` constraint: one declaration
+ * (the model's `Schema.isGreaterThanOrEqualTo(0)` / `isBetween` check) drives
+ * wire validation **and** the column's database constraint.
+ */
+export interface NumericBounds {
+  readonly minimum?: number;
+  readonly maximum?: number;
+  readonly exclusiveMinimum?: number;
+  readonly exclusiveMaximum?: number;
+}
+
+/** The bounds of one column-backed attribute, paired with its column metadata. */
+export interface ColumnBounds extends NumericBounds {
+  readonly column: DbColumn;
+}
+
+const BOUND_KEYS = ["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum"] as const;
+
+/**
+ * The neutral `CheckInput` the walker hands a check's `toJsonSchema`: no outer
+ * type, no member schemas, which the bound filters ignore.
+ */
+const NEUTRAL_CHECK_INPUT: SchemaRepresentation.ToJsonSchema.CheckInput = {
+  type: undefined,
+  schemas: [],
+};
+
+/**
+ * Whether a `toJsonSchema` output is a plain fragment. The approximate
+ * `[fragment, true]` form is an array, whose bound keys read as absent, so the
+ * walker reads no bounds from it.
+ */
+const isFragment = (
+  output: SchemaRepresentation.ToJsonSchema.CheckOutput,
+): output is JsonSchema.JsonSchema => P.isObject(output);
+
+/** The `representation.id` effect gives the `Schema.isInt()` filter. */
+const IS_INT_REPRESENTATION_ID = "effect/schema/isInt";
+
+/**
+ * Whether `check` is `Schema.isInt()` itself. Since effect 4.0.5 its
+ * `toJsonSchema` is `{ type: "integer", minimum: MIN_SAFE_INTEGER, maximum:
+ * MAX_SAFE_INTEGER }`: the integer type, not a bound the model declared, so
+ * the walker reads no bounds from it. Matched by the
+ * filter's identity rather than its fragment's shape, so an explicitly
+ * declared safe-integer bound still counts.
+ */
+const isIntTypeCheck = (check: SchemaAST.Check<never>): boolean =>
+  P.isObject(check.annotations?.representation) &&
+  check.annotations.representation.id === IS_INT_REPRESENTATION_ID;
+
+/** The JSON-Schema fragment a check's `toJsonSchema` annotation exposes, if any. */
+const checkFragment = (check: SchemaAST.Check<never>): Option.Option<JsonSchema.JsonSchema> =>
+  isIntTypeCheck(check)
+    ? Option.none()
+    : Option.flatMap(Option.fromNullishOr(check.annotations?.toJsonSchema), (toJsonSchema) =>
+        Option.filter(
+          // A filter whose toJsonSchema needs context it wasn't given throws — no bounds.
+          Option.flatMap(
+            Result.getSuccess(Result.try(() => toJsonSchema(NEUTRAL_CHECK_INPUT))),
+            Option.fromNullishOr,
+          ),
+          isFragment,
+        ),
+      );
+
+/** Merge a fragment's numeric bound keys over `bounds` (the later check wins a key). */
+const mergeBounds = (fragment: JsonSchema.JsonSchema, bounds: NumericBounds): NumericBounds =>
+  Arr.reduce(BOUND_KEYS, bounds, (acc, key) => {
+    const value = fragment[key];
+    return P.isNumber(value) ? { ...acc, [key]: value } : acc;
+  });
+
+/**
+ * Merge the numeric-bound fragments of a check list over `bounds`.
+ *
+ * `checks` is an `Option` because effect's own AST leaves the field absent; the
+ * callers convert that foreign `undefined` at the boundary with
+ * `Option.fromNullishOr`.
+ */
+const collectCheckBounds = (
+  checks: Option.Option<ReadonlyArray<SchemaAST.Check<never>>>,
+  bounds: NumericBounds,
+): NumericBounds =>
+  Arr.reduce(
+    Option.getOrElse(checks, () => []),
+    bounds,
+    (acc, check) => {
+      // A FilterGroup nests its members under `checks`; recurse into them.
+      const nested = P.isTagged(check, "FilterGroup")
+        ? collectCheckBounds(Option.some(check.checks), acc)
+        : acc;
+      return Option.match(checkFragment(check), {
+        onNone: () => nested,
+        onSome: (fragment) => mergeBounds(fragment, nested),
+      });
+    },
+  );
+
+/**
+ * Recover the {@link NumericBounds} a single attribute schema declares, or
+ * `Option.none()` when it declares none. Reads the schema's own checks plus the
+ * checks of each union member — the `Schema.NullOr(Schema.Finite.check(...))`
+ * shape a nullable numeric attribute takes. Deliberately shallow: bounds
+ * buried deeper than one union level are a modelling smell, not a supported
+ * shape. `Schema.isInt()`'s safe-integer range is the integer type, not a
+ * declared bound, so `Schema.Int` alone yields `Option.none()`.
+ *
+ * Exported because the `./JsonApi` entry's resource-level bounds reader is the
+ * same walk over a different field source.
+ */
+export const numericBounds = (schema: Schema.Constraint): Option.Option<NumericBounds> => {
+  const { ast } = schema;
+  const bounds = Arr.reduce(
+    SchemaAST.isUnion(ast) ? ast.types : [],
+    collectCheckBounds(Option.fromNullishOr(ast.checks), {}),
+    (acc, member) => collectCheckBounds(Option.fromNullishOr(member.checks), acc),
+  );
+  return Arr.some(BOUND_KEYS, (key) => bounds[key] !== undefined)
+    ? Option.some(bounds)
+    : Option.none();
+};
+
+// ── Struct-field projection ───────────────────────────────────────────
+
+/**
+ * Peels the `Schema.optional(...)` / `Schema.optionalKey(...)` /
+ * `Schema.NullOr(...)` / `Schema.UndefinedOr(...)` wrappers a model attribute
+ * applies, to reach a {@link dbColumn}-annotated base schema's phantom, or
+ * `never`. A required attribute carries the annotation on its base schema
+ * directly (no peel); an optional / nullable projection wraps it.
+ *
+ * The wrapper set mirrors what {@link fieldColumns} peels at runtime — note
+ * that `Schema.optional(S)` *is* `optionalKey(UndefinedOr(S))`, so the two pairs
+ * are one chain, not four independent cases.
+ */
+export type UnwrapColumn<S> = [DbColumnOf<S>] extends [never]
+  ? [S] extends [Schema.optional<infer Inner>]
+    ? UnwrapColumn<Inner>
+    : [S] extends [Schema.optionalKey<infer Inner>]
+      ? UnwrapColumn<Inner>
+      : [S] extends [Schema.NullOr<infer Inner>]
+        ? UnwrapColumn<Inner>
+        : [S] extends [Schema.UndefinedOr<infer Inner>]
+          ? UnwrapColumn<Inner>
+          : never
+  : DbColumnOf<S>;
+
+/**
+ * The db-column metadata map a `Schema.Struct`'s fields project to, keyed by the
+ * fields that declare a {@link dbColumn} (others drop out of the map entirely).
+ * The type-level counterpart of {@link fieldColumns}.
+ */
+export type FieldColumnsMetaOf<F extends Schema.Struct.Fields> = {
+  readonly [K in keyof F as [UnwrapColumn<F[K]>] extends [never] ? never : K]: UnwrapColumn<F[K]>;
+};
+
+/**
+ * One structural peel of a field wrapper: the schema `schema` wraps, or
+ * `Option.none()` when it wraps nothing.
+ *
+ * Structural, not annotation-driven, because `Schema.resolveAnnotations` on a
+ * wrapper does not see the inner schema's annotations — the wrapper is a
+ * different schema with its own (empty) annotation record. An
+ * `optional` / `optionalKey` wrapper exposes its inner schema as `.schema`; a
+ * `NullOr` / `UndefinedOr` union exposes its members as `.members`, of which the
+ * `null` / `undefined` arms are the ones to skip.
+ */
+const underlyingSchema = (schema: Schema.Constraint): Option.Option<Schema.Constraint> => {
+  if ("schema" in schema && Schema.isSchema(schema.schema)) return Option.some(schema.schema);
+  if (!("members" in schema) || !Arr.isArray(schema.members)) return Option.none();
+  return Arr.findFirst(
+    Arr.filter(schema.members, Schema.isSchema),
+    (member) => member.ast._tag !== "Null" && member.ast._tag !== "Undefined",
+  );
+};
+
+/**
+ * How many wrappers deep the peel walks before giving up. The deepest shape the
+ * projection supports is `optional(NullOr(annotated))`, which is three peels
+ * (`optionalKey` → `UndefinedOr` → `NullOr`); the cap is slack above that, and
+ * it is what keeps a self-referential schema from recursing forever.
+ */
+const MAX_WRAPPER_DEPTH = 8;
+
+/**
+ * The schema that actually carries the {@link dbColumn} annotation for a struct
+ * field: the field itself when it is annotated, otherwise the first annotated
+ * schema found by peeling its wrappers. `Option.none()` for a field that backs
+ * no column.
+ *
+ * Returning the *schema* rather than the metadata is what lets
+ * {@link fieldColumnBounds} read the bounds off the same node the column was
+ * declared on — bounds on `dbColumn(NullOr(Number.check(…)), …)` sit one union
+ * level below the annotated node, which is exactly what {@link numericBounds}
+ * walks.
+ */
+const columnSchema = (field: Schema.Constraint, depth = 0): Option.Option<Schema.Constraint> => {
+  if (depth > MAX_WRAPPER_DEPTH) return Option.none();
+  if (Option.isSome(readDbColumn(field))) return Option.some(field);
+  return Option.flatMap(underlyingSchema(field), (inner) => columnSchema(inner, depth + 1));
+};
+
+/**
+ * Project a `Schema.Struct`'s fields to the per-field {@link DbColumn} metadata
+ * the derivation consumes, dropping fields that declare no column. Peels the
+ * `optional` / `NullOr` wrappers a field may apply. The type-level counterpart
+ * is {@link FieldColumnsMetaOf}.
+ */
+export const fieldColumns = (fields: Schema.Struct.Fields): Record<string, DbColumn> =>
+  R.getSomes(R.map(fields, (field) => Option.flatMap(columnSchema(field), readDbColumn)));
+
+/**
+ * Project a `Schema.Struct`'s per-field numeric bounds into plain data a
+ * `CHECK`-constraint derivation consumes: for each {@link dbColumn}-annotated
+ * field whose schema carries numeric-bound checks, the bounds paired with the
+ * column metadata. Fields without a column, or without bounds, drop. The
+ * Drizzle-emitting counterpart is the `./Derive` entry's
+ * `deriveFieldCheckConstraints`.
+ */
+export const fieldColumnBounds = (fields: Schema.Struct.Fields): Record<string, ColumnBounds> =>
+  R.getSomes(
+    R.map(fields, (field) =>
+      Option.flatMap(columnSchema(field), (schema) =>
+        Option.zipWith(
+          readDbColumn(schema),
+          numericBounds(schema),
+          (column, bounds): ColumnBounds => ({ column, ...bounds }),
+        ),
+      ),
+    ),
+  );
+
+// ── Tree ──────────────────────────────────────────────────────────────
+
+/** The fields an entry's member `K` (`columns` or `leaf`) declares; `{}` when absent. */
+type EntryFields<E, K extends "columns" | "leaf"> = E extends { readonly [P in K]?: infer F }
+  ? Exclude<F, undefined> extends Schema.Struct.Fields
+    ? Exclude<F, undefined>
+    : Record<never, never>
+  : Record<never, never>;
+
+/** The fields an entry's keyed level declares; `{}` when it has none. */
+export type EntryKeyedFields<E> = E extends { readonly keyed?: infer K }
+  ? Exclude<K, undefined> extends { readonly columns: infer F }
+    ? F extends Schema.Struct.Fields
+      ? F
+      : Record<never, never>
+    : Record<never, never>
+  : Record<never, never>;
+
+/**
+ * The typed column metadata of a {@link defineTree} declaration `S`: per level,
+ * the `DbColumn` maps its level columns, its leaf fields and its keyed level
+ * carry. The phantom
+ * a `Tree` built by `defineTree` holds for the table derivation.
+ */
+export type FieldsTreeMeta<S> = {
+  readonly [K in keyof S]: {
+    readonly level: FieldColumnsMetaOf<EntryFields<S[K], "columns">>;
+    readonly leaf: FieldColumnsMetaOf<EntryFields<S[K], "leaf">>;
+    readonly keyed: FieldColumnsMetaOf<EntryKeyedFields<S[K]>>;
+  };
+};
+
+/**
+ * A {@link defineTree} whose every entry also carries the consumer's
+ * extension record `Ext` (pulpit's `owned` / `pageable` flags, say); the
+ * library reads none of its members and hands each entry back on
+ * `tree.level(name).entry`. Pin it once — `const defineTree =
+ * defineTreeFor<RegistryFlags>()` — so an entry missing a flag is a type
+ * error. Throws {@link DerivationError} at module load as `defineTree` does.
+ */
+export const defineTreeFor =
+  <Ext extends object>() =>
+  <const S extends CheckedTreeSpec<S, Schema.Struct.Fields, Ext>>(
+    spec: S,
+  ): Tree<S, FieldsTreeMeta<S>> =>
+    buildTree<S, Schema.Struct.Fields, FieldsTreeMeta<S>>(spec, {
+      levelColumns: fieldColumns,
+      leafColumns: fieldColumns,
+    });
+
+/**
+ * Declare an ontology's level tree once, Drizzle-free, so a models package can
+ * state it and the database layer derive every table, constraint and view from
+ * it. Each entry is a level: a **marker** (no `leaf`) or a **leaf**, whose
+ * `leaf` is the struct fields of its domain columns (`dbColumn`-annotated) and
+ * whose name is its discriminator value. A leaf may have children: its name
+ * then joins its own subtree leaves, and a node of it can later be refined to
+ * a descendant leaf. An entry names its `parent` (absent:
+ * a branch root under the tree's root), and may carry level `columns`
+ * contributed to every descendant's view and a level `kind`.
+ *
+ * Returns the checked {@link Tree}: per level, its ancestors, children,
+ * descendants, subtree leaves (the discriminator CHECK value set) and branch,
+ * all in declaration order. A parent naming no level of the tree, or the level
+ * itself, is a type error. Throws {@link DerivationError} at module load for
+ * every structural fault the types can't catch: a missing parent or a cycle, a
+ * marker with no leaf below it, an unannotated level
+ * column, a reserved column name (`id`, `version`, `action`, `type`), or two
+ * columns on one root-to-leaf path sharing a field key or a column name.
+ *
+ * @example
+ * ```ts
+ * import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext/Annotation";
+ * import * as Schema from "effect/Schema";
+ *
+ * const tree = defineTree({
+ *   work: {
+ *     columns: { title: dbColumn(Schema.String, { column: "title", pg: "text", notNull: true }) },
+ *   },
+ *   book: {
+ *     parent: "work",
+ *     leaf: { pages: dbColumn(Schema.Finite, { column: "pages", pg: "integer", notNull: false }) },
+ *   },
+ *   film: { parent: "work", leaf: {} },
+ * });
+ *
+ * console.log(tree.level("work").subtreeLeaves); // ["book", "film"]
+ * console.log(tree.level("book").ancestors); // ["work"]
+ * ```
+ */
+export const defineTree: <
+  const S extends CheckedTreeSpec<S, Schema.Struct.Fields, Record<never, never>>,
+>(
+  spec: S,
+) => Tree<S, FieldsTreeMeta<S>> = defineTreeFor<Record<never, never>>();

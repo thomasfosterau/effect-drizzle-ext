@@ -3,7 +3,7 @@
  * directory, and the extras generator. None needs a database. See the
  * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tooling.md).
  *
- * @module tooling
+ * @module Tooling
  */
 
 export {
@@ -38,7 +38,7 @@ export {
   renderExtrasMigration,
   renderRecordOnlyMigration,
   toExtrasState,
-} from "./extras.ts";
+} from "./internal/extras.ts";
 export {
   type BaseMigrations,
   type BaseRefEnvironment,
@@ -58,7 +58,7 @@ export {
   type SchemaModule,
   type Snapshot,
   type SnapshotEntry,
-} from "./migration-drift.ts";
+} from "./internal/migrationDrift.ts";
 export {
   checkViewDependencies,
   findViewEdges,
@@ -68,4 +68,4 @@ export {
   ViewDependencyError,
   type ViewEdge,
   viewKey,
-} from "./view-dependencies.ts";
+} from "./internal/viewDependencies.ts";

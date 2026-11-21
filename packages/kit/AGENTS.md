@@ -1,10 +1,10 @@
 # @thomasfosterau/effect-drizzle-ext-kit
 
-`effect-drizzle-kit`, the bin over the pg package's `./tooling`: `generate` (the extras migration) and `check` (extras drift, plus schema drift when the config names its schema module). The bin lives here so the pg package's `./tooling` stays bin-less.
+`effect-drizzle-kit`, the bin over the pg package's `./Tooling`: `generate` (the extras migration) and `check` (extras drift, plus schema drift when the config names its schema module). The bin lives here so the pg package's `./Tooling` stays bin-less.
 
 ## Boundary
 
-May import from `packages/pg` only (`.fallowrc.json` zone `kit`), and only from its `./tooling` subpath. Every command is a thin wrapper: the planning, the state file and the drift rules live in pg's `./tooling`, not here.
+May import from `packages/pg` only (`.fallowrc.json` zone `kit`), and only from its `./Tooling` subpath. Every command is a thin wrapper: the planning, the state file and the drift rules live in pg's `./Tooling`, not here.
 
 ## Invariants
 

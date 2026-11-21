@@ -26,14 +26,14 @@ import {
   text,
   uuid,
 } from "drizzle-orm/pg-core";
-import { dbColumn } from "../src/index.ts";
+import { dbColumn } from "../src/Annotation.ts";
 import {
   DerivationError,
   deriveCheckConstraintsFrom,
   deriveFieldCheckConstraints,
   deriveColumnsWith,
   type ColumnBuilders,
-} from "../src/derive.ts";
+} from "../src/Derive.ts";
 
 const builders = {
   text: (c: string) => text(c),

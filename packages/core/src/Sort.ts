@@ -3,7 +3,7 @@
  * `ORDER BY` a decoded sort list becomes, always closed on `id`. See the
  * [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/core/sort.md).
  *
- * @module sort
+ * @module Sort
  */
 
 import { asc, desc, getColumns, is, SQL } from "drizzle-orm";
@@ -75,7 +75,7 @@ export class UnsupportedSortError extends Schema.TaggedError<UnsupportedSortErro
 
 /**
  * How {@link sortableColumnsFor} names the version-chain columns of a view.
- * Every member defaults to the convention `./versioned-chain`'s
+ * Every member defaults to the convention `./VersionedChain`'s
  * `makeCurrentVersionView` documents (an `action` soft-delete gate, the
  * current version's `timestamp`, a birth-row `createdAt`).
  */
