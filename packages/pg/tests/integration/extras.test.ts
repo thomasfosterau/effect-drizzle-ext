@@ -3,6 +3,7 @@ import { layer } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as P from "effect/Predicate";
 import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
@@ -14,6 +15,7 @@ import {
   domain,
   emptyExtrasState,
   extension,
+  type ExtrasRename,
   type ExtrasState,
   planExtras,
   renderExtrasMigration,
@@ -37,16 +39,23 @@ const pgClient = Layer.unwrap(
 /** The sentinel the spec's transaction fails with, so nothing it wrote survives. */
 class Rollback extends Schema.TaggedError<Rollback>()("Rollback", {}) {}
 
-/** Run every step's plan in order inside one rolled-back transaction, then the probe; return the probe's result. */
+/** A plan from one state to the next (with its rename hints), or a statement of the spec's own. */
+type Step =
+  | readonly [prev: ExtrasState, next: ExtrasState, renames?: ReadonlyArray<ExtrasRename>]
+  | string;
+
+/** Run every step in order inside one rolled-back transaction, then the probe; return the probe's result. */
 const inRolledBackTransaction = <A>(
-  steps: ReadonlyArray<readonly [ExtrasState, ExtrasState]>,
+  steps: ReadonlyArray<Step>,
   probe: (sql: PgClient.PgClient) => Effect.Effect<A, SqlError>,
 ): Effect.Effect<A, SqlError, PgClient.PgClient> =>
   Effect.gen(function* () {
     const sql = yield* PgClient.PgClient;
     const seen = yield* Ref.make(Option.none<A>());
-    const statements = steps.flatMap(([prev, next]) =>
-      splitStatements(renderExtrasMigration(planExtras(prev, next).statements)),
+    const statements = steps.flatMap((step) =>
+      P.isString(step)
+        ? [step]
+        : splitStatements(renderExtrasMigration(planExtras(...step).statements)),
     );
     yield* sql
       .withTransaction(
@@ -164,6 +173,48 @@ layer(pgClient, { excludeTestServices: true })((it) => {
         );
         expect(result).toEqual([{ n: 0 }]);
       }),
+    );
+
+    it.effect(
+      "renames a domain under a column that uses it, a composite type and its attribute, in place",
+      () =>
+        Effect.gen(function* () {
+          const renamed = toExtrasState({
+            extensions: [extension("citext")],
+            domains: [
+              domain("extras_mail", "citext", {
+                notNull: true,
+                checks: { extras_email_has_at: "position('@' in VALUE) > 1" },
+              }),
+            ],
+            compositeTypes: [
+              compositeType(
+                "extras_person",
+                { mail: "extras_mail", label: "text" },
+                { schema: "public" },
+              ),
+            ],
+          });
+          const renames: ReadonlyArray<ExtrasRename> = [
+            ["domain", "extras_email", "extras_mail"],
+            ["compositeType", "fixture.extras_contact", "extras_person"],
+            ["attribute", "extras_person", "email", "mail"],
+          ];
+          expect(planExtras(created, renamed, renames).issues).toEqual([]);
+          const result = yield* inRolledBackTransaction(
+            [
+              [emptyExtrasState, created],
+              // A drop and re-create of the domain would fail on this column.
+              "create table fixture.extras_rename_probe (email extras_email)",
+              "insert into fixture.extras_rename_probe values ('A@B.example')",
+              [created, renamed, renames],
+            ],
+            (sql) => sql<{ column: string; mail: string }>`
+          select pg_typeof(email)::text as column, ((email, 'x')::extras_person).mail::text as mail
+          from fixture.extras_rename_probe`,
+          );
+          expect(result).toEqual([{ column: "extras_mail", mail: "A@B.example" }]);
+        }),
     );
   });
 });

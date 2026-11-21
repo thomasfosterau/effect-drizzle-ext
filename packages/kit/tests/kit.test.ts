@@ -31,6 +31,7 @@ import {
   generate,
   KitConfigError,
   loadConfig,
+  parseRename,
   version,
 } from "../src/index.ts";
 
@@ -192,5 +193,85 @@ describe("generate and check", () => {
       }),
     );
     expect(error).toBeInstanceOf(MigrationDriftError);
+  });
+
+  it("renames with --rename, and records by hand with --record-only", async () => {
+    const result = await run(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const file = yield* scratchProject(EXTRAS);
+        const runCli = Command.runWith(cli, { version });
+        yield* runCli(["generate", "--config", file, "--name", "email"]);
+        const config = yield* fs.readFileString(file);
+        // A new file per step: Node caches a module by its path.
+        const variant = Effect.fn("variant")(function* (name: string, from: string, to: string) {
+          const variantFile = path.join(path.dirname(file), `${name}.config.ts`);
+          yield* fs.writeFileString(variantFile, config.replace(from, to));
+          return variantFile;
+        });
+        const renamed = yield* variant("renamed", 'domain("email"', 'domain("mail"');
+        const badHint = yield* Effect.flip(
+          runCli(["generate", "--config", renamed, "--rename", "domain:email"]),
+        );
+        yield* runCli([
+          "generate",
+          "-c",
+          renamed,
+          "--name",
+          "rename",
+          "--rename",
+          "domain:email:mail",
+        ]);
+        yield* runCli(["check", "--config", renamed]);
+        const retyped = yield* variant(
+          "retyped",
+          'domain("email", "citext")',
+          'domain("mail", "text")',
+        );
+        const refused = yield* Effect.flip(
+          runCli(["generate", "-c", retyped, "--name", "refused"]),
+        );
+        yield* runCli(["generate", "-c", retyped, "--name", "retype", "--record-only"]);
+        const migrations = path.join(path.dirname(file), "migrations");
+        const read = (suffix: string) =>
+          Effect.flatMap(fs.readDirectory(migrations), (names) =>
+            fs.readFileString(
+              path.join(
+                migrations,
+                names.find((name) => name.endsWith(suffix)) ?? suffix,
+                "migration.sql",
+              ),
+            ),
+          );
+        return {
+          badHint,
+          refused,
+          renameSql: yield* read("_rename"),
+          retypeSql: yield* read("_retype"),
+        };
+      }),
+    );
+    expect(result.badHint).not.toBeInstanceOf(CliError.UserError);
+    expect(result.refused.message).toMatch(/recordOnly/);
+    expect(result.renameSql).toContain(`ALTER DOMAIN "public"."email" RENAME TO "mail";`);
+    expect(result.retypeSql).toMatch(/^-- Hand-written extras migration/);
+  });
+});
+
+describe("parseRename", () => {
+  it("reads each hint kind, and refuses anything else", () => {
+    expect(parseRename("domain:email:mail")).toEqual(Option.some(["domain", "email", "mail"]));
+    expect(parseRename("compositeType:app.money:price")).toEqual(
+      Option.some(["compositeType", "app.money", "price"]),
+    );
+    expect(parseRename("attribute:price:amount:value")).toEqual(
+      Option.some(["attribute", "price", "amount", "value"]),
+    );
+    expect(
+      ["domain:email", "attribute:a:b", "table:a:b", "domain::mail", "domain:a:b:c"].map(
+        parseRename,
+      ),
+    ).toEqual(Array.from({ length: 5 }, () => Option.none()));
   });
 });

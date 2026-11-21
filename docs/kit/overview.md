@@ -20,7 +20,9 @@ Paths are relative to the config file's directory, and drizzle-kit runs there. T
 
 ## The commands
 
-- **`effect-drizzle-kit generate [--name <slug>]`** (default slug `extras`) plans the declared extras against the state recorded in `migrationsDir`. When there is a diff, it writes a drizzle-kit custom migration with that SQL and an `extras.json` beside it, and prints the directory. With no diff it writes nothing. Run it **before** `drizzle-kit generate`, so a type or extension exists before the table migration that first uses it.
+- **`effect-drizzle-kit generate [--name <slug>] [--rename <hint>]… [--record-only]`** (default slug `extras`) plans the declared extras against the state recorded in `migrationsDir`. When there is a diff, it writes a drizzle-kit custom migration with that SQL and an `extras.json` beside it, and prints the directory. With no diff it writes nothing. Run it **before** `drizzle-kit generate`, so a type or extension exists before the table migration that first uses it.
+  - `--rename domain:<from>:<to>`, `compositeType:<from>:<to>` or `attribute:<type>:<from>:<to>` (repeatable) renames in place instead of dropping and re-creating ([rename hints](../pg/tooling.md#extras-what-drizzle-kit-doesnt-manage)).
+  - `--record-only` records the declared state and leaves `migration.sql` for you to write, for a change the generator refuses, such as a domain's base type.
 - **`effect-drizzle-kit check`** fails when the declared extras differ from the recorded state. When the config names `schema`, it then runs the migration-drift gate: DAG integrity, zero drift against the latest snapshot, and, in a pull request (`MIGRATION_BASE_REF`, or `GITHUB_BASE_REF` on GitHub Actions), base ancestry, with the migrations path taken relative to the repository root `git` reports. It needs no database.
 
 A failure prints its message and exits 1. Both commands take `--help`, and the bin takes `--version`.
