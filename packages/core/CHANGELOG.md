@@ -1,5 +1,44 @@
 # @thomasfosterau/effect-drizzle-ext
 
+## 0.8.0
+
+### Minor Changes
+
+- [#251](https://github.com/thomasfosterau/effect-drizzle-ext/pull/251) [`8051a2d`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/8051a2d7a456a9df240acae339178c418ccc8f9b) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - Add `retryTransaction` to `./errors`: piped onto a whole `transact(…)`, it re-runs the transaction on a jittered exponential backoff (default 3 retries from 50 ms) while it fails with a serialization failure (`40001`) or a deadlock (`40P01`), and passes every other failure through on the first attempt.
+  
+  Add `decodeHexBytea` to `./columns`, a `Result`-returning hex decoder failing with `effect/encoding`'s `EncodingError`. `byteaToHex` and `hexToBytea` now run on `effect/encoding`'s `Hex` (about ten times faster); their results and `hexToBytea`'s `TypeError` on malformed input are unchanged.
+
+- [#246](https://github.com/thomasfosterau/effect-drizzle-ext/pull/246) [`2bbc15f`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/2bbc15ff073d5847cc67c90765cecbaa1619ecd6) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - **Breaking:** adopt Effect v4's export layout. Every module is a PascalCase subpath, and each package root re-exports modules as namespaces instead of flat names. Function and type names are unchanged; only their import paths move.
+  
+  Upgrade by renaming subpaths:
+  
+  | Package | Old subpath | New subpath |
+  | --- | --- | --- |
+  | core | `.` (flat `dbColumn`, `dbTable`, `defineTree`, `DerivationError`, `VersionChainEntry`, …) | `./Annotation`, or the root's `Annotation` namespace |
+  | core | `./derive`, `./references`, `./constraints`, `./columns`, `./query`, `./sort`, `./update`, `./errors`, `./database` | `./Derive`, `./References`, `./Constraints`, `./Columns`, `./Query`, `./Sort`, `./Update`, `./Errors`, `./Database` |
+  | core | `./query-functions`, `./versioned-chain`, `./postgis` | `./QueryFunctions`, `./VersionedChain`, `./PostGis` |
+  | core | `./jsonapi`, `./jsonapi/derive` | `./JsonApi`, `./JsonApiDerive` |
+  | pg | `.` (flat `makePgDatabase`, `pgClientFromUrl`, `pgClientFromPool`, `PgDatabase*` types) | `./PgDatabase`, or the root's `PgDatabase` namespace |
+  | pg | `./chain`, `./migrations`, `./testing`, `./tooling` | `./Chain`, `./Migrations`, `./Testing`, `./Tooling` |
+  
+  ```ts
+  // before
+  import { dbColumnFor } from "@thomasfosterau/effect-drizzle-ext";
+  import { deriveColumnsWith } from "@thomasfosterau/effect-drizzle-ext/derive";
+  import { makePgDatabase } from "@thomasfosterau/effect-drizzle-ext-pg";
+  
+  // after
+  import { dbColumnFor } from "@thomasfosterau/effect-drizzle-ext/Annotation";
+  import { deriveColumnsWith } from "@thomasfosterau/effect-drizzle-ext/Derive";
+  import { makePgDatabase } from "@thomasfosterau/effect-drizzle-ext-pg/PgDatabase";
+  ```
+  
+  The core root stays Drizzle-free: it re-exports `Annotation`, `Errors`, `Predicate` and `Update`, plus the `PostGis` namespace as before. Modules that import Drizzle are subpaths only. The pg root re-exports every module except `Tooling`, which needs the optional `drizzle-kit` peer. `./Predicate`, `./Where`, `./Search`, `./Tin`, `./Outbox`, `./Documents` and `./ExternalIds` keep their paths.
+
+- [#253](https://github.com/thomasfosterau/effect-drizzle-ext/pull/253) [`1471ece`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/1471ece0f3ad12df7ec7c0237a049f23ed1a8138) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - A leaf level may now have children. `defineTree` no longer throws for a leaf with children: its name joins its own subtree leaves (so its discriminator CHECK), it gets a leaf view like any leaf, and the branch views above it gain its `CASE` arm. A tree with no such leaf derives exactly the DDL and view SQL it did before. `LeafName` no longer counts a bare `{}` marker as a leaf, so such a marker drops out of `views.leaves` and the chain's types, where it never had a runtime value.
+  
+  `-pg/chain` adds `LeafChain.refine({ id, from, patch, actor, keyed?, stable?, expectedVersion? })`: on the target leaf, it refines a node of `from` (a leaf above it on its path) to the target in one write. It reads `from`'s head and checks the precondition there, sets the identity row's `type` (the refinable arcs cascade it), inserts the stable rows of the levels the target adds, and appends an `update` at every level carrying `from`'s state with `patch` applied. Earlier versions have no row at the added levels, so the target reads none of them. A non-refinable arc makes the identity update fail with the driver's foreign-key violation.
+
 ## 0.7.0
 
 ### Minor Changes
