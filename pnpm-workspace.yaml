@@ -13,11 +13,11 @@ catalog:
   "@changesets/cli": ^3.0.3
   "@effect/docgen": ^4.1.4
   "@effect/language-service": ^0.87.5
-  # `effect-tsgo patch` supports only specific TypeScript / oxlint /
-  # oxlint-tsgolint versions and fails `vp install` on others: move it with
+  # `effect-tsgo patch` supports only specific TypeScript / oxlint / tsrs
+  # versions and fails `vp install` on others: move it with
   # `@typescript/native` and `vite-plus`, after checking the `components` table
   # in node_modules/@effect/tsgo/dist/effect-tsgo.cjs.
-  "@effect/tsgo": 0.69.0
+  "@effect/tsgo": 0.73.2
   "@effect/sql-pg": 4.1.4
   "@effect/vitest": 4.1.4
   "@effect/platform-node": 4.1.4
@@ -44,10 +44,11 @@ catalog:
   # @effect/tsgo's.
   typescript: "npm:@typescript/typescript6@6.0.2"
   "@typescript/native": "npm:typescript@7.0.2"
-  # vite-plus pins oxlint, oxfmt and vitest exactly: `vite`, `vitest` and
-  # `@vitest/coverage-istanbul` must match it.
-  vite-plus: 1.6.0
-  vite: npm:@voidzero-dev/vite-plus-core@1.6.0
+  # `vite`, `vitest` and `@vitest/coverage-istanbul` must equal what vite-plus
+  # itself depends on (`npm view vite-plus@<v> dependencies`); `vite` no longer
+  # equals vite-plus.
+  vite-plus: 1.7.0
+  vite: npm:@voidzero-dev/vite-plus-core@8.3.8000
   vitest: 5.1.0
 
 # Peer ranges the published packages declare.
@@ -85,14 +86,6 @@ permissions:
     skills: [fallow]
 skills:
   dirs: [.claude/skills]
-peerDependencyRules:
-  allowAny:
-    - vite
-    - vitest
-  allowedVersions:
-    vite: "*"
-    vitest: "*"
-
 # Hold new versions for 24 hours (minutes); Dependabot's cooldown is 1 day.
 minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
