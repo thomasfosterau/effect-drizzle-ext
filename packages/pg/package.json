@@ -39,7 +39,8 @@
     "./Outbox": "./src/Outbox.ts",
     "./tooling": "./src/tooling/index.ts",
     "./Documents": "./src/Documents.ts",
-    "./ExternalIds": "./src/ExternalIds.ts"
+    "./ExternalIds": "./src/ExternalIds.ts",
+    "./VersionedRow": "./src/VersionedRow.ts"
   },
   "publishConfig": {
     "exports": {
@@ -78,6 +79,10 @@
       "./ExternalIds": {
         "types": "./dist/ExternalIds.d.ts",
         "default": "./dist/ExternalIds.js"
+      },
+      "./VersionedRow": {
+        "types": "./dist/VersionedRow.d.ts",
+        "default": "./dist/VersionedRow.js"
       }
     },
     "access": "public"

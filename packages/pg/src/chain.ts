@@ -111,6 +111,8 @@ export interface ChainTables {
   >;
   readonly facts: Readonly<Record<string, Readonly<Record<string, PgTable>>>>;
   readonly keyed: Readonly<Record<string, PgTable>>;
+  /** Each named pointer's append-only log, keyed by pointer name. */
+  readonly pointers?: Readonly<Record<string, PgTable>> | undefined;
 }
 
 /** The tree facts the chain reads (a `defineTree` result satisfies it). */
@@ -372,6 +374,33 @@ export interface ChainRefineInput<F, Patch, VE, KL = never, ST = Record<never, n
   readonly stable?: ST | undefined;
 }
 
+/** The pointer names `T` carries a log for. */
+export type ChainPointerName<T extends ChainTables> = T extends {
+  readonly pointers: infer Pointers;
+}
+  ? Extract<keyof Pointers, string>
+  : never;
+
+/** The input to {@link LeafChain.setPointer}. */
+export interface ChainPointerInput<P extends string> extends ChainPrecondition {
+  /** The pointer to move. */
+  readonly pointer: P;
+  /** The node whose pointer moves. */
+  readonly id: string;
+  /** The version the pointer names from `at` on; `Option.none()` clears it. */
+  readonly version: Option.Option<bigint>;
+  /** When the fact takes effect (a scheduled publish); now when absent. */
+  readonly at?: Date;
+  /** The acting account, recorded in the log's actor column. */
+  readonly actor: string | undefined;
+}
+
+/** What {@link LeafChain.setPointer} returns: the node and the log row's `seq`. */
+export interface ChainPointerWrite {
+  readonly id: string;
+  readonly seq: bigint;
+}
+
 /** The options {@link LeafChain.delete} and {@link LeafChain.restoreVersion} take. */
 export interface ChainWriteOptions<VE> extends ChainActor<VE>, ChainPrecondition {}
 
@@ -401,6 +430,7 @@ export interface LeafChain<
   KP = never,
   ST = Record<never, never>,
   RF = Record<never, never>,
+  P extends string = never,
 > {
   /**
    * Insert the node, every level's stable row (with its `stable` extras) and
@@ -479,6 +509,24 @@ export interface LeafChain<
   readonly refine: <F extends keyof RF & string>(
     input: ChainRefineInput<F, MemberOf<RF[F], "patch">, VE, KL, MemberOf<RF[F], "stable">>,
   ) => Effect.Effect<ChainWrite, E | NodeNotFound | StaleVersion | VersionConflict, I>;
+  /**
+   * The head's reconstructed state and version, read together in one
+   * statement (a keyed leaf adds one for its keyed level): what a repository
+   * loads before deciding, then passes back as `expectedVersion`.
+   * `Option.none()` for an id with no versions of this leaf; a tombstone's is
+   * its `delete` snapshot.
+   */
+  readonly load: (id: string) => Effect.Effect<Option.Option<ChainSnapshot<State, KL>>, E, I>;
+  /**
+   * Append a fact to `pointer`'s log for the node: from `at` (now when
+   * absent) the pointer names `version`, or nothing. Never appends a
+   * version. Fails {@link NodeNotFound} when the node has no versions of this
+   * leaf, {@link VersionNotFound} when `version` is not one of them, and
+   * {@link StaleVersion} when `expectedVersion` is not the head.
+   */
+  readonly setPointer: (
+    input: ChainPointerInput<P>,
+  ) => Effect.Effect<ChainPointerWrite, E | NodeNotFound | VersionNotFound | StaleVersion, I>;
   /** The reconstructed state at `(id, version)`. Fails {@link VersionNotFound} when any level has no row there. */
   readonly getVersion: (
     id: string,
@@ -508,7 +556,8 @@ export type VersionChain<S, T extends ChainTables, E, I> = {
     ChainKeyedLevel<S, T, K>,
     ChainKeyedPatch<S, T, K>,
     ChainStableExtras<S, T, K>,
-    ChainRefinements<S, T, K>
+    ChainRefinements<S, T, K>,
+    ChainPointerName<T>
   >;
 };
 
@@ -561,6 +610,33 @@ const ChainEntryRow = Schema.Struct({
 
 /** Decode a root version row; a row that doesn't fit is a broken table, a defect. */
 const decodeEntry = Schema.decodeUnknownEffect(ChainEntryRow);
+
+/**
+ * A pointer write's preconditions against the head at `current`: the
+ * expected version, then a version the node has (`0..current`).
+ */
+const checkPointer = (
+  type: string,
+  current: bigint,
+  input: ChainPointerInput<string>,
+): Effect.Effect<void, StaleVersion | VersionNotFound> => {
+  const { id } = input;
+  if (input.expectedVersion !== undefined && input.expectedVersion !== current) {
+    return Effect.fail(new StaleVersion({ type, id, expected: input.expectedVersion, current }));
+  }
+  return Option.match(
+    Option.filter(input.version, (version) => version < 0n || version > current),
+    {
+      onNone: () => Effect.void,
+      onSome: (version) => Effect.fail(new VersionNotFound({ type, id, version })),
+    },
+  );
+};
+
+/** Decode the one row a pointer insert returns. */
+const decodeSeq = Schema.decodeUnknownEffect(
+  Schema.NonEmptyArray(Schema.Struct({ seq: Schema.BigInt })),
+);
 
 /** The query failure a Drizzle `CurrentTransaction` reports. */
 type QueryError<Tx> = Tx extends {
@@ -723,6 +799,20 @@ export const makeVersionChain = <
     action: columnOf(rootVersion, "action"),
     timestamp: columnOf(rootVersion, "timestamp"),
   };
+  /** A named pointer's log; a name the tables don't carry is a defect. */
+  const pointerLog = (name: string): Effect.Effect<PgTable> =>
+    Option.match(R.get(tables.pointers ?? {}, name), {
+      onNone: () =>
+        Effect.die(
+          new DerivationError({
+            message: `makeVersionChain: no "${name}" pointer log; was it named in root.pointers?`,
+          }),
+        ),
+      onSome: Effect.succeed,
+    });
+  /** `id`'s head version, as a scalar subquery. */
+  const headVersionOf = (id: string): SQL =>
+    sql`(SELECT max(h.${sql.identifier(root.version.name)}) FROM ${rootVersion} h WHERE h.${sql.identifier(root.id.name)} = ${id})`;
   const identityId = columnOf(identity, "id");
   const identityType = columnOf(identity, "type");
   const rootVersionKey = `${getTableName(rootVersion)}_pkey`;
@@ -817,7 +907,15 @@ export const makeVersionChain = <
       return Arr.head(yield* entriesOf(id, desc(root.version), 1));
     });
 
-    const snapshot = Effect.fn(`${leaf}.snapshot`)(function* (id: string, version: bigint) {
+    /**
+     * The state at `(id, version)`, or at the head (`max(version)`, read in
+     * the same statement) for `"head"`. A keyed leaf reads its keyed level in a
+     * second statement.
+     */
+    const snapshot = Effect.fn(`${leaf}.snapshot`)(function* (
+      id: string,
+      version: bigint | "head",
+    ) {
       if (!isNodeId(id)) return Option.none();
       const tx = yield* CurrentTransaction;
       const query = Arr.reduce(
@@ -839,7 +937,13 @@ export const makeVersionChain = <
         query,
         (q, fact) => q.leftJoin(fact, atVersion(fact, root.id, root.version)),
       )
-        .where(and(eq(root.id, id), eq(root.version, version), eq(identityType, leaf)))
+        .where(
+          and(
+            eq(root.id, id),
+            eq(root.version, version === "head" ? headVersionOf(id) : version),
+            eq(identityType, leaf),
+          ),
+        )
         .limit(1);
       const found = yield* Effect.orDie(
         Effect.transposeOption(
@@ -852,7 +956,7 @@ export const makeVersionChain = <
         ),
       );
       if (Option.isNone(found)) return Option.none();
-      return Option.some({ ...found.value, keyed: yield* keyedAt(id, version) });
+      return Option.some({ ...found.value, keyed: yield* keyedAt(id, found.value.version) });
     });
 
     /** The keyed level at `(id, version)`: each key's columns, keyed by key. */
@@ -871,15 +975,19 @@ export const makeVersionChain = <
       return R.fromEntries(Arr.map(rows, ({ key, ...values }) => [String(key), values] as const));
     });
 
-    /** The head's snapshot; a head with no snapshot is a broken chain (a defect). */
-    const current = Effect.fn(`${leaf}.current`)(function* (id: string) {
+    /**
+     * The head's snapshot, read with the head in one statement. Only a miss
+     * reads the head again, to tell an unknown node from a broken chain (a
+     * defect).
+     */
+    const load = Effect.fn(`${leaf}.load`)(function* (id: string) {
+      const state = yield* snapshot(id, "head");
+      if (Option.isSome(state)) return state;
       const found = yield* head(id);
-      if (Option.isNone(found)) return Option.none();
-      const state = yield* snapshot(id, found.value.version);
-      if (Option.isNone(state)) {
+      if (Option.isSome(found)) {
         return yield* Effect.die(new BrokenChain({ type: leaf, id, version: found.value.version }));
       }
-      return state;
+      return Option.none();
     });
 
     /** Write one version at every level: the root row, each level's row, each non-null fact. */
@@ -1021,7 +1129,7 @@ export const makeVersionChain = <
 
     const merge = (input: ChainUpdateInput<Row, Row, KeyedPatchRows>, allowDeleted: boolean) =>
       Effect.gen(function* () {
-        const found = yield* current(input.id);
+        const found = yield* load(input.id);
         if (Option.isNone(found) || (found.value.action === "delete" && !allowDeleted)) {
           return yield* new NodeNotFound({ type: leaf, id: input.id });
         }
@@ -1053,13 +1161,36 @@ export const makeVersionChain = <
       id: string,
       options: ChainWriteOptions<Row>,
     ) {
-      const found = yield* current(id);
+      const found = yield* load(id);
       if (Option.isNone(found)) return yield* new NodeNotFound({ type: leaf, id });
       if (found.value.action === "delete") {
         return { id, version: found.value.version, alreadyDeleted: true };
       }
       const written = yield* appendNext(id, found.value, "delete", found.value, options);
       return { ...written, alreadyDeleted: false };
+    });
+
+    const setPointer = Effect.fn(`${leaf}.setPointer`)(function* (
+      input: ChainPointerInput<string>,
+    ) {
+      const { id } = input;
+      const log = yield* pointerLog(input.pointer);
+      const found = yield* head(id);
+      if (Option.isNone(found)) return yield* new NodeNotFound({ type: leaf, id });
+      yield* checkPointer(leaf, found.value.version, input);
+      const tx = yield* CurrentTransaction;
+      const rows: ReadonlyArray<Row> = yield* tx
+        .insert(log)
+        .values({
+          id,
+          version: Option.getOrNull(input.version),
+          actor: input.actor,
+          // Drizzle writes `DEFAULT` (now) for an absent `at`.
+          at: input.at,
+        })
+        .returning({ seq: columnOf(log, "seq") });
+      const seq = yield* Effect.orDie(decodeSeq(rows));
+      return { id, seq: seq[0].seq };
     });
 
     const getVersion = Effect.fn(`${leaf}.getVersion`)(function* (id: string, version: bigint) {
@@ -1150,6 +1281,8 @@ export const makeVersionChain = <
     return {
       operations: {
         head,
+        load,
+        setPointer,
         create,
         update,
         restore,
@@ -1158,7 +1291,7 @@ export const makeVersionChain = <
         getVersion,
         history,
       },
-      source: { current },
+      source: { current: load },
       refineWith,
     };
   };

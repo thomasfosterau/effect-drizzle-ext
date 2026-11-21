@@ -120,6 +120,7 @@ import * as Pg from "@thomasfosterau/effect-drizzle-ext-pg";
 import * as PgChain from "@thomasfosterau/effect-drizzle-ext-pg/chain";
 import * as PgMigrations from "@thomasfosterau/effect-drizzle-ext-pg/migrations";
 import * as PgDocuments from "@thomasfosterau/effect-drizzle-ext-pg/Documents";
+import * as PgVersionedRow from "@thomasfosterau/effect-drizzle-ext-pg/VersionedRow";
 import * as PgExternalIds from "@thomasfosterau/effect-drizzle-ext-pg/ExternalIds";
 import * as PgOutbox from "@thomasfosterau/effect-drizzle-ext-pg/Outbox";
 import * as PgTesting from "@thomasfosterau/effect-drizzle-ext-pg/testing";
@@ -370,6 +371,8 @@ type NovelStableInput = NonNullable<Parameters<typeof chain.novel.create>[0]["st
 export const novelUpdated = chain.novel.update({ id: "x", patch: { words: null }, actor: "a" });
 export const novelSnapshot = chain.novel.getVersion("x", 0n);
 type NovelState = Effect.Success<typeof novelSnapshot>["state"];
+export const novelLoaded = chain.novel.load("x");
+type NovelPointerName = Parameters<typeof chain.novel.setPointer>[0]["pointer"];
 
 // ── sort ──────────────────────────────────────────────────────────────────
 
@@ -559,6 +562,20 @@ export const externalIdLink = externalIds.link({
   nodeId: "x",
 });
 type ExternalIdRow = typeof externalIdTable.$inferSelect;
+
+// ── VersionedRow ──────────────────────────────────────────────────────────
+
+export const accountTable = pgTable("account", {
+  id: uuid("id").primaryKey(),
+  name: text("name").notNull(),
+  ...PgVersionedRow.versionColumn(),
+});
+export const accounts = PgVersionedRow.makeVersionedRow({
+  table: accountTable,
+  CurrentTransaction: outboxDatabase.CurrentTransaction,
+});
+export const accountLoaded = accounts.load("x");
+type AccountValues = PgVersionedRow.VersionedRowValues<typeof accountTable>;
 
 /**
  * Every compile-time assertion, exported so `noUnusedLocals` keeps them and a
@@ -751,6 +768,14 @@ export type Checks = [
   /** _externalIdLink */ Assert<
     Equals<Effect.Success<typeof externalIdLink>, PgExternalIds.LinkResult>
   >,
+  /** _novelLoaded */ Assert<
+    Equals<Effect.Success<typeof novelLoaded>, Option.Option<Effect.Success<typeof novelSnapshot>>>
+  >,
+  /** _novelPointerName */ Assert<Equals<NovelPointerName, "live">>,
+  /** _accountVersion */ Assert<
+    Equals<Option.Option.Value<Effect.Success<typeof accountLoaded>>["version"], bigint>
+  >,
+  /** _accountValues */ Assert<Equals<AccountValues, { name: string }>>,
   /** _tinMatch */ Assert<Equals<typeof tinMatch, SQL<boolean>>>,
   /** _tinScore */ Assert<Equals<typeof tinScore, SQL<number>>>,
   /** _tinHighlight */ Assert<Equals<typeof tinHighlight, SQL<string>>>,

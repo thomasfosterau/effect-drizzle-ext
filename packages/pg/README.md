@@ -1,6 +1,6 @@
 # `@thomasfosterau/effect-drizzle-ext-pg`
 
-The `@effect/sql-pg` binding for `@thomasfosterau/effect-drizzle-ext`: `Database` / `CurrentTransaction` services over `drizzle-orm/effect-postgres`, `PgClient` layers, the version-chain discipline over a tree's tables (`./chain`), a sentinel-rollback test runner with test-database provisioning, a fresh-database migration runner, a transactional outbox (`./Outbox`), a content-addressed document store (`./Documents`), external identifiers (`./ExternalIds`), typed helpers for PlanetScale's TIN full-text search (`./Tin`), and migration-drift / view-dependency guards.
+The `@effect/sql-pg` binding for `@thomasfosterau/effect-drizzle-ext`: `Database` / `CurrentTransaction` services over `drizzle-orm/effect-postgres`, `PgClient` layers, the version-chain discipline over a tree's tables (`./chain`), a sentinel-rollback test runner with test-database provisioning, a fresh-database migration runner, a transactional outbox (`./Outbox`), a content-addressed document store (`./Documents`), external identifiers (`./ExternalIds`), optimistic concurrency over a flat table (`./VersionedRow`), typed helpers for PlanetScale's TIN full-text search (`./Tin`), and migration-drift / view-dependency guards.
 
 [![npm version](https://img.shields.io/npm/v/@thomasfosterau/effect-drizzle-ext-pg.svg)](https://www.npmjs.com/package/@thomasfosterau/effect-drizzle-ext-pg)
 
@@ -50,6 +50,7 @@ The [overview](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/d
 | `./Outbox` | A transactional outbox: the table builder (`outboxColumns`, `outboxConstraints`) and `makeOutbox`'s `append`, `drain` and `pending`. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/outbox.md) |
 | `./testing` | The sentinel-rollback test runner, test-database provisioning and the connect-seam retry. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/testing.md) |
 | `./Tin` | Typed helpers for PlanetScale's TIN full-text search: `matches` (`==>`), `score`, `highlight`, `tinIndex` and `phrase`. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tin.md) |
+| `./VersionedRow` | Optimistic concurrency over a flat table: `versionColumn` and `makeVersionedRow`'s `load`, `insert`, `update` and `delete`. | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/versioned-row.md) |
 | `./tooling` | The migration-drift and view-dependency schema guards, and migrations for the extensions, domains and composite types drizzle-kit doesn't manage (optional peer `drizzle-kit`). | [guide](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/tooling.md) |
 
 ## Links
