@@ -20,4 +20,4 @@ Read [README.md](README.md) and [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) fir
 
 ## Fallow
 
-The `fallow` agent skill is linked into `.claude/skills/` from the installed `fallow` package after `vp install`; repository-specific rules (the pre-commit audit, tracing before deleting) are in docs/CONTRIBUTING.md.
+The `fallow` agent skill is linked into `.claude/skills/` from the installed `fallow` package after `vp install`, and drizzle-kit's `drizzle` skill is linked the same way; repository-specific rules (the pre-commit audit, tracing before deleting) are in docs/CONTRIBUTING.md.
