@@ -28,7 +28,7 @@ catalog:
   "@thomasfosterau/effect-jsonapi": ^0.22.1
   "@types/node": ^26.6.6
   # Must equal the vitest that vite-plus bundles (see `vitest` below).
-  "@vitest/coverage-istanbul": 5.1.0
+  "@vitest/coverage-istanbul": 5.1.1
   # The first drizzle line with the Effect integration this library extends.
   drizzle-orm: 1.0.0-rc.5
   # Always the drizzle-orm pin.
@@ -49,7 +49,7 @@ catalog:
   # equals vite-plus.
   vite-plus: 1.7.0
   vite: npm:@voidzero-dev/vite-plus-core@8.3.8000
-  vitest: 5.1.0
+  vitest: 5.1.1
 
 # Peer ranges the published packages declare.
 catalogs:
