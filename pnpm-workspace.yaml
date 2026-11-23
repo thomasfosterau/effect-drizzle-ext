@@ -11,16 +11,16 @@ catalogMode: strict
 catalog:
   "@changesets/changelog-github": ^1.0.1
   "@changesets/cli": ^3.0.3
-  "@effect/docgen": ^4.1.4
+  "@effect/docgen": ^4.1.5
   "@effect/language-service": ^0.87.5
   # `effect-tsgo patch` supports only specific TypeScript / oxlint / tsrs
   # versions and fails `vp install` on others: move it with
   # `@typescript/native` and `vite-plus`, after checking the `components` table
   # in node_modules/@effect/tsgo/dist/effect-tsgo.cjs.
   "@effect/tsgo": 0.73.2
-  "@effect/sql-pg": 4.1.4
-  "@effect/vitest": 4.1.4
-  "@effect/platform-node": 4.1.4
+  "@effect/sql-pg": 4.1.5
+  "@effect/vitest": 4.1.5
+  "@effect/platform-node": 4.1.5
   "@testcontainers/postgresql": ^12.2.1
   # A dependency, not a peer: pure Schema helpers with no service identity.
   # Both 0.x lines export identical declarations for what core imports.
@@ -34,7 +34,7 @@ catalog:
   # Always the drizzle-orm pin.
   drizzle-kit: 1.0.0-rc.5
   "@enfect/oxlint": 0.10.0
-  effect: 4.1.4
+  effect: 4.1.5
   fallow: 3.43.2
   # Only for `@effect/docgen`, which spawns it; scripts use `vpx`.
   tsx: ^4.23.15
