@@ -207,8 +207,8 @@ catalogs:
       specifier: ^0.3.1
       version: 0.3.1
     '@thomasfosterau/effect-jsonapi':
-      specifier: ^0.22.1
-      version: 0.22.1
+      specifier: ^0.22.2
+      version: 0.22.2
     '@types/node':
       specifier: ^26.6.6
       version: 26.6.6
@@ -315,7 +315,7 @@ importers:
         version: 4.1.5(effect@4.1.5)(vitest@5.1.0)
       '@thomasfosterau/effect-jsonapi':
         specifier: 'catalog:'
-        version: 0.22.1(@effect/platform-node@4.1.5(effect@4.1.5)(redis@6.2.1))(effect@4.1.5)
+        version: 0.22.2(@effect/platform-node@4.1.5(effect@4.1.5)(redis@6.2.1))(effect@4.1.5)
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.6
@@ -413,7 +413,7 @@ importers:
         version: 4.1.5(effect@4.1.5)
       '@thomasfosterau/effect-jsonapi':
         specifier: 'catalog:'
-        version: 0.22.1(@effect/platform-node@4.1.5(effect@4.1.5)(redis@6.2.1))(effect@4.1.5)
+        version: 0.22.2(@effect/platform-node@4.1.5(effect@4.1.5)(redis@6.2.1))(effect@4.1.5)
       drizzle-kit:
         specifier: 'catalog:'
         version: 1.0.0-rc.5(drizzle-orm@1.0.0-rc.5(@effect/sql-pg@4.1.5(effect@4.1.5))(@types/pg@8.23.1)(effect@4.1.5)(pg@8.23.0))
@@ -1380,9 +1380,9 @@ packages:
       '@thomasfosterau/effect-parse':
         optional: true
 
-  '@thomasfosterau/effect-jsonapi@0.22.1':
-    resolution: {integrity: sha512-9Jaua/w1tYcSsslhim03VHGSRkzDz3qU0SrEd4e2m1KUXc2SL+xzeBBeldRXNRDW1dPYuV6czD3gdKjTSWjocQ==}
-    engines: {node: '>=22', pnpm: '>=11'}
+  '@thomasfosterau/effect-jsonapi@0.22.2':
+    resolution: {integrity: sha512-UiijACmRIHRjZrEx/rkaYsGAPsKVWI3Iy3wvsRcwjQxzVRjLqS9tPtTF2Ep8bUeql/xwEz+88o4KwGEWr3WNAw==}
+    engines: {node: '>=22'}
     peerDependencies:
       effect: 4.1.5
 
@@ -3977,7 +3977,7 @@ snapshots:
     optionalDependencies:
       '@effect/platform-node': 4.1.5(effect@4.1.5)(redis@6.2.1)
 
-  '@thomasfosterau/effect-jsonapi@0.22.1(@effect/platform-node@4.1.5(effect@4.1.5)(redis@6.2.1))(effect@4.1.5)':
+  '@thomasfosterau/effect-jsonapi@0.22.2(@effect/platform-node@4.1.5(effect@4.1.5)(redis@6.2.1))(effect@4.1.5)':
     dependencies:
       '@thomasfosterau/effect-ext': 0.3.1(@effect/platform-node@4.1.5(effect@4.1.5)(redis@6.2.1))(effect@4.1.5)
       effect: 4.1.5
