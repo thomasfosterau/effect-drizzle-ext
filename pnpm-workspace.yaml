@@ -21,7 +21,7 @@ catalog:
   "@effect/sql-pg": 4.1.5
   "@effect/vitest": 4.1.5
   "@effect/platform-node": 4.1.5
-  "@testcontainers/postgresql": ^12.2.1
+  "@testcontainers/postgresql": ^12.2.2
   # A dependency, not a peer: pure Schema helpers with no service identity.
   # Both 0.x lines export identical declarations for what core imports.
   "@thomasfosterau/effect-ext": ^0.3.1
