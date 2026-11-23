@@ -24,7 +24,7 @@ catalog:
   "@testcontainers/postgresql": ^12.2.2
   # A dependency, not a peer: pure Schema helpers with no service identity.
   # Both 0.x lines export identical declarations for what core imports.
-  "@thomasfosterau/effect-ext": ^0.3.1
+  "@thomasfosterau/effect-ext": ^0.4.0
   "@thomasfosterau/effect-jsonapi": ^0.22.2
   "@types/node": ^26.6.6
   # Must equal the vitest that vite-plus bundles (see `vitest` below).
