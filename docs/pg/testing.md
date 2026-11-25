@@ -141,16 +141,19 @@ it.effect("rejects a duplicate slug without poisoning the rest of the test", () 
 
 An explicit `PG*` target that does not answer fails with `DatabaseUnreachable`; the run never falls back silently. The database name is `<dbNamePrefix>_test_<sha256(migrationsDir)[:8]>`, so parallel worktrees sharing one server never drop each other's database; pass `migrationsDir` as an absolute path. The container `image` and `dbNamePrefix` are parameters: `pgvector/pgvector:pg17` in website and gardeneria, `postgres:17` in preferenceflow. By default the database is migrated with `./Migrations`' `applyMigrations` over `migrationsDir`; a harness whose migrations are not a drizzle-kit directory passes its own `applyMigrations: (url) => Effect<number, …>`.
 
+The settings are read through Effect `Config` as `TestDatabaseConfig`: the URLs and `PGPASSWORD` are `Redacted` from the moment they are read, empty values count as unset, and a malformed `PGPORT` fails with a `ConfigError`. They come from the current `ConfigProvider`, which defaults to `process.env`; a test supplies its own with `ConfigProvider.fromEnvRecord({ … })` or `fromUnknown`. The `env` record option still works for one more release but is deprecated.
+
 The resolution order is `resolveDatabaseSource(options)`. It is pure apart from one server probe, and the probe is injectable, so the order is unit-testable without a server. Fixture users and seed data stay with the application: the harness → database edge runs one way.
 
 ```ts
 export const provisionTestDatabase: <E, R>(
-  options: ProvisionOptions<E, R>, // { env, migrationsDir, dbNamePrefix, image, probe?, applyMigrations? }
+  options: ProvisionOptions<E, R>, // { migrationsDir, dbNamePrefix, image, probe?, applyMigrations? }
 ) => Effect.Effect<
   ProvisionedDatabase, // { url: Redacted<string>, source: DatabaseSource }
   | E
   | DatabaseUnreachable
   | InvalidDatabasePrefix
+  | ConfigError
   | ContainerStartFailed
   | SqlError
   | MigrationError
@@ -159,7 +162,7 @@ export const provisionTestDatabase: <E, R>(
 >;
 export const resolveDatabaseSource: (
   options: DatabaseSourceOptions,
-) => Effect.Effect<DatabaseSource, DatabaseUnreachable | InvalidDatabasePrefix>;
+) => Effect.Effect<DatabaseSource, DatabaseUnreachable | InvalidDatabasePrefix | ConfigError>;
 export type DatabaseSource =
   | { readonly _tag: "Explicit"; readonly url: Redacted<string> }
   | {
@@ -175,7 +178,19 @@ export const testDatabaseName: (options: {
   readonly prefix: string;
   readonly migrationsDir: string;
 }) => Effect.Effect<string, InvalidDatabasePrefix>;
-export const connectionUrl: (env: ResolutionEnvironment, database: string) => Redacted<string>;
+export const TestDatabaseConfig: Config<TestDatabaseSettings>;
+export interface TestDatabaseSettings {
+  readonly explicitUrl: Option<Redacted<string>>; // DATABASE_URL_TEST, else DATABASE_URL
+  readonly server: TestServer;
+}
+export interface TestServer {
+  readonly host: string; // PGHOST, default 127.0.0.1
+  readonly port: number; // PGPORT, default 5432
+  readonly user: string; // PGUSER, default postgres
+  readonly password: Option<Redacted<string>>; // PGPASSWORD
+  readonly explicit: boolean; // any PG* variable set
+}
+export const connectionUrl: (server: TestServer, database: string) => Redacted<string>;
 ```
 
 A vitest global setup holds a `Scope` across the run and closes it in the teardown it returns. This is this repository's own `packages/pg/tests/integration/global-setup.ts`:
@@ -185,7 +200,6 @@ export default async function setup() {
   const scope = Effect.runSync(Scope.make());
   const database = await Effect.runPromise(
     provisionTestDatabase({
-      env: process.env,
       migrationsDir: MIGRATIONS_DIR,
       dbNamePrefix: "effect_drizzle_ext",
       image: "pgvector/pgvector:pg17",

@@ -48,7 +48,10 @@ export {
   resolveDatabaseSource,
   type ServerProbe,
   ServerUnreachable,
+  TestDatabaseConfig,
+  type TestDatabaseSettings,
   testDatabaseName,
+  type TestServer,
 } from "./internal/provisioning.ts";
 
 // ── Connect-seam retry classification ─────────────────────────────────

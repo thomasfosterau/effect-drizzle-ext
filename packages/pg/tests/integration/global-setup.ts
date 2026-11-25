@@ -1,8 +1,9 @@
 /**
  * Vitest global setup for the integration suite: provision this run's
  * database through the package's own export, `provisionTestDatabase` from
- * `./Testing` — an explicit `DATABASE_URL_TEST` / `DATABASE_URL` (from the
- * environment, then `.env`) wins and is used as-is; otherwise a fresh
+ * `./Testing`, reading its settings through the default `ConfigProvider`
+ * (the environment, after `.env` is loaded into it) — an explicit
+ * `DATABASE_URL_TEST` / `DATABASE_URL` wins and is used as-is; otherwise a fresh
  * database on a reachable local server, or a `pgvector/pgvector:pg17`
  * container via Testcontainers, migrated with the committed fixture chain
  * (`tests/fixtures/migrations`) by `./Migrations`' `applyMigrations`.
@@ -33,7 +34,6 @@ export default async function setup(): Promise<() => Promise<void>> {
   const scope = await runtime.runPromise(Scope.make());
   const database = await runtime.runPromise(
     provisionTestDatabase({
-      env: process.env,
       migrationsDir: MIGRATIONS_DIR,
       dbNamePrefix: "effect_drizzle_ext",
       image: CONTAINER_IMAGE,
