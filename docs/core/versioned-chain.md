@@ -36,7 +36,7 @@ The chain writes stable columns once, at `create`; no later write touches them. 
 - **Per marker named in `branches`, a branch view** (`${level}_view`): one row per node of the marker's subtree leaves, with the marker's path and the leaf `type` (see [Branch views](#branch-views)). An optional per-leaf `project` adds columns such as a search text.
 - **Per keyed leaf, a keyed view** (one row per key, and one `NULL`-key row for a head with none).
 - **Per pointer and leaf named in `pointers`, the leaf view at the pointer's effective fact.** It projects the head's `action` and `${pointer}At`, and composes with the keyed view.
-- **`asOf(leaf, { version } | { at })`:** the leaf view at an older point, as a subquery.
+- **`asOf(leaf, { version } | { at })`:** the leaf view at an older point, as a subquery. `at` is a `DateTime.Utc` (a `Date` is still accepted for one release).
 
 Every derived view reads base tables only, never another view. Each view's row type is derived from the tree. The write side is [`@thomasfosterau/effect-drizzle-ext-pg/Chain`](https://github.com/thomasfosterau/effect-drizzle-ext/blob/trunk/docs/pg/chain.md).
 
@@ -101,7 +101,7 @@ On the fixture chain (PostgreSQL 16.15, two leaves, 50,000 books and 50,000 essa
 
 **No view built by `makeCurrentVersionView` may select from another view built by `makeCurrentVersionView`** — a library-level rule, not just an observation about the DROP-ordering hazard above.
 
-The read shapes of a chain are structural types, so a history listing and the page that renders it can share them without depending on an operations module. `VersionChainEntry<Action>` is one `{ version, action, timestamp }` row. `VersionSnapshot<Action, Extra>` is one version's reconstructed state: the entry plus `columns` (every leaf-chain domain column at that version) and whatever branch-level facts `Extra` names. `Action` defaults to `"create" | "update" | "delete"`. `versionTimestamps(row)` reads a current-version row's `createdAt` / `updatedAt` pair: `updatedAt` is the current `timestamp`, and `createdAt` comes from the birth-row merge, falling back to `updatedAt` for a view that has none.
+The read shapes of a chain are structural types, so a history listing and the page that renders it can share them without depending on an operations module. `VersionChainEntry<Action>` is one `{ version, action, timestamp }` row, its `timestamp` a `DateTime.Utc`. `VersionSnapshot<Action, Extra>` is one version's reconstructed state: the entry plus `columns` (every leaf-chain domain column at that version) and whatever branch-level facts `Extra` names. `Action` defaults to `"create" | "update" | "delete"`. `versionTimestamps(row)` reads a current-version row's `createdAt` / `updatedAt` pair: `updatedAt` is the current `timestamp`, and `createdAt` comes from the birth-row merge, falling back to `updatedAt` for a view that has none. It takes the Drizzle row's `Date`s and returns `DateTime.Utc`s: the domain types carry Effect's `DateTime`, and Drizzle's `Date` stays at the edge.
 
 The three read-shape types (`VersionAction`, `VersionChainEntry`, `VersionSnapshot`) are also exported from the Drizzle-free `@thomasfosterau/effect-drizzle-ext/Annotation` (the root entry's `Annotation` namespace), as the same types: a client-bundled package that only names them imports them from there and keeps `drizzle-orm` out of its module graph.
 
@@ -133,7 +133,7 @@ export type VersionAction = "create" | "update" | "delete";
 export interface VersionChainEntry<Action extends string = VersionAction> {
   readonly version: bigint;
   readonly action: Action;
-  readonly timestamp: Date;
+  readonly timestamp: DateTime.Utc;
 }
 export type VersionSnapshot<
   Action extends string = VersionAction,
@@ -142,5 +142,5 @@ export type VersionSnapshot<
 export const versionTimestamps: (row: {
   readonly timestamp: Date;
   readonly createdAt?: Date | null | undefined;
-}) => { readonly createdAt: Date; readonly updatedAt: Date };
+}) => { readonly createdAt: DateTime.Utc; readonly updatedAt: DateTime.Utc };
 ```

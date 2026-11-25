@@ -688,6 +688,7 @@ export type Checks = [
   /** _entryAction */ Assert<Equals<VersionChainEntry["action"], "create" | "update" | "delete">>,
   /** _snapshotDraft */ Assert<Equals<Snapshot["draft"], boolean | undefined>>,
   /** _snapshotVersion */ Assert<Equals<Snapshot["version"], bigint>>,
+  /** _entryTimestamp */ Assert<Equals<VersionChainEntry["timestamp"], DateTime.Utc>>,
   // `./Annotation` (Drizzle-free) exports the same read shapes as
   // `./VersionedChain`.
   /** _rootEntry */ Assert<Equals<RootVersionChainEntry, VersionChainEntry>>,
@@ -783,6 +784,9 @@ export type Checks = [
   /** _tinFromRoot */ Assert<Equals<typeof tinFromRoot, SQL<boolean>>>,
   /** _tinPhrase */ Assert<Equals<typeof tinPhrase, Option.Option<string>>>,
   /** _timestamps */ Assert<
-    Equals<typeof filmTimestamps, { readonly createdAt: Date; readonly updatedAt: Date }>
+    Equals<
+      typeof filmTimestamps,
+      { readonly createdAt: DateTime.Utc; readonly updatedAt: DateTime.Utc }
+    >
   >,
 ];
