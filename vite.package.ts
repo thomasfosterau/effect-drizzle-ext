@@ -54,7 +54,7 @@ const packageTasks = (cacheInputs: CacheInputs): RunTasks => {
     // consumer would; the workspace `exports` resolve that name to `src/`, so
     // no build is needed first. `docs/` is generated and gitignored.
     docgen: {
-      command: "docgen",
+      command: 'PATH="$(cd ../../scripts/bin && pwd):$PATH" docgen',
       cache: { input: [...input, "!docs/**"], output: ["docs/**"] },
     },
   };

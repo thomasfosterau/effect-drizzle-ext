@@ -42,6 +42,8 @@ CI ([ci.yml](../.github/workflows/ci.yml)) runs `vp run ci` on Node `lts` and `l
 
 ## Dependencies
 
+Dependabot ([dependabot.yml](../.github/dependabot.yml)) opens `@thomasfosterau/*` updates daily and every other update weekly, on Wednesday morning Melbourne time: the named runtime sets (`effect` and the like) each in one PR, and every other development dependency in the single `toolchain` group. Security updates skip the schedule and open as soon as an advisory lands, one PR each. Vite+ selects Node.js from `.node-version` and pnpm from `packageManager`; pnpm's own switching is off (`runtimeOnFail` / `pmOnFail`), so one version of each is installed and used.
+
 Every external version lives in the `pnpm-workspace.yaml` catalog; package.json files use `catalog:`, `catalog:peers` or `workspace:`. After editing the catalog, run `vp install` and commit `pnpm-lock.yaml`.
 
 Dependabot groups the sets that must move together (toolchain, effect, drizzle), but can't make the toolchain moves below: make them in a PR from a new branch started from its PR's head (never push to a `dependabot/*` branch, which stops it rebasing), and Dependabot closes its own PR once yours merges. For a toolchain update: run `vp dlx --package=vite-plus@<v> vp migrate --no-interactive` to re-pin `vite` and `vitest`, then drop any `minimumReleaseAgeExclude` entries it adds; move `typescript` / `@typescript/native` only to a pair the new `@effect/tsgo` supports (see the catalog comment).
