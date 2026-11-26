@@ -422,21 +422,30 @@ describe("version-chain read shapes", () => {
 });
 
 describe("versionTimestamps", () => {
-  const born = DateTime.toDateUtc(DateTime.makeUnsafe("2024-01-01T00:00:00.000Z"));
-  const edited = DateTime.toDateUtc(DateTime.makeUnsafe("2024-06-01T00:00:00.000Z"));
+  const born = DateTime.makeUnsafe("2024-01-01T00:00:00.000Z");
+  const edited = DateTime.makeUnsafe("2024-06-01T00:00:00.000Z");
 
   it("reads createdAt off the birth row and updatedAt off the current version", () => {
-    expect(versionTimestamps({ timestamp: edited, createdAt: born })).toEqual({
-      createdAt: born,
-      updatedAt: edited,
+    const pair = versionTimestamps({
+      timestamp: DateTime.toDateUtc(edited),
+      createdAt: DateTime.toDateUtc(born),
     });
+    expect(DateTime.Equivalence(pair.createdAt, born)).toBe(true);
+    expect(DateTime.Equivalence(pair.updatedAt, edited)).toBe(true);
   });
 
   it("falls back to the current timestamp for a view with no birth-row merge", () => {
-    expect(versionTimestamps({ timestamp: edited })).toEqual({
-      createdAt: edited,
-      updatedAt: edited,
+    Arr.forEach([undefined, null], (createdAt) => {
+      const pair = versionTimestamps({ timestamp: DateTime.toDateUtc(edited), createdAt });
+      expect(DateTime.Equivalence(pair.createdAt, edited)).toBe(true);
+      expect(DateTime.Equivalence(pair.updatedAt, edited)).toBe(true);
     });
-    expect(versionTimestamps({ timestamp: edited, createdAt: null }).createdAt).toBe(edited);
+  });
+
+  it("returns DateTime.Utc", () => {
+    expectTypeOf(versionTimestamps({ timestamp: DateTime.toDateUtc(edited) })).toEqualTypeOf<{
+      readonly createdAt: DateTime.Utc;
+      readonly updatedAt: DateTime.Utc;
+    }>();
   });
 });

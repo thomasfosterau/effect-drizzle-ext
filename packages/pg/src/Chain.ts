@@ -28,6 +28,7 @@ import {
 import type { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import * as Arr from "effect/Array";
 import type * as Context from "effect/Context";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as P from "effect/Predicate";
@@ -389,8 +390,11 @@ export interface ChainPointerInput<P extends string> extends ChainPrecondition {
   readonly id: string;
   /** The version the pointer names from `at` on; `Option.none()` clears it. */
   readonly version: Option.Option<bigint>;
-  /** When the fact takes effect (a scheduled publish); now when absent. */
-  readonly at?: Date;
+  /**
+   * When the fact takes effect (a scheduled publish); now when absent. A
+   * `Date` is still accepted for one release; pass a `DateTime.Utc`.
+   */
+  readonly at?: DateTime.Utc | Date;
   /** The acting account, recorded in the log's actor column. */
   readonly actor: string | undefined;
 }
@@ -601,11 +605,14 @@ const initialKeyed = (level: Option.Option<KeyedRows>): KeyedRows =>
     (values) => present(values),
   );
 
-/** A root version row as the chain reads it: decoded at the driver boundary. */
+/**
+ * A root version row as the chain reads it: decoded at the driver boundary,
+ * Drizzle's `Date` timestamp to a `DateTime.Utc`.
+ */
 const ChainEntryRow = Schema.Struct({
   version: Schema.BigInt,
   action: Schema.Literals(["create", "update", "delete"]),
-  timestamp: Schema.Date,
+  timestamp: Schema.DateTimeUtcFromDate,
 });
 
 /** Decode a root version row; a row that doesn't fit is a broken table, a defect. */
@@ -1186,7 +1193,8 @@ export const makeVersionChain = <
           version: Option.getOrNull(input.version),
           actor: input.actor,
           // Drizzle writes `DEFAULT` (now) for an absent `at`.
-          at: input.at,
+          at:
+            input.at === undefined || P.isDate(input.at) ? input.at : DateTime.toDateUtc(input.at),
         })
         .returning({ seq: columnOf(log, "seq") });
       const seq = yield* Effect.orDie(decodeSeq(rows));

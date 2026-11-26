@@ -14,6 +14,7 @@
 import { classifyError } from "@thomasfosterau/effect-drizzle-ext/Errors";
 import { eq, sql } from "drizzle-orm";
 import * as Cause from "effect/Cause";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
@@ -356,7 +357,11 @@ integrationLayer(database)((it) => {
             [1n, "update"],
             [2n, "delete"],
           ]);
-          expect(entries[0]?.timestamp).toBeInstanceOf(Date);
+          expect(
+            entries.every(
+              (entry) => DateTime.isDateTime(entry.timestamp) && DateTime.isUtc(entry.timestamp),
+            ),
+          ).toBe(true);
         }),
       ),
     );

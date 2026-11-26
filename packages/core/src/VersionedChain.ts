@@ -65,6 +65,7 @@ import {
 import * as LiteralExact from "@thomasfosterau/effect-ext/LiteralExact";
 import * as Arr from "effect/Array";
 import * as Data from "effect/Data";
+import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";
 import * as P from "effect/Predicate";
@@ -641,9 +642,9 @@ export type {
 /** The `createdAt` / `updatedAt` pair {@link versionTimestamps} returns. */
 export interface VersionTimestamps {
   /** The birth row's timestamp, or `updatedAt` when the view merges none in. */
-  readonly createdAt: Date;
+  readonly createdAt: DateTime.Utc;
   /** The current version's `timestamp`. */
-  readonly updatedAt: Date;
+  readonly updatedAt: DateTime.Utc;
 }
 
 /**
@@ -651,14 +652,15 @@ export interface VersionTimestamps {
  * the current version's `timestamp`; `createdAt` is the birth row's own
  * timestamp where the view merges one in (a function `merge` of
  * {@link makeCurrentVersionView}), and falls back to `updatedAt` for a view
- * that carries none.
+ * that carries none. The row is Drizzle's, so it reads `Date`s; the pair is
+ * `DateTime.Utc`.
  */
 export const versionTimestamps = (row: {
   readonly timestamp: Date;
   readonly createdAt?: Date | null | undefined;
 }): VersionTimestamps => ({
-  createdAt: row.createdAt ?? row.timestamp,
-  updatedAt: row.timestamp,
+  createdAt: DateTime.fromDateUnsafe(row.createdAt ?? row.timestamp),
+  updatedAt: DateTime.fromDateUnsafe(row.timestamp),
 });
 
 // ── Tree → tables ─────────────────────────────────────────────────────
@@ -1526,8 +1528,13 @@ export interface TreeViewsConfig<BR, PV = Record<never, never>> {
 /**
  * The point an {@link TreeViews.asOf} read resolves each node at: the latest
  * version at or below `version`, or the latest written at or before `at`.
+ * A `Date` `at` is still accepted for one release; pass a `DateTime.Utc`.
  */
-export type AsOfPoint = { readonly version: bigint } | { readonly at: Date };
+export type AsOfPoint = { readonly version: bigint } | { readonly at: DateTime.Utc | Date };
+
+/** An {@link AsOfPoint}'s `at` as the `Date` Drizzle binds. */
+const toDate = (at: DateTime.Utc | Date): Date =>
+  DateTime.isDateTime(at) ? DateTime.toDateUtc(at) : at;
 
 /** Everything {@link makeTreeViews} derives from a tree. */
 /** The leaves `PV` names for pointer `N`. */
@@ -2458,7 +2465,7 @@ export const makeTreeViews = <
       const columns = getTableColumns(table);
       return "version" in point
         ? lte(columnOf(columns, "version"), point.version)
-        : lte(columnOf(columns, "timestamp"), point.at);
+        : lte(columnOf(columns, "timestamp"), toDate(point.at));
     };
     const driver = ArmDriver.Head({ bound: Option.some(within) });
     return armOf(qb, `asOf("${leaf}")`, driver, leaf).as(`${leaf}_as_of`);

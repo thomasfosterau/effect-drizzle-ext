@@ -167,7 +167,7 @@ describe("setPointer", () => {
           pointer: "live",
           id: BOOK,
           version: Option.some(0n),
-          at: DateTime.toDateUtc(DateTime.add(yield* DateTime.now, { days: 1 })),
+          at: DateTime.add(yield* DateTime.now, { days: 1 }),
           actor: ACTOR,
         });
         expect(yield* liveVersion()).toEqual([]);

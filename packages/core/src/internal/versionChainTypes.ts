@@ -8,6 +8,7 @@
  * @module internal/versionChainTypes
  */
 
+import type * as DateTime from "effect/DateTime";
 import type * as Schema from "effect/Schema";
 
 /**
@@ -28,7 +29,7 @@ export interface VersionChainEntry<Action extends string = VersionAction> {
   /** The edit action this version recorded. */
   readonly action: Action;
   /** When the version was written. */
-  readonly timestamp: Date;
+  readonly timestamp: DateTime.Utc;
 }
 
 /**

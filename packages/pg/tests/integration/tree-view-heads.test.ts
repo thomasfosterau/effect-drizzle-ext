@@ -362,13 +362,16 @@ integrationLayerWith(
               oracle: trunkAsOf(views, leaf, `"ontology"."node_version"."version" <= ${version}`),
             })),
           );
+          // A `Date` point is still accepted, and must resolve the same rows.
           const byTime = Arr.flatMap(LEAVES, (leaf) =>
-            Arr.map(TIME_POINTS, ({ iso, nonEmpty }) => ({
-              expectNonEmpty: Arr.contains(nonEmpty, leaf),
-              label: `${leaf} at ${iso}`,
-              query: sql`select * from ${ontologyViews.asOf(leaf, { at: date(iso) })}`,
-              oracle: trunkAsOf(views, leaf, `"ontology"."node_version"."timestamp" <= '${iso}'`),
-            })),
+            Arr.flatMap(TIME_POINTS, ({ iso, nonEmpty }) =>
+              Arr.map([DateTime.makeUnsafe(iso), date(iso)], (point) => ({
+                expectNonEmpty: Arr.contains(nonEmpty, leaf),
+                label: `${leaf} at ${iso}${DateTime.isDateTime(point) ? "" : " (Date)"}`,
+                query: sql`select * from ${ontologyViews.asOf(leaf, { at: point })}`,
+                oracle: trunkAsOf(views, leaf, `"ontology"."node_version"."timestamp" <= '${iso}'`),
+              })),
+            ),
           );
           const results = yield* Effect.forEach(
             [...byVersion, ...byTime],
