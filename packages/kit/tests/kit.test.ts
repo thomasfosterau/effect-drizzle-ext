@@ -40,7 +40,7 @@ const PG_FIXTURES = `${import.meta.dirname}/../../pg/tests/fixtures`;
 /** drizzle-kit's own bin, run with this Node: the package has no `.bin` of its own under pnpm's hoisting. */
 const DRIZZLE_KIT = [
   process.execPath,
-  decodeURIComponent(new URL("bin.cjs", import.meta.resolve("drizzle-kit")).pathname),
+  decodeURIComponent(new URL("bin.js", import.meta.resolve("drizzle-kit")).pathname),
 ];
 
 const runtime = ManagedRuntime.make(NodeServices.layer);

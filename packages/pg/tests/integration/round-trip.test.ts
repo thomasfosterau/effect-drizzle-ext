@@ -5,8 +5,8 @@
  * server. Two runtimes: the plain `pgClientFromUrl` layer, and one that
  * forwards a `types` registry (an int8 -> decimal-string codec) through the
  * helper. The registry was the fix for `bigint({ mode: "string" })` under the
- * `1.0.0-rc.5-ab785fc` commit build; the published
- * drizzle-orm `1.0.0-rc.5` decodes it itself, so both runtimes now agree.
+ * `1.0.0-rc.5-ab785fc` commit build; published drizzle-orm decodes it
+ * itself, so both runtimes now agree.
  *
  * Both tables live in a rolled-back transaction, so nothing is left behind.
  *
@@ -97,15 +97,13 @@ describe("Drizzle round trip over the binary driver", () => {
   });
 
   layer(databaseLayer(), { excludeTestServices: true })((it) => {
-    it.effect(
-      "round-trips the same row without a registry (drizzle-orm 1.0.0-rc.5's own codecs)",
-      () =>
-        Effect.gen(function* () {
-          const rows = yield* inTestTransaction(roundTrip());
-          // The commit build handed `big` back as a JS bigint here, against
-          // drizzle's `string` type; the published rc.5 returns the decimal string.
-          expect(rows).toEqual([{ id: 1, mood: "happy", big: BIG, at: AT }]);
-        }),
+    it.effect("round-trips the same row without a registry (drizzle-orm's own codecs)", () =>
+      Effect.gen(function* () {
+        const rows = yield* inTestTransaction(roundTrip());
+        // The commit build handed `big` back as a JS bigint here, against
+        // drizzle's `string` type; published drizzle-orm returns the decimal string.
+        expect(rows).toEqual([{ id: 1, mood: "happy", big: BIG, at: AT }]);
+      }),
     );
   });
 });

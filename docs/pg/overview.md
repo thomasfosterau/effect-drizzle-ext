@@ -49,7 +49,17 @@ Both output `PgClient | SqlClient` — that is what `@effect/sql-pg`'s own `PgCl
 
 ### Binary codecs and Drizzle (read this before upgrading the driver)
 
-`@effect/sql-pg` rc.113 and later talks to PostgreSQL in the **binary** protocol only, and decodes each column by OID. Drizzle's `effect-postgres` driver was written for the text protocol, so under the `1.0.0-rc.5-ab785fc` commit build some column types broke or were silently corrupted: user enums and enum arrays, `vector`, `interval`, `tsvector`, `time`, `macaddr`, and `bigint({ mode: "string" })` (the driver handed back a JS `bigint` where Drizzle's type says `string`). The published `drizzle-orm@1.0.0-rc.5`, which this package is built against, reads most of them itself: it selects enums and their arrays, `vector`, `interval`, `tsvector` and `regconfig` as `::text`, and returns a string-mode `bigint` as a string.
+`@effect/sql-pg` talks to PostgreSQL in the **binary** protocol only, and decodes each column by OID. `drizzle-orm@1.0.0-rc.6`, which this package is built against, no longer selects the types that format breaks as `::text` (rc.5 did), so a bare select of these columns fails to decode or comes back in another shape. Select them through a cast instead:
+
+| Column | Bare select over `@effect/sql-pg` | Select instead |
+| --- | --- | --- |
+| enum array | fails to decode | ``sql<ReadonlyArray<string>>`${column}::text[]` `` |
+| `vector` | fails (drizzle marks it unsupported) | ``sql<ReadonlyArray<number>>`${column}::real[]` `` |
+| `macaddr` / `macaddr8` | fails (unsupported) | ``sql<string>`${column}::text` `` |
+| `regconfig` (core's `Search.regconfig`) | fails to decode (the value is an OID) | `Search.configName(column)` |
+| `interval` | `@effect/sql-pg`'s interval object, not the string Drizzle's type says | ``sql<string>`${column}::text` `` |
+
+Scalar enums, `time`, `timestamptz` and `bigint({ mode: "string" })` read back as Drizzle's types say. `tests/integration/binary-reads.test.ts` pins both halves of the table, so it fails when a drizzle-orm release reads these types itself again.
 
 For a column type it still doesn't cover, use a per-client codec registry. Both helpers forward two optional `@effect/sql-pg` options for it:
 

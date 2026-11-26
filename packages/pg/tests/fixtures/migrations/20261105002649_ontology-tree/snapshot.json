@@ -1,18 +1,31 @@
 {
   "type": "diff",
-  "version": "9",
+  "version": "10",
   "dialect": "postgres",
   "id": "ffcab908-0c2b-4531-bd7f-ceaf73fdabbe",
-  "prevIds": ["fa7acbdc-ec40-469b-bbdd-82348f947ba3"],
+  "prevIds": [
+    "fa7acbdc-ec40-469b-bbdd-82348f947ba3"
+  ],
   "footprints": [
     {
       "statementType": "create_schema",
-      "statementTarget": ["schema", "ontology"],
-      "writes": ["s|sch|ontology", "n|sch|ontology", "e|sch|ontology"]
+      "statementTarget": [
+        "schema",
+        "ontology"
+      ],
+      "writes": [
+        "s|sch|ontology",
+        "n|sch|ontology",
+        "e|sch|ontology"
+      ]
     },
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "ontology", "agent"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "agent"
+      ],
       "writes": [
         "s|tbl|ontology.agent",
         "n|tbl|ontology.agent",
@@ -22,11 +35,17 @@
         "n|rel|ontology.agent_pkey",
         "n|rel|ontology.agent_id_type_unique"
       ],
-      "reads": ["n|sch|ontology"]
+      "reads": [
+        "n|sch|ontology"
+      ]
     },
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "ontology", "agent_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "agent_version"
+      ],
       "writes": [
         "s|tbl|ontology.agent_version",
         "n|tbl|ontology.agent_version",
@@ -35,11 +54,17 @@
         "n|type|ontology.agent_version",
         "n|rel|ontology.agent_version_pkey"
       ],
-      "reads": ["n|sch|ontology"]
+      "reads": [
+        "n|sch|ontology"
+      ]
     },
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "ontology", "book"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "book"
+      ],
       "writes": [
         "s|tbl|ontology.book",
         "n|tbl|ontology.book",
@@ -49,11 +74,17 @@
         "n|rel|ontology.book_pkey",
         "n|rel|ontology.book_id_type_unique"
       ],
-      "reads": ["n|sch|ontology"]
+      "reads": [
+        "n|sch|ontology"
+      ]
     },
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "ontology", "book_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "book_version"
+      ],
       "writes": [
         "s|tbl|ontology.book_version",
         "n|tbl|ontology.book_version",
@@ -62,11 +93,17 @@
         "n|type|ontology.book_version",
         "n|rel|ontology.book_version_pkey"
       ],
-      "reads": ["n|sch|ontology"]
+      "reads": [
+        "n|sch|ontology"
+      ]
     },
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "ontology", "edition"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "edition"
+      ],
       "writes": [
         "s|tbl|ontology.edition",
         "n|tbl|ontology.edition",
@@ -76,11 +113,17 @@
         "n|rel|ontology.edition_pkey",
         "n|rel|ontology.edition_id_type_unique"
       ],
-      "reads": ["n|sch|ontology"]
+      "reads": [
+        "n|sch|ontology"
+      ]
     },
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "ontology", "edition_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "edition_version"
+      ],
       "writes": [
         "s|tbl|ontology.edition_version",
         "n|tbl|ontology.edition_version",
@@ -89,11 +132,17 @@
         "n|type|ontology.edition_version",
         "n|rel|ontology.edition_version_pkey"
       ],
-      "reads": ["n|sch|ontology"]
+      "reads": [
+        "n|sch|ontology"
+      ]
     },
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "ontology", "essay"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "essay"
+      ],
       "writes": [
         "s|tbl|ontology.essay",
         "n|tbl|ontology.essay",
@@ -103,11 +152,17 @@
         "n|rel|ontology.essay_pkey",
         "n|rel|ontology.essay_id_type_unique"
       ],
-      "reads": ["n|sch|ontology"]
+      "reads": [
+        "n|sch|ontology"
+      ]
     },
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "ontology", "essay_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "essay_version"
+      ],
       "writes": [
         "s|tbl|ontology.essay_version",
         "n|tbl|ontology.essay_version",
@@ -116,11 +171,17 @@
         "n|type|ontology.essay_version",
         "n|rel|ontology.essay_version_pkey"
       ],
-      "reads": ["n|sch|ontology"]
+      "reads": [
+        "n|sch|ontology"
+      ]
     },
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "ontology", "manifestation"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "manifestation"
+      ],
       "writes": [
         "s|tbl|ontology.manifestation",
         "n|tbl|ontology.manifestation",
@@ -130,11 +191,17 @@
         "n|rel|ontology.manifestation_pkey",
         "n|rel|ontology.manifestation_id_type_unique"
       ],
-      "reads": ["n|sch|ontology"]
+      "reads": [
+        "n|sch|ontology"
+      ]
     },
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "ontology", "manifestation_isbn"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "manifestation_isbn"
+      ],
       "writes": [
         "s|tbl|ontology.manifestation_isbn",
         "n|tbl|ontology.manifestation_isbn",
@@ -143,11 +210,17 @@
         "n|type|ontology.manifestation_isbn",
         "n|rel|ontology.manifestation_isbn_pkey"
       ],
-      "reads": ["n|sch|ontology"]
+      "reads": [
+        "n|sch|ontology"
+      ]
     },
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "ontology", "manifestation_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "manifestation_version"
+      ],
       "writes": [
         "s|tbl|ontology.manifestation_version",
         "n|tbl|ontology.manifestation_version",
@@ -156,11 +229,17 @@
         "n|type|ontology.manifestation_version",
         "n|rel|ontology.manifestation_version_pkey"
       ],
-      "reads": ["n|sch|ontology"]
+      "reads": [
+        "n|sch|ontology"
+      ]
     },
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "ontology", "node"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "node"
+      ],
       "writes": [
         "s|tbl|ontology.node",
         "n|tbl|ontology.node",
@@ -170,11 +249,17 @@
         "n|rel|ontology.node_pkey",
         "n|rel|ontology.node_id_type_unique"
       ],
-      "reads": ["n|sch|ontology"]
+      "reads": [
+        "n|sch|ontology"
+      ]
     },
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "ontology", "node_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "node_version"
+      ],
       "writes": [
         "s|tbl|ontology.node_version",
         "n|tbl|ontology.node_version",
@@ -183,11 +268,17 @@
         "n|type|ontology.node_version",
         "n|rel|ontology.node_version_pkey"
       ],
-      "reads": ["n|sch|ontology"]
+      "reads": [
+        "n|sch|ontology"
+      ]
     },
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "ontology", "organisation"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "organisation"
+      ],
       "writes": [
         "s|tbl|ontology.organisation",
         "n|tbl|ontology.organisation",
@@ -197,11 +288,17 @@
         "n|rel|ontology.organisation_pkey",
         "n|rel|ontology.organisation_id_type_unique"
       ],
-      "reads": ["n|sch|ontology"]
+      "reads": [
+        "n|sch|ontology"
+      ]
     },
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "ontology", "organisation_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "organisation_version"
+      ],
       "writes": [
         "s|tbl|ontology.organisation_version",
         "n|tbl|ontology.organisation_version",
@@ -210,11 +307,17 @@
         "n|type|ontology.organisation_version",
         "n|rel|ontology.organisation_version_pkey"
       ],
-      "reads": ["n|sch|ontology"]
+      "reads": [
+        "n|sch|ontology"
+      ]
     },
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "ontology", "person"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "person"
+      ],
       "writes": [
         "s|tbl|ontology.person",
         "n|tbl|ontology.person",
@@ -224,11 +327,17 @@
         "n|rel|ontology.person_pkey",
         "n|rel|ontology.person_id_type_unique"
       ],
-      "reads": ["n|sch|ontology"]
+      "reads": [
+        "n|sch|ontology"
+      ]
     },
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "ontology", "person_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "person_version"
+      ],
       "writes": [
         "s|tbl|ontology.person_version",
         "n|tbl|ontology.person_version",
@@ -237,11 +346,17 @@
         "n|type|ontology.person_version",
         "n|rel|ontology.person_version_pkey"
       ],
-      "reads": ["n|sch|ontology"]
+      "reads": [
+        "n|sch|ontology"
+      ]
     },
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "ontology", "work"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "work"
+      ],
       "writes": [
         "s|tbl|ontology.work",
         "n|tbl|ontology.work",
@@ -251,11 +366,17 @@
         "n|rel|ontology.work_pkey",
         "n|rel|ontology.work_id_type_unique"
       ],
-      "reads": ["n|sch|ontology"]
+      "reads": [
+        "n|sch|ontology"
+      ]
     },
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "ontology", "work_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "work_version"
+      ],
       "writes": [
         "s|tbl|ontology.work_version",
         "n|tbl|ontology.work_version",
@@ -264,11 +385,17 @@
         "n|type|ontology.work_version",
         "n|rel|ontology.work_version_pkey"
       ],
-      "reads": ["n|sch|ontology"]
+      "reads": [
+        "n|sch|ontology"
+      ]
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "agent"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "agent"
+      ],
       "writes": [
         "s|fk|ontology.agent.agent_id_node_id_fkey",
         "n|fk|ontology.agent.agent_id_node_id_fkey",
@@ -287,7 +414,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "agent"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "agent"
+      ],
       "writes": [
         "s|fk|ontology.agent.agent_id_type_fk",
         "n|fk|ontology.agent.agent_id_type_fk",
@@ -308,7 +439,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "agent_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "agent_version"
+      ],
       "writes": [
         "s|fk|ontology.agent_version.agent_version_id_agent_id_fkey",
         "n|fk|ontology.agent_version.agent_version_id_agent_id_fkey",
@@ -327,7 +462,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "agent_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "agent_version"
+      ],
       "writes": [
         "s|fk|ontology.agent_version.agent_version_node_version_fk",
         "n|fk|ontology.agent_version.agent_version_node_version_fk",
@@ -348,7 +487,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "book"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "book"
+      ],
       "writes": [
         "s|fk|ontology.book.book_id_work_id_fkey",
         "n|fk|ontology.book.book_id_work_id_fkey",
@@ -367,7 +510,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "book"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "book"
+      ],
       "writes": [
         "s|fk|ontology.book.book_id_type_fk",
         "n|fk|ontology.book.book_id_type_fk",
@@ -388,7 +535,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "book_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "book_version"
+      ],
       "writes": [
         "s|fk|ontology.book_version.book_version_id_book_id_fkey",
         "n|fk|ontology.book_version.book_version_id_book_id_fkey",
@@ -407,7 +558,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "book_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "book_version"
+      ],
       "writes": [
         "s|fk|ontology.book_version.book_version_work_version_fk",
         "n|fk|ontology.book_version.book_version_work_version_fk",
@@ -428,7 +583,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "edition"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "edition"
+      ],
       "writes": [
         "s|fk|ontology.edition.edition_id_manifestation_id_fkey",
         "n|fk|ontology.edition.edition_id_manifestation_id_fkey",
@@ -447,7 +606,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "edition"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "edition"
+      ],
       "writes": [
         "s|fk|ontology.edition.edition_id_type_fk",
         "n|fk|ontology.edition.edition_id_type_fk",
@@ -468,7 +631,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "edition_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "edition_version"
+      ],
       "writes": [
         "s|fk|ontology.edition_version.edition_version_id_edition_id_fkey",
         "n|fk|ontology.edition_version.edition_version_id_edition_id_fkey",
@@ -487,7 +654,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "edition_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "edition_version"
+      ],
       "writes": [
         "s|fk|ontology.edition_version.edition_version_manifestation_version_fk",
         "n|fk|ontology.edition_version.edition_version_manifestation_version_fk",
@@ -508,7 +679,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "essay"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "essay"
+      ],
       "writes": [
         "s|fk|ontology.essay.essay_id_work_id_fkey",
         "n|fk|ontology.essay.essay_id_work_id_fkey",
@@ -527,7 +702,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "essay"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "essay"
+      ],
       "writes": [
         "s|fk|ontology.essay.essay_id_type_fk",
         "n|fk|ontology.essay.essay_id_type_fk",
@@ -548,7 +727,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "essay_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "essay_version"
+      ],
       "writes": [
         "s|fk|ontology.essay_version.essay_version_id_essay_id_fkey",
         "n|fk|ontology.essay_version.essay_version_id_essay_id_fkey",
@@ -567,7 +750,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "essay_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "essay_version"
+      ],
       "writes": [
         "s|fk|ontology.essay_version.essay_version_work_version_fk",
         "n|fk|ontology.essay_version.essay_version_work_version_fk",
@@ -588,7 +775,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "manifestation"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "manifestation"
+      ],
       "writes": [
         "s|fk|ontology.manifestation.manifestation_id_node_id_fkey",
         "n|fk|ontology.manifestation.manifestation_id_node_id_fkey",
@@ -607,7 +798,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "manifestation"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "manifestation"
+      ],
       "writes": [
         "s|fk|ontology.manifestation.manifestation_id_type_fk",
         "n|fk|ontology.manifestation.manifestation_id_type_fk",
@@ -628,7 +823,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "manifestation_isbn"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "manifestation_isbn"
+      ],
       "writes": [
         "s|fk|ontology.manifestation_isbn.manifestation_isbn_manifestation_version_fk",
         "n|fk|ontology.manifestation_isbn.manifestation_isbn_manifestation_version_fk",
@@ -649,7 +848,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "manifestation_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "manifestation_version"
+      ],
       "writes": [
         "s|fk|ontology.manifestation_version.manifestation_version_id_manifestation_id_fkey",
         "n|fk|ontology.manifestation_version.manifestation_version_id_manifestation_id_fkey",
@@ -668,7 +871,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "manifestation_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "manifestation_version"
+      ],
       "writes": [
         "s|fk|ontology.manifestation_version.manifestation_version_node_version_fk",
         "n|fk|ontology.manifestation_version.manifestation_version_node_version_fk",
@@ -689,7 +896,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "node_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "node_version"
+      ],
       "writes": [
         "s|fk|ontology.node_version.node_version_id_node_id_fkey",
         "n|fk|ontology.node_version.node_version_id_node_id_fkey",
@@ -708,7 +919,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "organisation"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "organisation"
+      ],
       "writes": [
         "s|fk|ontology.organisation.organisation_id_agent_id_fkey",
         "n|fk|ontology.organisation.organisation_id_agent_id_fkey",
@@ -727,7 +942,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "organisation"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "organisation"
+      ],
       "writes": [
         "s|fk|ontology.organisation.organisation_id_type_fk",
         "n|fk|ontology.organisation.organisation_id_type_fk",
@@ -748,7 +967,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "organisation_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "organisation_version"
+      ],
       "writes": [
         "s|fk|ontology.organisation_version.organisation_version_id_organisation_id_fkey",
         "n|fk|ontology.organisation_version.organisation_version_id_organisation_id_fkey",
@@ -767,7 +990,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "organisation_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "organisation_version"
+      ],
       "writes": [
         "s|fk|ontology.organisation_version.organisation_version_agent_version_fk",
         "n|fk|ontology.organisation_version.organisation_version_agent_version_fk",
@@ -788,7 +1015,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "person"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "person"
+      ],
       "writes": [
         "s|fk|ontology.person.person_id_agent_id_fkey",
         "n|fk|ontology.person.person_id_agent_id_fkey",
@@ -807,7 +1038,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "person"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "person"
+      ],
       "writes": [
         "s|fk|ontology.person.person_id_type_fk",
         "n|fk|ontology.person.person_id_type_fk",
@@ -828,7 +1063,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "person_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "person_version"
+      ],
       "writes": [
         "s|fk|ontology.person_version.person_version_id_person_id_fkey",
         "n|fk|ontology.person_version.person_version_id_person_id_fkey",
@@ -847,7 +1086,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "person_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "person_version"
+      ],
       "writes": [
         "s|fk|ontology.person_version.person_version_agent_version_fk",
         "n|fk|ontology.person_version.person_version_agent_version_fk",
@@ -868,7 +1111,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "work"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "work"
+      ],
       "writes": [
         "s|fk|ontology.work.work_id_node_id_fkey",
         "n|fk|ontology.work.work_id_node_id_fkey",
@@ -887,7 +1134,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "work"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "work"
+      ],
       "writes": [
         "s|fk|ontology.work.work_id_type_fk",
         "n|fk|ontology.work.work_id_type_fk",
@@ -908,7 +1159,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "work_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "work_version"
+      ],
       "writes": [
         "s|fk|ontology.work_version.work_version_id_work_id_fkey",
         "n|fk|ontology.work_version.work_version_id_work_id_fkey",
@@ -927,7 +1182,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "ontology", "work_version"],
+      "statementTarget": [
+        "table",
+        "ontology",
+        "work_version"
+      ],
       "writes": [
         "s|fk|ontology.work_version.work_version_node_version_fk",
         "n|fk|ontology.work_version.work_version_node_version_fk",
@@ -1837,10 +2096,14 @@
         "table": "agent",
         "name": "agent_id_node_id_fkey",
         "nameExplicit": false,
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "schemaTo": "ontology",
         "tableTo": "node",
-        "columnsTo": ["id"],
+        "columnsTo": [
+          "id"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -1853,10 +2116,16 @@
         "table": "agent",
         "name": "agent_id_type_fk",
         "nameExplicit": true,
-        "columns": ["id", "type"],
+        "columns": [
+          "id",
+          "type"
+        ],
         "schemaTo": "ontology",
         "tableTo": "node",
-        "columnsTo": ["id", "type"],
+        "columnsTo": [
+          "id",
+          "type"
+        ],
         "onUpdate": "CASCADE",
         "onDelete": "NO ACTION",
         "entityType": "fks"
@@ -1869,10 +2138,14 @@
         "table": "agent_version",
         "name": "agent_version_id_agent_id_fkey",
         "nameExplicit": false,
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "schemaTo": "ontology",
         "tableTo": "agent",
-        "columnsTo": ["id"],
+        "columnsTo": [
+          "id"
+        ],
         "onUpdate": "CASCADE",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -1885,10 +2158,16 @@
         "table": "agent_version",
         "name": "agent_version_node_version_fk",
         "nameExplicit": true,
-        "columns": ["id", "version"],
+        "columns": [
+          "id",
+          "version"
+        ],
         "schemaTo": "ontology",
         "tableTo": "node_version",
-        "columnsTo": ["id", "version"],
+        "columnsTo": [
+          "id",
+          "version"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "NO ACTION",
         "entityType": "fks"
@@ -1901,10 +2180,14 @@
         "table": "book",
         "name": "book_id_work_id_fkey",
         "nameExplicit": false,
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "schemaTo": "ontology",
         "tableTo": "work",
-        "columnsTo": ["id"],
+        "columnsTo": [
+          "id"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -1917,10 +2200,16 @@
         "table": "book",
         "name": "book_id_type_fk",
         "nameExplicit": true,
-        "columns": ["id", "type"],
+        "columns": [
+          "id",
+          "type"
+        ],
         "schemaTo": "ontology",
         "tableTo": "work",
-        "columnsTo": ["id", "type"],
+        "columnsTo": [
+          "id",
+          "type"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "NO ACTION",
         "entityType": "fks"
@@ -1933,10 +2222,14 @@
         "table": "book_version",
         "name": "book_version_id_book_id_fkey",
         "nameExplicit": false,
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "schemaTo": "ontology",
         "tableTo": "book",
-        "columnsTo": ["id"],
+        "columnsTo": [
+          "id"
+        ],
         "onUpdate": "CASCADE",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -1949,10 +2242,16 @@
         "table": "book_version",
         "name": "book_version_work_version_fk",
         "nameExplicit": true,
-        "columns": ["id", "version"],
+        "columns": [
+          "id",
+          "version"
+        ],
         "schemaTo": "ontology",
         "tableTo": "work_version",
-        "columnsTo": ["id", "version"],
+        "columnsTo": [
+          "id",
+          "version"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "NO ACTION",
         "entityType": "fks"
@@ -1965,10 +2264,14 @@
         "table": "edition",
         "name": "edition_id_manifestation_id_fkey",
         "nameExplicit": false,
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "schemaTo": "ontology",
         "tableTo": "manifestation",
-        "columnsTo": ["id"],
+        "columnsTo": [
+          "id"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -1981,10 +2284,16 @@
         "table": "edition",
         "name": "edition_id_type_fk",
         "nameExplicit": true,
-        "columns": ["id", "type"],
+        "columns": [
+          "id",
+          "type"
+        ],
         "schemaTo": "ontology",
         "tableTo": "manifestation",
-        "columnsTo": ["id", "type"],
+        "columnsTo": [
+          "id",
+          "type"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "NO ACTION",
         "entityType": "fks"
@@ -1997,10 +2306,14 @@
         "table": "edition_version",
         "name": "edition_version_id_edition_id_fkey",
         "nameExplicit": false,
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "schemaTo": "ontology",
         "tableTo": "edition",
-        "columnsTo": ["id"],
+        "columnsTo": [
+          "id"
+        ],
         "onUpdate": "CASCADE",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -2013,10 +2326,16 @@
         "table": "edition_version",
         "name": "edition_version_manifestation_version_fk",
         "nameExplicit": true,
-        "columns": ["id", "version"],
+        "columns": [
+          "id",
+          "version"
+        ],
         "schemaTo": "ontology",
         "tableTo": "manifestation_version",
-        "columnsTo": ["id", "version"],
+        "columnsTo": [
+          "id",
+          "version"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "NO ACTION",
         "entityType": "fks"
@@ -2029,10 +2348,14 @@
         "table": "essay",
         "name": "essay_id_work_id_fkey",
         "nameExplicit": false,
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "schemaTo": "ontology",
         "tableTo": "work",
-        "columnsTo": ["id"],
+        "columnsTo": [
+          "id"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -2045,10 +2368,16 @@
         "table": "essay",
         "name": "essay_id_type_fk",
         "nameExplicit": true,
-        "columns": ["id", "type"],
+        "columns": [
+          "id",
+          "type"
+        ],
         "schemaTo": "ontology",
         "tableTo": "work",
-        "columnsTo": ["id", "type"],
+        "columnsTo": [
+          "id",
+          "type"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "NO ACTION",
         "entityType": "fks"
@@ -2061,10 +2390,14 @@
         "table": "essay_version",
         "name": "essay_version_id_essay_id_fkey",
         "nameExplicit": false,
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "schemaTo": "ontology",
         "tableTo": "essay",
-        "columnsTo": ["id"],
+        "columnsTo": [
+          "id"
+        ],
         "onUpdate": "CASCADE",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -2077,10 +2410,16 @@
         "table": "essay_version",
         "name": "essay_version_work_version_fk",
         "nameExplicit": true,
-        "columns": ["id", "version"],
+        "columns": [
+          "id",
+          "version"
+        ],
         "schemaTo": "ontology",
         "tableTo": "work_version",
-        "columnsTo": ["id", "version"],
+        "columnsTo": [
+          "id",
+          "version"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "NO ACTION",
         "entityType": "fks"
@@ -2093,10 +2432,14 @@
         "table": "manifestation",
         "name": "manifestation_id_node_id_fkey",
         "nameExplicit": false,
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "schemaTo": "ontology",
         "tableTo": "node",
-        "columnsTo": ["id"],
+        "columnsTo": [
+          "id"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -2109,10 +2452,16 @@
         "table": "manifestation",
         "name": "manifestation_id_type_fk",
         "nameExplicit": true,
-        "columns": ["id", "type"],
+        "columns": [
+          "id",
+          "type"
+        ],
         "schemaTo": "ontology",
         "tableTo": "node",
-        "columnsTo": ["id", "type"],
+        "columnsTo": [
+          "id",
+          "type"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "NO ACTION",
         "entityType": "fks"
@@ -2125,10 +2474,16 @@
         "table": "manifestation_isbn",
         "name": "manifestation_isbn_manifestation_version_fk",
         "nameExplicit": true,
-        "columns": ["id", "version"],
+        "columns": [
+          "id",
+          "version"
+        ],
         "schemaTo": "ontology",
         "tableTo": "manifestation_version",
-        "columnsTo": ["id", "version"],
+        "columnsTo": [
+          "id",
+          "version"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -2141,10 +2496,14 @@
         "table": "manifestation_version",
         "name": "manifestation_version_id_manifestation_id_fkey",
         "nameExplicit": false,
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "schemaTo": "ontology",
         "tableTo": "manifestation",
-        "columnsTo": ["id"],
+        "columnsTo": [
+          "id"
+        ],
         "onUpdate": "CASCADE",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -2157,10 +2516,16 @@
         "table": "manifestation_version",
         "name": "manifestation_version_node_version_fk",
         "nameExplicit": true,
-        "columns": ["id", "version"],
+        "columns": [
+          "id",
+          "version"
+        ],
         "schemaTo": "ontology",
         "tableTo": "node_version",
-        "columnsTo": ["id", "version"],
+        "columnsTo": [
+          "id",
+          "version"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "NO ACTION",
         "entityType": "fks"
@@ -2173,10 +2538,14 @@
         "table": "node_version",
         "name": "node_version_id_node_id_fkey",
         "nameExplicit": false,
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "schemaTo": "ontology",
         "tableTo": "node",
-        "columnsTo": ["id"],
+        "columnsTo": [
+          "id"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -2189,10 +2558,14 @@
         "table": "organisation",
         "name": "organisation_id_agent_id_fkey",
         "nameExplicit": false,
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "schemaTo": "ontology",
         "tableTo": "agent",
-        "columnsTo": ["id"],
+        "columnsTo": [
+          "id"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -2205,10 +2578,16 @@
         "table": "organisation",
         "name": "organisation_id_type_fk",
         "nameExplicit": true,
-        "columns": ["id", "type"],
+        "columns": [
+          "id",
+          "type"
+        ],
         "schemaTo": "ontology",
         "tableTo": "agent",
-        "columnsTo": ["id", "type"],
+        "columnsTo": [
+          "id",
+          "type"
+        ],
         "onUpdate": "CASCADE",
         "onDelete": "NO ACTION",
         "entityType": "fks"
@@ -2221,10 +2600,14 @@
         "table": "organisation_version",
         "name": "organisation_version_id_organisation_id_fkey",
         "nameExplicit": false,
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "schemaTo": "ontology",
         "tableTo": "organisation",
-        "columnsTo": ["id"],
+        "columnsTo": [
+          "id"
+        ],
         "onUpdate": "CASCADE",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -2237,10 +2620,16 @@
         "table": "organisation_version",
         "name": "organisation_version_agent_version_fk",
         "nameExplicit": true,
-        "columns": ["id", "version"],
+        "columns": [
+          "id",
+          "version"
+        ],
         "schemaTo": "ontology",
         "tableTo": "agent_version",
-        "columnsTo": ["id", "version"],
+        "columnsTo": [
+          "id",
+          "version"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "NO ACTION",
         "entityType": "fks"
@@ -2253,10 +2642,14 @@
         "table": "person",
         "name": "person_id_agent_id_fkey",
         "nameExplicit": false,
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "schemaTo": "ontology",
         "tableTo": "agent",
-        "columnsTo": ["id"],
+        "columnsTo": [
+          "id"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -2269,10 +2662,16 @@
         "table": "person",
         "name": "person_id_type_fk",
         "nameExplicit": true,
-        "columns": ["id", "type"],
+        "columns": [
+          "id",
+          "type"
+        ],
         "schemaTo": "ontology",
         "tableTo": "agent",
-        "columnsTo": ["id", "type"],
+        "columnsTo": [
+          "id",
+          "type"
+        ],
         "onUpdate": "CASCADE",
         "onDelete": "NO ACTION",
         "entityType": "fks"
@@ -2285,10 +2684,14 @@
         "table": "person_version",
         "name": "person_version_id_person_id_fkey",
         "nameExplicit": false,
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "schemaTo": "ontology",
         "tableTo": "person",
-        "columnsTo": ["id"],
+        "columnsTo": [
+          "id"
+        ],
         "onUpdate": "CASCADE",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -2301,10 +2704,16 @@
         "table": "person_version",
         "name": "person_version_agent_version_fk",
         "nameExplicit": true,
-        "columns": ["id", "version"],
+        "columns": [
+          "id",
+          "version"
+        ],
         "schemaTo": "ontology",
         "tableTo": "agent_version",
-        "columnsTo": ["id", "version"],
+        "columnsTo": [
+          "id",
+          "version"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "NO ACTION",
         "entityType": "fks"
@@ -2317,10 +2726,14 @@
         "table": "work",
         "name": "work_id_node_id_fkey",
         "nameExplicit": false,
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "schemaTo": "ontology",
         "tableTo": "node",
-        "columnsTo": ["id"],
+        "columnsTo": [
+          "id"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -2333,10 +2746,16 @@
         "table": "work",
         "name": "work_id_type_fk",
         "nameExplicit": true,
-        "columns": ["id", "type"],
+        "columns": [
+          "id",
+          "type"
+        ],
         "schemaTo": "ontology",
         "tableTo": "node",
-        "columnsTo": ["id", "type"],
+        "columnsTo": [
+          "id",
+          "type"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "NO ACTION",
         "entityType": "fks"
@@ -2349,10 +2768,14 @@
         "table": "work_version",
         "name": "work_version_id_work_id_fkey",
         "nameExplicit": false,
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "schemaTo": "ontology",
         "tableTo": "work",
-        "columnsTo": ["id"],
+        "columnsTo": [
+          "id"
+        ],
         "onUpdate": "CASCADE",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -2365,10 +2788,16 @@
         "table": "work_version",
         "name": "work_version_node_version_fk",
         "nameExplicit": true,
-        "columns": ["id", "version"],
+        "columns": [
+          "id",
+          "version"
+        ],
         "schemaTo": "ontology",
         "tableTo": "node_version",
-        "columnsTo": ["id", "version"],
+        "columnsTo": [
+          "id",
+          "version"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "NO ACTION",
         "entityType": "fks"
@@ -2380,7 +2809,10 @@
         "schema": "ontology",
         "table": "agent_version",
         "name": "agent_version_pkey",
-        "columns": ["id", "version"],
+        "columns": [
+          "id",
+          "version"
+        ],
         "nameExplicit": true,
         "entityType": "pks"
       }
@@ -2391,7 +2823,10 @@
         "schema": "ontology",
         "table": "book_version",
         "name": "book_version_pkey",
-        "columns": ["id", "version"],
+        "columns": [
+          "id",
+          "version"
+        ],
         "nameExplicit": true,
         "entityType": "pks"
       }
@@ -2402,7 +2837,10 @@
         "schema": "ontology",
         "table": "edition_version",
         "name": "edition_version_pkey",
-        "columns": ["id", "version"],
+        "columns": [
+          "id",
+          "version"
+        ],
         "nameExplicit": true,
         "entityType": "pks"
       }
@@ -2413,7 +2851,10 @@
         "schema": "ontology",
         "table": "essay_version",
         "name": "essay_version_pkey",
-        "columns": ["id", "version"],
+        "columns": [
+          "id",
+          "version"
+        ],
         "nameExplicit": true,
         "entityType": "pks"
       }
@@ -2424,7 +2865,10 @@
         "schema": "ontology",
         "table": "manifestation_isbn",
         "name": "manifestation_isbn_pkey",
-        "columns": ["id", "version"],
+        "columns": [
+          "id",
+          "version"
+        ],
         "nameExplicit": true,
         "entityType": "pks"
       }
@@ -2435,7 +2879,10 @@
         "schema": "ontology",
         "table": "manifestation_version",
         "name": "manifestation_version_pkey",
-        "columns": ["id", "version"],
+        "columns": [
+          "id",
+          "version"
+        ],
         "nameExplicit": true,
         "entityType": "pks"
       }
@@ -2446,7 +2893,10 @@
         "schema": "ontology",
         "table": "node_version",
         "name": "node_version_pkey",
-        "columns": ["id", "version"],
+        "columns": [
+          "id",
+          "version"
+        ],
         "nameExplicit": true,
         "entityType": "pks"
       }
@@ -2457,7 +2907,10 @@
         "schema": "ontology",
         "table": "organisation_version",
         "name": "organisation_version_pkey",
-        "columns": ["id", "version"],
+        "columns": [
+          "id",
+          "version"
+        ],
         "nameExplicit": true,
         "entityType": "pks"
       }
@@ -2468,7 +2921,10 @@
         "schema": "ontology",
         "table": "person_version",
         "name": "person_version_pkey",
-        "columns": ["id", "version"],
+        "columns": [
+          "id",
+          "version"
+        ],
         "nameExplicit": true,
         "entityType": "pks"
       }
@@ -2479,7 +2935,10 @@
         "schema": "ontology",
         "table": "work_version",
         "name": "work_version_pkey",
-        "columns": ["id", "version"],
+        "columns": [
+          "id",
+          "version"
+        ],
         "nameExplicit": true,
         "entityType": "pks"
       }
@@ -2490,7 +2949,9 @@
         "schema": "ontology",
         "table": "agent",
         "name": "agent_pkey",
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "nameExplicit": false,
         "entityType": "pks"
       }
@@ -2501,7 +2962,9 @@
         "schema": "ontology",
         "table": "book",
         "name": "book_pkey",
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "nameExplicit": false,
         "entityType": "pks"
       }
@@ -2512,7 +2975,9 @@
         "schema": "ontology",
         "table": "edition",
         "name": "edition_pkey",
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "nameExplicit": false,
         "entityType": "pks"
       }
@@ -2523,7 +2988,9 @@
         "schema": "ontology",
         "table": "essay",
         "name": "essay_pkey",
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "nameExplicit": false,
         "entityType": "pks"
       }
@@ -2534,7 +3001,9 @@
         "schema": "ontology",
         "table": "manifestation",
         "name": "manifestation_pkey",
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "nameExplicit": false,
         "entityType": "pks"
       }
@@ -2545,7 +3014,9 @@
         "schema": "ontology",
         "table": "node",
         "name": "node_pkey",
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "nameExplicit": false,
         "entityType": "pks"
       }
@@ -2556,7 +3027,9 @@
         "schema": "ontology",
         "table": "organisation",
         "name": "organisation_pkey",
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "nameExplicit": false,
         "entityType": "pks"
       }
@@ -2567,7 +3040,9 @@
         "schema": "ontology",
         "table": "person",
         "name": "person_pkey",
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "nameExplicit": false,
         "entityType": "pks"
       }
@@ -2578,7 +3053,9 @@
         "schema": "ontology",
         "table": "work",
         "name": "work_pkey",
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "nameExplicit": false,
         "entityType": "pks"
       }
@@ -2590,7 +3067,10 @@
         "table": "agent",
         "name": "agent_id_type_unique",
         "nameExplicit": true,
-        "columns": ["id", "type"],
+        "columns": [
+          "id",
+          "type"
+        ],
         "nullsNotDistinct": false,
         "entityType": "uniques"
       }
@@ -2602,7 +3082,10 @@
         "table": "book",
         "name": "book_id_type_unique",
         "nameExplicit": true,
-        "columns": ["id", "type"],
+        "columns": [
+          "id",
+          "type"
+        ],
         "nullsNotDistinct": false,
         "entityType": "uniques"
       }
@@ -2614,7 +3097,10 @@
         "table": "edition",
         "name": "edition_id_type_unique",
         "nameExplicit": true,
-        "columns": ["id", "type"],
+        "columns": [
+          "id",
+          "type"
+        ],
         "nullsNotDistinct": false,
         "entityType": "uniques"
       }
@@ -2626,7 +3112,10 @@
         "table": "essay",
         "name": "essay_id_type_unique",
         "nameExplicit": true,
-        "columns": ["id", "type"],
+        "columns": [
+          "id",
+          "type"
+        ],
         "nullsNotDistinct": false,
         "entityType": "uniques"
       }
@@ -2638,7 +3127,10 @@
         "table": "manifestation",
         "name": "manifestation_id_type_unique",
         "nameExplicit": true,
-        "columns": ["id", "type"],
+        "columns": [
+          "id",
+          "type"
+        ],
         "nullsNotDistinct": false,
         "entityType": "uniques"
       }
@@ -2650,7 +3142,10 @@
         "table": "node",
         "name": "node_id_type_unique",
         "nameExplicit": true,
-        "columns": ["id", "type"],
+        "columns": [
+          "id",
+          "type"
+        ],
         "nullsNotDistinct": false,
         "entityType": "uniques"
       }
@@ -2662,7 +3157,10 @@
         "table": "organisation",
         "name": "organisation_id_type_unique",
         "nameExplicit": true,
-        "columns": ["id", "type"],
+        "columns": [
+          "id",
+          "type"
+        ],
         "nullsNotDistinct": false,
         "entityType": "uniques"
       }
@@ -2674,7 +3172,10 @@
         "table": "person",
         "name": "person_id_type_unique",
         "nameExplicit": true,
-        "columns": ["id", "type"],
+        "columns": [
+          "id",
+          "type"
+        ],
         "nullsNotDistinct": false,
         "entityType": "uniques"
       }
@@ -2686,7 +3187,10 @@
         "table": "work",
         "name": "work_id_type_unique",
         "nameExplicit": true,
-        "columns": ["id", "type"],
+        "columns": [
+          "id",
+          "type"
+        ],
         "nullsNotDistinct": false,
         "entityType": "uniques"
       }

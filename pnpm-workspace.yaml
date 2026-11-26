@@ -30,9 +30,9 @@ catalog:
   # Must equal the vitest that vite-plus bundles (see `vitest` below).
   "@vitest/coverage-istanbul": 5.1.1
   # The first drizzle line with the Effect integration this library extends.
-  drizzle-orm: 1.0.0-rc.5
+  drizzle-orm: 1.0.0-rc.6
   # Always the drizzle-orm pin.
-  drizzle-kit: 1.0.0-rc.5
+  drizzle-kit: 1.0.0-rc.6
   "@enfect/oxlint": 0.10.0
   effect: 4.1.5
   fallow: 3.48.0
@@ -58,8 +58,8 @@ catalogs:
     "@effect/sql-pg": ^4.0.0
     "@effect/platform-node": ^4.0.0
     "@thomasfosterau/effect-jsonapi": ">=0.16.0"
-    drizzle-kit: ">=1.0.0-rc.5"
-    drizzle-orm: ">=1.0.0-rc.5"
+    drizzle-kit: ">=1.0.0-rc.6"
+    drizzle-orm: ">=1.0.0-rc.6"
     effect: ^4.0.0
     # Optional peer of the pg package's `./testing` Testcontainers fallback.
     "@testcontainers/postgresql": ">=12"

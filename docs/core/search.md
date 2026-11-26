@@ -8,7 +8,8 @@ The pieces of a hybrid, multilingual search: what a searchable row stores, the i
 
 | Export | What it is |
 | --- | --- |
-| `regconfig(name)` | A text-search configuration column, read back as its name (the `regconfig` codec, not an OID). |
+| `regconfig(name)` | A text-search configuration column. Select it with `configName(column)`, which reads it as its name: over `@effect/sql-pg` the bare column comes back as an OID. |
+| `configName(config)` | A `regconfig` column or expression as its name (`::text`). |
 | `textArray(name)` | A `text[]` column for exact-match literals: identifiers, URLs, codes. |
 | `configForLanguage(lang, { configs?, fallback? })` | The configuration for a BCP 47 tag expression: a `CASE` over its primary subtag (`en-AU` → `english`), `simple` otherwise. `SNOWBALL_CONFIGS` is the default map. |
 | `weightedTsvector(config, { A?, B?, C?, D? })` | `setweight(to_tsvector(config, coalesce(text, '')), w) \|\| …` over the weights given. |
