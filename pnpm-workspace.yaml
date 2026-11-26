@@ -36,8 +36,6 @@ catalog:
   "@enfect/oxlint": 0.10.0
   effect: 4.1.5
   fallow: 3.48.0
-  # Only for `@effect/docgen`, which spawns it; scripts use `vpx`.
-  tsx: ^4.23.15
   # TypeScript 6/7 side by side: `typescript` is the TS6 JS API (bin `tsc6`)
   # for JS-API consumers; `@typescript/native` is TS7 (bin `tsc`), which
   # type-checks and emits declarations. Exact: its build must match
@@ -47,8 +45,8 @@ catalog:
   # `vite`, `vitest` and `@vitest/coverage-istanbul` must equal what vite-plus
   # itself depends on (`npm view vite-plus@<v> dependencies`); `vite` no longer
   # equals vite-plus.
-  vite-plus: 1.7.0
-  vite: npm:@voidzero-dev/vite-plus-core@8.3.8000
+  vite-plus: 1.8.0
+  vite: npm:@voidzero-dev/vite-plus-core@8.3.8001
   vitest: 5.1.1
 
 # Peer ranges the published packages declare.
@@ -93,3 +91,14 @@ skills:
 minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
   - "@thomasfosterau/*"
+# Vite+ selects Node.js (.node-version) and pnpm (packageManager); pnpm
+# must not download or switch to its own.
+runtimeOnFail: ignore
+pmOnFail: ignore
+# docgen runs its examples with `tsx`, which scripts/bin/tsx stands in for
+# (through vpx), so its `tsx` peer is optional and never installed.
+packageExtensions:
+  "@effect/docgen":
+    peerDependenciesMeta:
+      tsx:
+        optional: true
