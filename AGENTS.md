@@ -18,6 +18,12 @@ Read [README.md](README.md) and [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) fir
 - **Publish only through the Release workflow** (`vp run release`: `vp pm publish -r`, then `changeset git-tag`). Release-path registry calls go through `vp pm`, never `npm` / `pnpm` directly, and `release` depends only on the builds.
 - **Declare every required peer of a dependency.** A missing one passes on a warm tree and fails on a fresh CI runner.
 
+## Pull requests
+
+- **Write the PR body with the `pr` skill** from Matt Pocock's skills (`mattpocock-skills:pr`), filling in the repository's pull request template where there is one.
+- **Resolve merge conflicts before you hand a PR over.** Rebase onto `origin/trunk` and push; a PR that conflicts with `trunk` isn't finished.
+- **Mark the PR ready for review as soon as the initial draft is finished.** Don't wait for CI to run, for reviews, or for the owner to do it. Keep fixing CI failures and review findings on the ready PR.
+
 ## Fallow
 
 The `fallow` agent skill is linked into `.claude/skills/` from the installed `fallow` package after `vp install`, and drizzle-kit's `drizzle` skill is linked the same way; repository-specific rules (the pre-commit audit, tracing before deleting) are in docs/CONTRIBUTING.md.
