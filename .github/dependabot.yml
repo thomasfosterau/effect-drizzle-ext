@@ -1,5 +1,7 @@
-# Groups cover only sets that must move together. By-hand steps for the
-# toolchain group are in docs/CONTRIBUTING.md.
+# Groups bundle sets that must move together (toolchain, effect, drizzle) and
+# cut noise for the rest. `vite`, `vitest` and `@vitest/*` are ignored: their
+# versions are whatever vite-plus depends on, re-pinned by `vp migrate` in the
+# toolchain update (see docs/CONTRIBUTING.md).
 version: 2
 updates:
   - package-ecosystem: "npm"
@@ -15,14 +17,16 @@ updates:
       default-days: 1
       exclude:
         - "@thomasfosterau/*"
+    ignore:
+      - dependency-name: "vite"
+      - dependency-name: "vitest"
+      - dependency-name: "@vitest/*"
     groups:
       toolchain:
         applies-to: version-updates
         patterns:
           - "vite-plus"
           - "@voidzero-dev/*"
-          - "vitest"
-          - "@vitest/*"
           - "@effect/tsgo"
       effect:
         applies-to: version-updates
@@ -36,10 +40,23 @@ updates:
         patterns:
           - "drizzle-orm"
           - "drizzle-kit"
+      own-packages:
+        applies-to: version-updates
+        patterns:
+          - "@thomasfosterau/*"
+      dev-tools:
+        applies-to: version-updates
+        patterns:
+          - "@changesets/*"
+          - "@enfect/oxlint"
+          - "@testcontainers/*"
+          - "@types/node"
+          - "fallow"
+          - "tsx"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
     open-pull-requests-limit: 5
     assignees: [thomasfosterau]
     labels: [dependencies]
@@ -47,10 +64,13 @@ updates:
       prefix: "chore"
     cooldown:
       default-days: 1
+    groups:
+      actions:
+        patterns: ["*"]
   - package-ecosystem: "devcontainers"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
     open-pull-requests-limit: 5
     assignees: [thomasfosterau]
     labels: [dependencies]
@@ -58,3 +78,6 @@ updates:
       prefix: "chore"
     cooldown:
       default-days: 1
+    groups:
+      devcontainers:
+        patterns: ["*"]
