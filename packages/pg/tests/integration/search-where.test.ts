@@ -166,7 +166,7 @@ integrationLayerWith(
         Effect.gen(function* () {
           const tx = yield* CurrentTransaction;
           const found = yield* tx
-            .select({ id: columns.id, config: columns.config })
+            .select({ id: columns.id, config: Search.configName(columns.config) })
             .from(item)
             .orderBy(asc(columns.id));
           expect(found.map((r) => r.config)).toEqual([

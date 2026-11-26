@@ -66,13 +66,13 @@ const isPostgresSnapshot = (raw: unknown): raw is PostgresSnapshot =>
   Schema.is(PostgresSnapshotContract)(raw);
 
 /**
- * A version `"9"` snapshot, which drizzle-kit 1.0.0-rc.5 writes (and
- * `drizzle-kit up` upgrades a v8 chain to): a `base` or a `diff` over its
- * parents, so the state at one is rebuilt from the whole chain with
- * drizzle-kit's own `reconstruct`.
+ * A version `"10"` snapshot, which drizzle-kit 1.0.0-rc.6 writes (and
+ * `drizzle-kit up` upgrades a v8 or v9 chain to): a `base` or a `diff` over
+ * its parents, so the state at one is rebuilt from the whole chain with
+ * drizzle-kit's own `reconstruct`, which refuses a v9 chain.
  */
 const ChainSnapshotContract = Schema.Struct({
-  version: Schema.Literal("9"),
+  version: Schema.Literal("10"),
   dialect: Schema.Literal("postgres"),
   type: Schema.Literals(["base", "diff"]),
 });
@@ -477,7 +477,7 @@ const checkZeroDrift = Effect.fn("Tooling.checkZeroDrift")(function* (
     onSome: (entry) => `${label}/${entry.dir}/snapshot.json`,
   });
   // The state the latest snapshot records: a v8 snapshot is that state; a
-  // v9 one is rebuilt from the chain (every directory's snapshot, keyed by
+  // v10 one is rebuilt from the chain (every directory's snapshot, keyed by
   // directory name, as drizzle-kit's own folder reader keys them).
   const stateOf = (entry: ReadSnapshot): Option.Option<Effect.Effect<object, SchemaDiffError>> =>
     isPostgresSnapshot(entry.raw)
@@ -499,7 +499,8 @@ const checkZeroDrift = Effect.fn("Tooling.checkZeroDrift")(function* (
   if (Option.isNone(prevState)) {
     return [
       `${where} doesn't match a drizzle-kit snapshot contract \`generateMigration\` reads ` +
-        '(`version: "8"` with a `ddl` array, or `version: "9"` with `type` `base` / `diff`; `dialect: "postgres"`): a stale (pre-v8) or hand-edited snapshot.',
+        '(`version: "8"` with a `ddl` array, or `version: "10"` with `type` `base` / `diff`; `dialect: "postgres"`): ' +
+        "a stale snapshot (run `drizzle-kit up` on a v9 chain) or a hand-edited one.",
     ];
   }
   const cur = yield* drizzleKit(() =>

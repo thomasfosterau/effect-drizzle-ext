@@ -34,6 +34,10 @@ describe("columns", () => {
     expect(c.ids.getSQLType()).toBe("text[]");
   });
 
+  it("selects a regconfig column as its name", () => {
+    expect(render(Search.configName(c.config)).sql).toBe(`"doc"."config"::text`);
+  });
+
   it("names the fts and trigram indexes", () => {
     const indexes = getTableConfig(doc).indexes.map((i) => i.config.name);
     expect(indexes).toEqual(["doc_fts_idx", "doc_title_trgm_idx"]);

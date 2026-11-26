@@ -22,9 +22,10 @@ import * as P from "effect/Predicate";
 import * as Str from "effect/String";
 
 /**
- * A `regconfig` column: a text-search configuration (`'english'`), read back
- * as its name. Declared with the `regconfig` codec, so Drizzle selects it as
- * text rather than the OID a binary result format would carry.
+ * A `regconfig` column: a text-search configuration (`'english'`). Read it
+ * with {@link configName}: over a binary-protocol driver such as
+ * `@effect/sql-pg`, selecting the column itself returns the configuration's
+ * OID, which no codec can turn back into its name.
  */
 export const regconfig = (
   name: string,
@@ -33,6 +34,21 @@ export const regconfig = (
     dataType: () => "regconfig",
     codec: "regconfig",
   })(name);
+
+/**
+ * A `regconfig` column (or expression) selected as its configuration's name.
+ *
+ * @example
+ * ```ts
+ * import { configName, regconfig } from "@thomasfosterau/effect-drizzle-ext/Search";
+ * import { PgDialect, pgTable } from "drizzle-orm/pg-core";
+ *
+ * const doc = pgTable("doc", { config: regconfig("config") });
+ * const { sql } = new PgDialect().sqlToQuery(configName(doc.config));
+ * console.log(sql); // "doc"."config"::text
+ * ```
+ */
+export const configName = (config: SQLWrapper): SQL<string> => sql<string>`${config}::text`;
 
 /** A `text[]` column, for exact-match literals (identifiers, URLs, codes). */
 export const textArray = (

@@ -48,7 +48,7 @@ const FIXTURE_MIGRATIONS = `${import.meta.dirname}/fixtures/migrations`;
 /** drizzle-kit's own bin, run with this Node: the package has no `.bin` of its own under pnpm's hoisting. */
 const DRIZZLE_KIT = [
   process.execPath,
-  decodeURIComponent(new URL("bin.cjs", import.meta.resolve("drizzle-kit")).pathname),
+  decodeURIComponent(new URL("bin.js", import.meta.resolve("drizzle-kit")).pathname),
 ] as const;
 
 const runtime = ManagedRuntime.make(NodeServices.layer);
