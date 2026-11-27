@@ -9,10 +9,14 @@
 
 import * as PgClient from "@effect/sql-pg/PgClient";
 import { Digest } from "effect/crypto";
+import * as Arr from "effect/Array";
+import * as Config from "effect/Config";
+import * as ConfigProvider from "effect/ConfigProvider";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import type * as FileSystem from "effect/FileSystem";
 import type * as Path from "effect/Path";
+import * as Option from "effect/Option";
 import type { PlatformError } from "effect/PlatformError";
 import * as P from "effect/Predicate";
 import * as Redacted from "effect/Redacted";
@@ -22,44 +26,73 @@ import type { SqlError } from "effect/sql/SqlError";
 import { applyMigrations, type MigrationError } from "../Migrations.ts";
 
 /**
- * The environment the resolution reads — the shape of `process.env`, taken
- * as a parameter so the order is testable against a fake.
+ * An environment record — the shape of `process.env`.
+ *
+ * @deprecated Supply settings through a `ConfigProvider` instead (the default
+ * reads `process.env`); see {@link DatabaseSourceOptions.env}.
  */
 export type ResolutionEnvironment = Readonly<NodeJS.ProcessEnv>;
-
-/** The variables that count as "explicitly pointed at a server". */
-const SERVER_VARIABLES = ["PGHOST", "PGPORT", "PGUSER", "PGPASSWORD"] as const;
 
 /** How long one connection attempt against the admin database may take. */
 const CONNECT_TIMEOUT = Duration.seconds(10);
 
-/** Where a local server is expected, honouring the standard `PG*` variables. */
-const serverConfig = (env: ResolutionEnvironment) => ({
-  host: env.PGHOST ?? "127.0.0.1",
-  port: Number(env.PGPORT ?? "5432"),
-  user: env.PGUSER ?? "postgres",
-  password: env.PGPASSWORD ?? "",
-});
+/** Where a local server is expected: the standard `PG*` variables, with their defaults applied. */
+export interface TestServer {
+  readonly host: string;
+  readonly port: number;
+  readonly user: string;
+  readonly password: Option.Option<Redacted.Redacted<string>>;
+  /** Was any `PG*` variable set, as opposed to the loopback default? */
+  readonly explicit: boolean;
+}
 
-/** Was a server location explicitly configured (vs. the loopback default)? */
-const serverExplicitlyConfigured = (env: ResolutionEnvironment): boolean =>
-  SERVER_VARIABLES.some((name) => (env[name] ?? "") !== "");
+/** The test-database settings, read from the current `ConfigProvider`. */
+export interface TestDatabaseSettings {
+  /** `DATABASE_URL_TEST`, else `DATABASE_URL`: an already-migrated database. */
+  readonly explicitUrl: Option.Option<Redacted.Redacted<string>>;
+  readonly server: TestServer;
+}
 
-/** The connection URL for `database` on the configured local server. */
-export const connectionUrl = (
-  env: ResolutionEnvironment,
-  database: string,
-): Redacted.Redacted<string> => {
-  const { host, port, user, password } = serverConfig(env);
-  const auth = password === "" ? user : `${user}:${encodeURIComponent(password)}`;
-  return Redacted.make(`postgresql://${auth}@${host}:${port}/${database}`);
+/**
+ * The settings {@link resolveDatabaseSource} reads: `DATABASE_URL_TEST` /
+ * `DATABASE_URL` as `Redacted`, and `PGHOST` / `PGPORT` / `PGUSER` /
+ * `PGPASSWORD` defaulting to a trust-auth `postgres@127.0.0.1:5432`. Empty
+ * values count as unset.
+ */
+export const TestDatabaseConfig: Config.Config<TestDatabaseSettings> = Config.all({
+  explicitUrl: Config.option(
+    Config.Redacted("DATABASE_URL_TEST").pipe(Config.orElse(() => Config.Redacted("DATABASE_URL"))),
+  ),
+  host: Config.option(Config.String("PGHOST")),
+  port: Config.option(Config.Port("PGPORT")),
+  user: Config.option(Config.String("PGUSER")),
+  password: Config.option(Config.Redacted("PGPASSWORD")),
+}).pipe(
+  Config.map(({ explicitUrl, host, port, user, password }) => ({
+    explicitUrl,
+    server: {
+      host: Option.getOrElse(host, () => "127.0.0.1"),
+      port: Option.getOrElse(port, () => 5432),
+      user: Option.getOrElse(user, () => "postgres"),
+      password,
+      explicit: Arr.some([host, port, user, password], (value: Option.Option<unknown>) =>
+        Option.isSome(value),
+      ),
+    },
+  })),
+);
+
+/** The connection URL for `database` on `server`. */
+export const connectionUrl = (server: TestServer, database: string): Redacted.Redacted<string> => {
+  const auth = Option.match(server.password, {
+    onNone: () => server.user,
+    onSome: (password) => `${server.user}:${encodeURIComponent(Redacted.value(password))}`,
+  });
+  return Redacted.make(`postgresql://${auth}@${server.host}:${server.port}/${database}`);
 };
 
 /** `user@host:port` — the configured server, printable (no password). */
-const serverLabel = (env: ResolutionEnvironment): string => {
-  const { host, port, user } = serverConfig(env);
-  return `${user}@${host}:${port}`;
-};
+const serverLabel = (server: TestServer): string => `${server.user}@${server.host}:${server.port}`;
 
 /** A database-name prefix is spliced into DDL unquoted-safe, so it is restricted to an identifier. */
 const DATABASE_PREFIX = /^[a-z_][a-z0-9_]*$/;
@@ -155,8 +188,15 @@ export type DatabaseSource =
 
 /** The inputs {@link resolveDatabaseSource} reads. */
 export interface DatabaseSourceOptions {
-  /** The environment — `process.env` in a global setup. */
-  readonly env: ResolutionEnvironment;
+  /**
+   * An environment record to read the settings from instead of the current
+   * `ConfigProvider`.
+   *
+   * @deprecated Provide `ConfigProvider.fromEnvRecord(record)` (or any
+   * provider) instead; without either, the default provider reads
+   * `process.env`. Removed in the next release.
+   */
+  readonly env?: ResolutionEnvironment;
   /** The migrations directory, as an absolute path: the per-checkout key of the database name. */
   readonly migrationsDir: string;
   /** The database-name prefix, a lower-case SQL identifier (the application's name, say). */
@@ -167,32 +207,34 @@ export interface DatabaseSourceOptions {
   readonly probe?: ServerProbe;
 }
 
-/**
- * Resolve where a run's database comes from, in the order the module doc
- * describes: an explicit URL, then a reachable local server (an explicit but
- * unreachable `PG*` target is a {@link DatabaseUnreachable}), then the
- * Testcontainers fallback. Pure apart from the one probe, which only runs
- * when no explicit URL is set.
- */
-export const resolveDatabaseSource = Effect.fn("Testing.resolveDatabaseSource")(function* (
+/** {@link TestDatabaseConfig} from `options.env` when given, else the current provider. */
+const readSettings = (
+  options: DatabaseSourceOptions,
+): Effect.Effect<TestDatabaseSettings, Config.ConfigError> =>
+  options.env === undefined
+    ? TestDatabaseConfig
+    : TestDatabaseConfig.parse(ConfigProvider.fromEnvRecord(options.env));
+
+const resolveFrom = Effect.fnUntraced(function* (
+  settings: TestDatabaseSettings,
   options: DatabaseSourceOptions,
 ): Effect.fn.Return<DatabaseSource, DatabaseUnreachable | InvalidDatabasePrefix> {
-  const { env } = options;
-  const explicit = env.DATABASE_URL_TEST ?? env.DATABASE_URL ?? "";
-  if (explicit !== "") return { _tag: "Explicit", url: Redacted.make(explicit) } as const;
-
+  if (Option.isSome(settings.explicitUrl)) {
+    return { _tag: "Explicit", url: settings.explicitUrl.value } as const;
+  }
+  const { server } = settings;
   const database = yield* testDatabaseName({
     prefix: options.dbNamePrefix,
     migrationsDir: options.migrationsDir,
   });
-  const adminUrl = connectionUrl(env, "postgres");
+  const adminUrl = connectionUrl(server, "postgres");
   const probe = options.probe ?? probeServer;
   const reachable = yield* probe(adminUrl).pipe(
     Effect.as(true),
     Effect.catchTag("ServerUnreachable", (unreachable) =>
-      serverExplicitlyConfigured(env)
+      server.explicit
         ? Effect.fail(
-            new DatabaseUnreachable({ server: serverLabel(env), cause: unreachable.cause }),
+            new DatabaseUnreachable({ server: serverLabel(server), cause: unreachable.cause }),
           )
         : Effect.succeed(false),
     ),
@@ -202,10 +244,27 @@ export const resolveDatabaseSource = Effect.fn("Testing.resolveDatabaseSource")(
       _tag: "LocalServer",
       adminUrl,
       database,
-      url: connectionUrl(env, database),
+      url: connectionUrl(server, database),
     } as const;
   }
   return { _tag: "Container", image: options.image } as const;
+});
+
+/**
+ * Resolve where a run's database comes from, in the order the module doc
+ * describes: an explicit URL, then a reachable local server (an explicit but
+ * unreachable `PG*` target is a {@link DatabaseUnreachable}), then the
+ * Testcontainers fallback. The settings are {@link TestDatabaseConfig}, read
+ * from the current `ConfigProvider`. Pure apart from the one probe, which
+ * only runs when no explicit URL is set.
+ */
+export const resolveDatabaseSource = Effect.fn("Testing.resolveDatabaseSource")(function* (
+  options: DatabaseSourceOptions,
+): Effect.fn.Return<
+  DatabaseSource,
+  DatabaseUnreachable | InvalidDatabasePrefix | Config.ConfigError
+> {
+  return yield* resolveFrom(yield* readSettings(options), options);
 });
 
 /**
@@ -338,7 +397,6 @@ const startContainer = (
  *   const scope = Effect.runSync(Scope.make());
  *   const database = await Effect.runPromise(
  *     provisionTestDatabase({
- *       env: process.env,
  *       migrationsDir: MIGRATIONS_DIR,
  *       dbNamePrefix: "website",
  *       image: "pgvector/pgvector:pg17",
@@ -359,18 +417,20 @@ export const provisionTestDatabase = Effect.fn("Testing.provisionTestDatabase")(
   | E
   | DatabaseUnreachable
   | InvalidDatabasePrefix
+  | Config.ConfigError
   | ContainerStartFailed
   | SqlError
   | MigrationError
   | PlatformError,
   R | FileSystem.FileSystem | Path.Path | Scope.Scope
 > {
-  const source = yield* resolveDatabaseSource(options);
+  const settings = yield* readSettings(options);
+  const source = yield* resolveFrom(settings, options);
   if (P.isTagged(source, "Explicit")) return { url: source.url, source };
 
   const url = P.isTagged(source, "LocalServer")
     ? yield* recreateDatabase(source).pipe(Effect.as(source.url))
-    : yield* startContainer(source.image, serverLabel(options.env));
+    : yield* startContainer(source.image, serverLabel(settings.server));
 
   const migrate = options.applyMigrations ?? defaultRunner(options.migrationsDir);
   const applied = yield* migrate(url);

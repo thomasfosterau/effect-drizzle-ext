@@ -7,6 +7,8 @@
  * application. Never executed; type-checked only.
  */
 
+import type * as Config from "effect/Config";
+import * as ConfigProvider from "effect/ConfigProvider";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -456,12 +458,20 @@ export const testLayer: Layer.Layer<"AppDb", SqlError> = PgTesting.testDatabaseL
 export const migrated = PgMigrations.applyMigrations("/app/migrations");
 export const migrations = PgMigrations.readMigrations("/app/migrations");
 export const provisioned = PgTesting.provisionTestDatabase({
-  env: {},
   migrationsDir: "/app/migrations",
   dbNamePrefix: "app",
   image: "postgres:17",
 });
 export const source = PgTesting.resolveDatabaseSource({
+  migrationsDir: "/app/migrations",
+  dbNamePrefix: "app",
+  image: "postgres:17",
+});
+export const testDatabaseSettings: Effect.Effect<
+  PgTesting.TestDatabaseSettings,
+  Config.ConfigError
+> = PgTesting.TestDatabaseConfig.parse(ConfigProvider.fromEnvRecord({}));
+export const legacySource = PgTesting.resolveDatabaseSource({
   env: {},
   migrationsDir: "/app/migrations",
   dbNamePrefix: "app",
@@ -729,7 +739,7 @@ export type Checks = [
   /** _sourceErrors */ Assert<
     Equals<
       Effect.Error<typeof source>,
-      PgTesting.DatabaseUnreachable | PgTesting.InvalidDatabasePrefix
+      PgTesting.DatabaseUnreachable | PgTesting.InvalidDatabasePrefix | Config.ConfigError
     >
   >,
   /** _driftServices */ Assert<

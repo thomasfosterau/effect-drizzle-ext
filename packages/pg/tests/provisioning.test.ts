@@ -13,22 +13,25 @@
  */
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as Config from "effect/Config";
+import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as ManagedRuntime from "effect/ManagedRuntime";
+import * as Option from "effect/Option";
 import * as P from "effect/Predicate";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import { afterAll, assert, describe, expect, it } from "vite-plus/test";
 import {
   connectionUrl,
-  type DatabaseSourceOptions,
   DatabaseUnreachable,
   InvalidDatabasePrefix,
   provisionTestDatabase,
   resolveDatabaseSource,
   type ServerProbe,
   ServerUnreachable,
+  TestDatabaseConfig,
   testDatabaseName,
 } from "../src/Testing.ts";
 
@@ -66,17 +69,23 @@ const probeAnswering = (reachable: boolean): RecordingProbe => {
   return { probe, asked };
 };
 
-const resolve = (
-  env: DatabaseSourceOptions["env"],
-  probe: ServerProbe,
-): ReturnType<typeof resolveDatabaseSource> =>
+/** Run `effect` against `env` as the current `ConfigProvider`. */
+const withEnv =
+  (env: Record<string, string>) =>
+  <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+    Effect.provideService(effect, ConfigProvider.ConfigProvider, ConfigProvider.fromEnvRecord(env));
+
+const resolve = (env: Record<string, string>, probe: ServerProbe) =>
   resolveDatabaseSource({
-    env,
     probe,
     migrationsDir: MIGRATIONS_DIR,
     dbNamePrefix: "app",
     image: IMAGE,
-  });
+  }).pipe(withEnv(env));
+
+/** {@link TestDatabaseConfig} read from `env`. */
+const settingsFor = (env: Record<string, string>) =>
+  run(TestDatabaseConfig.parse(ConfigProvider.fromEnvRecord(env)));
 
 /** The platform services `provisionTestDatabase` requires (its migration runner reads files). */
 const nodeRuntime = ManagedRuntime.make(NodeServices.layer);
@@ -89,7 +98,6 @@ describe("provisionTestDatabase", () => {
     const provisioned = await nodeRuntime.runPromise(
       Effect.scoped(
         provisionTestDatabase({
-          env: { DATABASE_URL_TEST: "postgresql://explicit@db.example/test" },
           probe,
           migrationsDir: MIGRATIONS_DIR,
           dbNamePrefix: "app",
@@ -97,7 +105,7 @@ describe("provisionTestDatabase", () => {
           applyMigrations: (url) =>
             Effect.sync(() => migrated.push(Redacted.value(url))).pipe(Effect.as(0)),
         }),
-      ),
+      ).pipe(withEnv({ DATABASE_URL_TEST: "postgresql://explicit@db.example/test" })),
     );
     expect(Redacted.value(provisioned.url)).toBe("postgresql://explicit@db.example/test");
     expect(provisioned.source._tag).toBe("Explicit");
@@ -189,14 +197,43 @@ describe("resolveDatabaseSource", () => {
     const { probe } = probeAnswering(false);
     const source = await run(
       resolveDatabaseSource({
-        env: {},
         probe,
         migrationsDir: MIGRATIONS_DIR,
         dbNamePrefix: "app",
         image: "pgvector/pgvector:pg17",
-      }),
+      }).pipe(withEnv({})),
     );
     expect(source).toEqual({ _tag: "Container", image: "pgvector/pgvector:pg17" });
+  });
+
+  it("treats an empty variable as unset", async () => {
+    const { probe, asked } = probeAnswering(false);
+    const source = await run(resolve({ DATABASE_URL_TEST: "", PGHOST: "" }, probe));
+    expect(source._tag).toBe("Container");
+    expect(asked).toEqual(["postgresql://postgres@127.0.0.1:5432/postgres"]);
+  });
+
+  it("fails with a ConfigError on a PGPORT that is not a port", async () => {
+    const { probe, asked } = probeAnswering(true);
+    const error = await run(Effect.flip(resolve({ PGPORT: "fifty" }, probe)));
+    expect(error).toBeInstanceOf(Config.ConfigError);
+    expect(asked).toEqual([]);
+  });
+
+  it("still reads a deprecated env record, ahead of the current provider", async () => {
+    const { probe } = probeAnswering(false);
+    const source = await run(
+      resolveDatabaseSource({
+        env: { DATABASE_URL: "postgresql://legacy@db.example/app" },
+        probe,
+        migrationsDir: MIGRATIONS_DIR,
+        dbNamePrefix: "app",
+        image: IMAGE,
+      }).pipe(withEnv({ DATABASE_URL: "postgresql://provider@db.example/app" })),
+    );
+    expect(P.isTagged(source, "Explicit") && Redacted.value(source.url)).toBe(
+      "postgresql://legacy@db.example/app",
+    );
   });
 });
 
@@ -234,10 +271,27 @@ describe("testDatabaseName", () => {
 });
 
 describe("connectionUrl", () => {
-  it("URL-encodes the password and omits the auth separator when there is none", () => {
-    expect(Redacted.value(connectionUrl({ PGUSER: "ci", PGPASSWORD: "p@ss word" }, "db"))).toBe(
+  it("URL-encodes the password and omits the auth separator when there is none", async () => {
+    const withPassword = await settingsFor({ PGUSER: "ci", PGPASSWORD: "p@ss word" });
+    expect(Redacted.value(connectionUrl(withPassword.server, "db"))).toBe(
       "postgresql://ci:p%40ss%20word@127.0.0.1:5432/db",
     );
-    expect(Redacted.value(connectionUrl({}, "db"))).toBe("postgresql://postgres@127.0.0.1:5432/db");
+    const defaults = await settingsFor({});
+    expect(Redacted.value(connectionUrl(defaults.server, "db"))).toBe(
+      "postgresql://postgres@127.0.0.1:5432/db",
+    );
+  });
+});
+
+describe("TestDatabaseConfig", () => {
+  it("holds the URLs and the password as Redacted", async () => {
+    const settings = await settingsFor({
+      DATABASE_URL_TEST: "postgresql://u:secret@db.example/test",
+      PGPASSWORD: "s3cret",
+    });
+    assert(Option.isSome(settings.explicitUrl), "expected an explicit URL");
+    expect(Redacted.isRedacted(settings.explicitUrl.value)).toBe(true);
+    expect(Option.map(settings.server.password, Redacted.value)).toEqual(Option.some("s3cret"));
+    expect(settings.server.explicit).toBe(true);
   });
 });
