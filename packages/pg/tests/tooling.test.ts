@@ -63,7 +63,7 @@ describe("checkMigrationDrift", () => {
     const report = await run(
       checkMigrationDrift({ schema: fixtureSchema, migrationsDir: FIXTURE_MIGRATIONS }),
     );
-    expect(report).toEqual({ snapshots: 14, baseRef: Option.none() });
+    expect(report).toEqual({ snapshots: 15, baseRef: Option.none() });
   });
 
   it("reads a full v8 snapshot as the latest state", async () => {
@@ -94,7 +94,7 @@ describe("checkMigrationDrift", () => {
     if (!(error instanceof MigrationDriftError)) throw error;
     expect(error.issues).toHaveLength(1);
     expect(error.issues[0]).toMatch(/Schema drift detected/);
-    expect(error.issues[0]).toMatch(/20261120133109_refinable-party\/snapshot\.json/);
+    expect(error.issues[0]).toMatch(/20261127054358_diamond-tree\/snapshot\.json/);
     expect(error.issues[0]).toMatch(/CREATE TABLE "fixture"\."gadget"/);
   });
 
@@ -284,9 +284,10 @@ describe("readBaseMigrations", () => {
       "20261112222142_leaf-view-fenced-tail",
       "20261120050207_outbox",
       "20261120133109_refinable-party",
+      "20261127054358_diamond-tree",
     ]);
     expect(Option.map(base.head, (h) => h.snapshot.id)).toEqual(
-      Option.some("f2a148b0-f889-4529-89f6-3f38d937fe1f"),
+      Option.some("4e9204ea-3549-48b5-a21e-09f49bb0ce0d"),
     );
   });
 
@@ -304,9 +305,9 @@ describe("readBaseMigrations", () => {
 // ── checkViewDependencies ────────────────────────────────────────────────
 
 describe("checkViewDependencies", () => {
-  it("passes on the fixture schema's views: the widget view and the tree's nineteen", async () => {
+  it("passes on the fixture schema's views: the widget view and the tree's twenty-three", async () => {
     expect(await run(checkViewDependencies({ schema: fixtureSchema }))).toEqual({
-      viewCount: 20,
+      viewCount: 24,
     });
   });
 

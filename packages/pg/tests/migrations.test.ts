@@ -63,6 +63,7 @@ describe("readMigrations", () => {
       "20261112222142_leaf-view-fenced-tail",
       "20261120050207_outbox",
       "20261120133109_refinable-party",
+      "20261127054358_diamond-tree",
     ]);
     expect(migrations[0]?.statements[0]).toBe('CREATE SCHEMA "fixture";');
     expect(migrations[0]?.statements).toHaveLength(5);

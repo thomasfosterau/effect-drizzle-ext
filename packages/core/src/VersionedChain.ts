@@ -998,6 +998,9 @@ const VERSION_ACTIONS = LiteralExact.tuple<VersionAction>()(["create", "update",
  * level's subtree leaves) and a version table (`(id, version)` key and
  * `(id, version)` → parent version FK) carrying the level's level columns,
  * its leaf's columns (both derived through `builders`) and its hook columns.
+ * A level with several parents arcs both tables to each: the first parent
+ * under the names above, each further one through `${level}_id_${parent}_id_fkey`,
+ * `${level}_id_type_${parent}_fk` and `${level}_version_${parent}_version_fk`.
  * A fact-scoped level's version table is a spine, with one
  * `${level}_${column}` fact table per own column, keyed and foreign-keyed on
  * `(id, version)` (cascade delete).
@@ -1128,9 +1131,43 @@ export const makeTreeTables = <
     readonly tables: SubtypeTables<ColumnMap, ColumnMap>;
     readonly facts: Readonly<Record<string, PgTable>>;
   }
+  /** One parent's tables, as a level's discriminator and version arcs read them. */
+  interface ParentTables {
+    readonly name: string;
+    readonly stable: TypedStable;
+    readonly version: ParentVersionTable;
+  }
+  // The first parent keeps the single-parent constraint names, so a level
+  // gaining a parent only adds constraints. Each further parent adds an `id`
+  // FK (named as drizzle-kit names the first, column-level one) and an
+  // `(id, type)` FK named for that parent.
   const subtype = makeSubtypeTables(
-    (level, stable, parent: { readonly stable: TypedStable; readonly refinable: boolean }) =>
-      toolkit.typeConstraints(level, stable, parent.stable, { refinable: parent.refinable }),
+    (
+      level,
+      stable,
+      parent: {
+        readonly stable: TypedStable;
+        readonly further: ReadonlyArray<ParentTables>;
+        readonly refinable: boolean;
+      },
+    ) => [
+      ...toolkit.typeConstraints(level, stable, parent.stable, { refinable: parent.refinable }),
+      ...Arr.flatMap(parent.further, (further) => {
+        const typeFk = foreignKey({
+          name: `${level}_id_type_${further.name}_fk`,
+          columns: [stable.id, stable.type],
+          foreignColumns: [further.stable.id, further.stable.type],
+        });
+        return [
+          foreignKey({
+            name: `${level}_id_${further.name}_id_fkey`,
+            columns: [stable.id],
+            foreignColumns: [further.stable.id],
+          }).onDelete("cascade"),
+          parent.refinable ? typeFk.onUpdate("cascade") : typeFk,
+        ];
+      }),
+    ],
   );
   const builtLevel = (built: Readonly<Record<string, BuiltLevel>>, name: string): BuiltLevel =>
     Option.getOrElse(R.get(built, name), () =>
@@ -1140,11 +1177,13 @@ export const makeTreeTables = <
     built: Readonly<Record<string, BuiltLevel>>,
     level: Tree<S, M>["levels"][number],
   ): BuiltLevel => {
-    const parent: { readonly stable: TypedStable; readonly version: ParentVersionTable } =
-      Option.match(level.parent, {
-        onNone: () => ({ stable: identity, version }),
-        onSome: (name) => builtLevel(built, name).tables,
-      });
+    const [parent, ...further] = Arr.match(level.parents, {
+      onEmpty: (): Arr.NonEmptyReadonlyArray<ParentTables> => [
+        { name: identityName, stable: identity, version },
+      ],
+      onNonEmpty: (names) =>
+        Arr.map(names, (name): ParentTables => ({ name, ...builtLevel(built, name).tables })),
+    });
     const hooks = hooksOf(level.name);
     const metas = { ...level.levelColumns, ...level.leafColumns };
     const own: ColumnMap = derive.fromMeta(metas);
@@ -1173,11 +1212,23 @@ export const makeTreeTables = <
       parentId: parent.stable.id,
       parentVersion: parent.version,
       columns: factScoped ? { ...hooks.columns } : { ...own, ...hooks.columns },
-      extraConstraints: hooks.extraConstraints,
+      extraConstraints: Arr.isReadonlyArrayNonEmpty(further)
+        ? (table) => [
+            ...Arr.map(further, (other) =>
+              foreignKey({
+                name: `${level.name}_version_${getTableName(other.version)}_fk`,
+                columns: [rootColumnOf(table, "id"), rootColumnOf(table, "version")],
+                foreignColumns: [other.version.id, other.version.version],
+              }).onDelete("cascade"),
+            ),
+            ...(hooks.extraConstraints?.(table) ?? []),
+          ]
+        : hooks.extraConstraints,
       stableColumns: hooks.stableColumns,
       stableConstraints: hooks.stableConstraints,
       discriminator: {
         stable: parent.stable,
+        further,
         // A refinable level's whole subtree cascades: a flipped root `type`
         // must travel down every arc below it, not just the first.
         refinable: Arr.some(
@@ -1335,12 +1386,29 @@ type ColumnDataOf<C, F> = F extends keyof C
     : never
   : never;
 
-/** Level `K`'s path from its branch root down to itself, as a tuple of names. */
+/** The members of tuple `P` that are not in `X`, in order. */
+type TupleWithout<P, X> = P extends readonly [infer H, ...infer Rest]
+  ? [H] extends [X]
+    ? TupleWithout<Rest, X>
+    : [H, ...TupleWithout<Rest, X>]
+  : [];
+
+/** Each parent's path in tuple `P`, concatenated, keeping a shared ancestor once. */
+type TreeParentsPath<S, P> = P extends readonly [infer H, ...infer Rest]
+  ? [...TreePathOf<S, H>, ...TupleWithout<TreeParentsPath<S, Rest>, TreePathOf<S, H>[number]>]
+  : [];
+
+/**
+ * Level `K`'s path from its branch root down to itself, as a tuple of names:
+ * its ancestors (through every parent, a shared one once), then `K`.
+ */
 export type TreePathOf<S, K> = K extends keyof S
   ? S[K] extends { readonly parent: infer P }
     ? P extends keyof S
       ? [...TreePathOf<S, P>, K]
-      : [K]
+      : P extends ReadonlyArray<unknown>
+        ? [...TreeParentsPath<S, P>, K]
+        : [K]
     : [K]
   : [];
 
@@ -2339,8 +2407,9 @@ export const makeTreeViews = <
     const leaves = branch.subtreeLeaves;
     const view = `view "${name}_view"`;
     const spine = pathOf(name);
-    /** The levels strictly below the branch on `leaf`'s path, the leaf included. */
-    const below = (leaf: string) => Arr.drop(pathOf(leaf), spine.length);
+    /** The levels on `leaf`'s path off the branch's spine, the leaf included. */
+    const below = (leaf: string) =>
+      Arr.filter(pathOf(leaf), (level) => !Arr.contains(spine, level));
     const lower = Arr.filter(
       Arr.map(tree.levels, (level) => level.name),
       (level) => Arr.some(leaves, (leaf) => Arr.contains(below(leaf), level)),

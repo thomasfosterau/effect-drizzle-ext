@@ -39,8 +39,13 @@ export interface KeyedSpec {
  * the leaf payload.
  */
 export interface LevelSpec<Parent extends string = string, Leaf = unknown> {
-  /** The parent level. Absent: a child of the root (a branch root). */
-  readonly parent?: Parent;
+  /**
+   * The parent level, or several (a type with several supertypes, so the
+   * levels form a DAG). Absent: a child of the root (a branch root). Several
+   * parents must share one branch root, and none may be an ancestor of
+   * another.
+   */
+  readonly parent?: Parent | readonly [Parent, ...Array<Parent>];
   /** How the level stores its columns; `"plain"` when absent. */
   readonly kind?: LevelKind;
   /**
@@ -93,13 +98,22 @@ export interface TreeLevel<S> {
   readonly name: LevelName<S>;
   /** The declaration entry, extension flags included. */
   readonly entry: S[LevelName<S>];
-  /** The parent level; `Option.none()` for a branch root. */
+  /**
+   * The first declared parent; `Option.none()` for a branch root. A level
+   * with several parents lists them all in {@link TreeLevel.parents}.
+   */
   readonly parent: Option.Option<LevelName<S>>;
+  /** Every parent, in declaration order; empty for a branch root. */
+  readonly parents: ReadonlyArray<LevelName<S>>;
   /** The level kind, `"plain"` when the entry names none. */
   readonly kind: LevelKind;
   /** Whether the level is a concrete leaf (it may still have children). */
   readonly isLeaf: boolean;
-  /** Every ancestor, root-most first, the level itself excluded. */
+  /**
+   * Every ancestor, the level itself excluded, each after all of its own
+   * ancestors: each parent's ancestors then the parent, in parent declaration
+   * order, keeping an ancestor two parents share once.
+   */
   readonly ancestors: ReadonlyArray<LevelName<S>>;
   /** The direct children, in declaration order. */
   readonly children: ReadonlyArray<LevelName<S>>;
@@ -110,7 +124,10 @@ export interface TreeLevel<S> {
    * included when it is a leaf: the value set of its discriminator CHECK.
    */
   readonly subtreeLeaves: ReadonlyArray<LeafName<S>>;
-  /** The branch root the level belongs to (itself for a branch root). */
+  /**
+   * The branch root the level belongs to (itself for a branch root); every
+   * parent of a level shares it.
+   */
   readonly branch: LevelName<S>;
   /** The level columns' db-column metadata, keyed by field, in order. */
   readonly levelColumns: Readonly<Record<string, DbColumn>>;
@@ -218,7 +235,9 @@ const firstClash = (
  * Check a tree declaration and derive every level's facts. Throws
  * {@link DerivationError} at module load for an empty tree, a level name a JS
  * object would reorder (an array index) or that is empty, a parent naming no
- * level, a parent cycle, a marker with no leaf below it,
+ * level, a parent named twice, a parent already an ancestor of another parent,
+ * parents under different branch roots, a parent cycle, a marker with no leaf
+ * below it,
  * a level column without a `dbColumn` annotation, a column taking a reserved
  * name (`id`, `version`, `action`, `type`), or two columns on one root-to-leaf
  * path sharing a field key or a column name. The entries' own payload checks
@@ -244,37 +263,65 @@ export const buildTree = <
 
   const has = (name: string): name is LevelName<S> => R.has(spec, name);
   const entryOf = (name: LevelName<S>): S[LevelName<S>] => spec[name];
-  const parentOf = (name: LevelName<S>): Option.Option<LevelName<S>> =>
-    Option.map(Option.fromUndefinedOr(entryOf(name).parent), (parent: string) =>
-      has(parent) ? parent : unknownParent(name, parent),
-    );
+  const parentsOf = (name: LevelName<S>): ReadonlyArray<LevelName<S>> => {
+    const declared = entryOf(name).parent;
+    const parents: ReadonlyArray<string> = declared === undefined ? [] : Arr.ensure(declared);
+    return Arr.map(parents, (parent, i) => {
+      if (!has(parent)) return unknownParent(name, parent);
+      if (Arr.contains(Arr.take(parents, i), parent)) {
+        return treeError(`level "${name}" names parent "${parent}" twice`);
+      }
+      return parent;
+    });
+  };
   const leafOf = (name: LevelName<S>): Option.Option<Leaf> =>
     Option.fromUndefinedOr(entryOf(name).leaf);
   const isLeafName = (name: LevelName<S>): name is LeafName<S> => Option.isSome(leafOf(name));
 
-  // Root-most first; `trail` is the chain walked so far, so a parent already on
-  // it closes a cycle.
+  // Each parent's ancestors then the parent, deduplicated keeping the first
+  // occurrence, so every ancestor follows its own; `trail` is the chain walked
+  // so far, so a parent already on it closes a cycle.
   const ancestorsOf = (
     name: LevelName<S>,
     trail: ReadonlyArray<LevelName<S>>,
   ): ReadonlyArray<LevelName<S>> =>
-    Option.match(parentOf(name), {
-      onNone: () => [],
-      onSome: (parent) =>
+    Arr.dedupe(
+      Arr.flatMap(parentsOf(name), (parent) =>
         Arr.contains(trail, parent)
           ? treeError(
               `the parents form a cycle: ${[...Arr.dropWhile(trail, (step) => step !== parent), parent].join(" → ")}`,
             )
           : [...ancestorsOf(parent, [...trail, parent]), parent],
-    });
+      ),
+    );
   const ancestorsFor = (name: LevelName<S>): ReadonlyArray<LevelName<S>> =>
     ancestorsOf(name, [name]);
+  const branchOf = (name: LevelName<S>): LevelName<S> =>
+    Option.getOrElse(Arr.head(ancestorsFor(name)), () => name);
+
+  Arr.forEach(names, (name) => {
+    const parents = parentsOf(name);
+    if (parents.length < 2) return;
+    Arr.forEach(parents, (parent) =>
+      Option.map(
+        Arr.findFirst(parents, (other) => Arr.contains(ancestorsFor(other), parent)),
+        (other) =>
+          treeError(
+            `level "${name}" names parent "${parent}", which is already an ancestor of its parent "${other}"`,
+          ),
+      ),
+    );
+    const branches = Arr.dedupe(Arr.map(parents, branchOf));
+    if (branches.length > 1) {
+      treeError(
+        `level "${name}"'s parents (${parents.join(", ")}) lie under different branch roots (${branches.join(", ")}); several parents must share one branch root`,
+      );
+    }
+  });
 
   const leaves = Arr.filter(names, isLeafName);
   const childrenOf = (name: LevelName<S>): ReadonlyArray<LevelName<S>> =>
-    Arr.filter(names, (candidate) =>
-      Option.exists(parentOf(candidate), (parent) => parent === name),
-    );
+    Arr.filter(names, (candidate) => Arr.contains(parentsOf(candidate), name));
   const descendantsOf = (name: LevelName<S>): ReadonlyArray<LevelName<S>> =>
     Arr.filter(names, (candidate) => Arr.contains(ancestorsFor(candidate), name));
   const subtreeLeavesOf = (name: LevelName<S>): ReadonlyArray<LeafName<S>> =>
@@ -369,14 +416,15 @@ export const buildTree = <
   const levels = Arr.map(names, (name): TreeLevel<S> => ({
     name,
     entry: entryOf(name),
-    parent: parentOf(name),
+    parent: Arr.head(parentsOf(name)),
+    parents: parentsOf(name),
     kind: entryOf(name).kind ?? "plain",
     isLeaf: isLeafName(name),
     ancestors: ancestorsFor(name),
     children: childrenOf(name),
     descendants: descendantsOf(name),
     subtreeLeaves: subtreeLeavesOf(name),
-    branch: Option.getOrElse(Arr.head(ancestorsFor(name)), () => name),
+    branch: branchOf(name),
     levelColumns: ownOf(name).levelColumns,
     leafColumns: ownOf(name).leafColumns,
     keyed: ownOf(name).keyed,
@@ -386,7 +434,7 @@ export const buildTree = <
     names,
     levels,
     leaves,
-    branchRoots: Arr.filter(names, (name) => Option.isNone(parentOf(name))),
+    branchRoots: Arr.filter(names, (name) => Arr.isReadonlyArrayEmpty(parentsOf(name))),
     level: (name) =>
       Option.getOrElse(
         Arr.findFirst(levels, (level) => level.name === name),

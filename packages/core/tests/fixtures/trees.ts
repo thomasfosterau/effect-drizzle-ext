@@ -72,3 +72,14 @@ export const flatTree = defineResourceTree({
   agents: {},
   author: { parent: "agents", leaf: Author },
 });
+
+/**
+ * A diamond (a type with two supertypes): `ebook` is both `printed` and
+ * `digital`, each a leaf with its own level column under one `artefact` root.
+ */
+export const diamondTree = defineTree({
+  artefact: { columns: { label: requiredText("label") } },
+  printed: { parent: "artefact", columns: { pressRun: integer("press_run") }, leaf: {} },
+  digital: { parent: "artefact", columns: { fileSize: integer("file_size") }, leaf: {} },
+  ebook: { parent: ["printed", "digital"], leaf: { drm: text("drm") } },
+});

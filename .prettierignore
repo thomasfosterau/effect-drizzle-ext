@@ -1,3 +1,5 @@
 # Read by oxfmt as its ignore file. Generated Drizzle migrations (the pg
 # package's fixture chain) are drizzle-kit output, never hand-formatted.
 migrations/
+# Vitest file snapshots are written by the test runner, byte for byte.
+__snapshots__/

@@ -1,0 +1,1754 @@
+{
+  "type": "diff",
+  "version": "10",
+  "dialect": "postgres",
+  "id": "4e9204ea-3549-48b5-a21e-09f49bb0ce0d",
+  "prevIds": [
+    "f2a148b0-f889-4529-89f6-3f38d937fe1f"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "artefact"
+      ],
+      "writes": [
+        "s|tbl|ontology.artefact",
+        "n|tbl|ontology.artefact",
+        "e|tbl|ontology.artefact",
+        "n|rel|ontology.artefact",
+        "n|type|ontology.artefact",
+        "n|rel|ontology.artefact_pkey",
+        "n|rel|ontology.artefact_id_type_unique"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "artefact_version"
+      ],
+      "writes": [
+        "s|tbl|ontology.artefact_version",
+        "n|tbl|ontology.artefact_version",
+        "e|tbl|ontology.artefact_version",
+        "n|rel|ontology.artefact_version",
+        "n|type|ontology.artefact_version",
+        "n|rel|ontology.artefact_version_pkey"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "digital"
+      ],
+      "writes": [
+        "s|tbl|ontology.digital",
+        "n|tbl|ontology.digital",
+        "e|tbl|ontology.digital",
+        "n|rel|ontology.digital",
+        "n|type|ontology.digital",
+        "n|rel|ontology.digital_pkey",
+        "n|rel|ontology.digital_id_type_unique"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "digital_version"
+      ],
+      "writes": [
+        "s|tbl|ontology.digital_version",
+        "n|tbl|ontology.digital_version",
+        "e|tbl|ontology.digital_version",
+        "n|rel|ontology.digital_version",
+        "n|type|ontology.digital_version",
+        "n|rel|ontology.digital_version_pkey"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "ebook"
+      ],
+      "writes": [
+        "s|tbl|ontology.ebook",
+        "n|tbl|ontology.ebook",
+        "e|tbl|ontology.ebook",
+        "n|rel|ontology.ebook",
+        "n|type|ontology.ebook",
+        "n|rel|ontology.ebook_pkey",
+        "n|rel|ontology.ebook_id_type_unique"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "ebook_version"
+      ],
+      "writes": [
+        "s|tbl|ontology.ebook_version",
+        "n|tbl|ontology.ebook_version",
+        "e|tbl|ontology.ebook_version",
+        "n|rel|ontology.ebook_version",
+        "n|type|ontology.ebook_version",
+        "n|rel|ontology.ebook_version_pkey"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "printed"
+      ],
+      "writes": [
+        "s|tbl|ontology.printed",
+        "n|tbl|ontology.printed",
+        "e|tbl|ontology.printed",
+        "n|rel|ontology.printed",
+        "n|type|ontology.printed",
+        "n|rel|ontology.printed_pkey",
+        "n|rel|ontology.printed_id_type_unique"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "printed_version"
+      ],
+      "writes": [
+        "s|tbl|ontology.printed_version",
+        "n|tbl|ontology.printed_version",
+        "e|tbl|ontology.printed_version",
+        "n|rel|ontology.printed_version",
+        "n|type|ontology.printed_version",
+        "n|rel|ontology.printed_version_pkey"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "artefact"
+      ],
+      "writes": [
+        "s|fk|ontology.artefact.artefact_id_node_id_fkey",
+        "n|fk|ontology.artefact.artefact_id_node_id_fkey",
+        "e|fk|ontology.artefact.artefact_id_node_id_fkey",
+        "n|con|ontology.artefact.artefact_id_node_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.artefact",
+        "n|sch|ontology",
+        "n|tbl|ontology.node",
+        "n|sch|ontology",
+        "n|col|ontology.artefact.id",
+        "n|col|ontology.node.id",
+        "e|uniqueness|ontology.node.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "artefact"
+      ],
+      "writes": [
+        "s|fk|ontology.artefact.artefact_id_type_fk",
+        "n|fk|ontology.artefact.artefact_id_type_fk",
+        "e|fk|ontology.artefact.artefact_id_type_fk",
+        "n|con|ontology.artefact.artefact_id_type_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.artefact",
+        "n|sch|ontology",
+        "n|tbl|ontology.node",
+        "n|sch|ontology",
+        "n|col|ontology.artefact.id",
+        "n|col|ontology.artefact.type",
+        "n|col|ontology.node.id",
+        "n|col|ontology.node.type",
+        "e|uniqueness|ontology.node.id.type"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "artefact_version"
+      ],
+      "writes": [
+        "s|fk|ontology.artefact_version.artefact_version_id_artefact_id_fkey",
+        "n|fk|ontology.artefact_version.artefact_version_id_artefact_id_fkey",
+        "e|fk|ontology.artefact_version.artefact_version_id_artefact_id_fkey",
+        "n|con|ontology.artefact_version.artefact_version_id_artefact_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.artefact_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.artefact",
+        "n|sch|ontology",
+        "n|col|ontology.artefact_version.id",
+        "n|col|ontology.artefact.id",
+        "e|uniqueness|ontology.artefact.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "artefact_version"
+      ],
+      "writes": [
+        "s|fk|ontology.artefact_version.artefact_version_node_version_fk",
+        "n|fk|ontology.artefact_version.artefact_version_node_version_fk",
+        "e|fk|ontology.artefact_version.artefact_version_node_version_fk",
+        "n|con|ontology.artefact_version.artefact_version_node_version_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.artefact_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.node_version",
+        "n|sch|ontology",
+        "n|col|ontology.artefact_version.id",
+        "n|col|ontology.artefact_version.version",
+        "n|col|ontology.node_version.id",
+        "n|col|ontology.node_version.version",
+        "e|uniqueness|ontology.node_version.id.version"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "digital"
+      ],
+      "writes": [
+        "s|fk|ontology.digital.digital_id_artefact_id_fkey",
+        "n|fk|ontology.digital.digital_id_artefact_id_fkey",
+        "e|fk|ontology.digital.digital_id_artefact_id_fkey",
+        "n|con|ontology.digital.digital_id_artefact_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.digital",
+        "n|sch|ontology",
+        "n|tbl|ontology.artefact",
+        "n|sch|ontology",
+        "n|col|ontology.digital.id",
+        "n|col|ontology.artefact.id",
+        "e|uniqueness|ontology.artefact.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "digital"
+      ],
+      "writes": [
+        "s|fk|ontology.digital.digital_id_type_fk",
+        "n|fk|ontology.digital.digital_id_type_fk",
+        "e|fk|ontology.digital.digital_id_type_fk",
+        "n|con|ontology.digital.digital_id_type_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.digital",
+        "n|sch|ontology",
+        "n|tbl|ontology.artefact",
+        "n|sch|ontology",
+        "n|col|ontology.digital.id",
+        "n|col|ontology.digital.type",
+        "n|col|ontology.artefact.id",
+        "n|col|ontology.artefact.type",
+        "e|uniqueness|ontology.artefact.id.type"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "digital_version"
+      ],
+      "writes": [
+        "s|fk|ontology.digital_version.digital_version_id_digital_id_fkey",
+        "n|fk|ontology.digital_version.digital_version_id_digital_id_fkey",
+        "e|fk|ontology.digital_version.digital_version_id_digital_id_fkey",
+        "n|con|ontology.digital_version.digital_version_id_digital_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.digital_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.digital",
+        "n|sch|ontology",
+        "n|col|ontology.digital_version.id",
+        "n|col|ontology.digital.id",
+        "e|uniqueness|ontology.digital.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "digital_version"
+      ],
+      "writes": [
+        "s|fk|ontology.digital_version.digital_version_artefact_version_fk",
+        "n|fk|ontology.digital_version.digital_version_artefact_version_fk",
+        "e|fk|ontology.digital_version.digital_version_artefact_version_fk",
+        "n|con|ontology.digital_version.digital_version_artefact_version_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.digital_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.artefact_version",
+        "n|sch|ontology",
+        "n|col|ontology.digital_version.id",
+        "n|col|ontology.digital_version.version",
+        "n|col|ontology.artefact_version.id",
+        "n|col|ontology.artefact_version.version",
+        "e|uniqueness|ontology.artefact_version.id.version"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "ebook"
+      ],
+      "writes": [
+        "s|fk|ontology.ebook.ebook_id_printed_id_fkey",
+        "n|fk|ontology.ebook.ebook_id_printed_id_fkey",
+        "e|fk|ontology.ebook.ebook_id_printed_id_fkey",
+        "n|con|ontology.ebook.ebook_id_printed_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.ebook",
+        "n|sch|ontology",
+        "n|tbl|ontology.printed",
+        "n|sch|ontology",
+        "n|col|ontology.ebook.id",
+        "n|col|ontology.printed.id",
+        "e|uniqueness|ontology.printed.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "ebook"
+      ],
+      "writes": [
+        "s|fk|ontology.ebook.ebook_id_type_fk",
+        "n|fk|ontology.ebook.ebook_id_type_fk",
+        "e|fk|ontology.ebook.ebook_id_type_fk",
+        "n|con|ontology.ebook.ebook_id_type_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.ebook",
+        "n|sch|ontology",
+        "n|tbl|ontology.printed",
+        "n|sch|ontology",
+        "n|col|ontology.ebook.id",
+        "n|col|ontology.ebook.type",
+        "n|col|ontology.printed.id",
+        "n|col|ontology.printed.type",
+        "e|uniqueness|ontology.printed.id.type"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "ebook"
+      ],
+      "writes": [
+        "s|fk|ontology.ebook.ebook_id_digital_id_fkey",
+        "n|fk|ontology.ebook.ebook_id_digital_id_fkey",
+        "e|fk|ontology.ebook.ebook_id_digital_id_fkey",
+        "n|con|ontology.ebook.ebook_id_digital_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.ebook",
+        "n|sch|ontology",
+        "n|tbl|ontology.digital",
+        "n|sch|ontology",
+        "n|col|ontology.ebook.id",
+        "n|col|ontology.digital.id",
+        "e|uniqueness|ontology.digital.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "ebook"
+      ],
+      "writes": [
+        "s|fk|ontology.ebook.ebook_id_type_digital_fk",
+        "n|fk|ontology.ebook.ebook_id_type_digital_fk",
+        "e|fk|ontology.ebook.ebook_id_type_digital_fk",
+        "n|con|ontology.ebook.ebook_id_type_digital_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.ebook",
+        "n|sch|ontology",
+        "n|tbl|ontology.digital",
+        "n|sch|ontology",
+        "n|col|ontology.ebook.id",
+        "n|col|ontology.ebook.type",
+        "n|col|ontology.digital.id",
+        "n|col|ontology.digital.type",
+        "e|uniqueness|ontology.digital.id.type"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "ebook_version"
+      ],
+      "writes": [
+        "s|fk|ontology.ebook_version.ebook_version_id_ebook_id_fkey",
+        "n|fk|ontology.ebook_version.ebook_version_id_ebook_id_fkey",
+        "e|fk|ontology.ebook_version.ebook_version_id_ebook_id_fkey",
+        "n|con|ontology.ebook_version.ebook_version_id_ebook_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.ebook_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.ebook",
+        "n|sch|ontology",
+        "n|col|ontology.ebook_version.id",
+        "n|col|ontology.ebook.id",
+        "e|uniqueness|ontology.ebook.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "ebook_version"
+      ],
+      "writes": [
+        "s|fk|ontology.ebook_version.ebook_version_printed_version_fk",
+        "n|fk|ontology.ebook_version.ebook_version_printed_version_fk",
+        "e|fk|ontology.ebook_version.ebook_version_printed_version_fk",
+        "n|con|ontology.ebook_version.ebook_version_printed_version_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.ebook_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.printed_version",
+        "n|sch|ontology",
+        "n|col|ontology.ebook_version.id",
+        "n|col|ontology.ebook_version.version",
+        "n|col|ontology.printed_version.id",
+        "n|col|ontology.printed_version.version",
+        "e|uniqueness|ontology.printed_version.id.version"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "ebook_version"
+      ],
+      "writes": [
+        "s|fk|ontology.ebook_version.ebook_version_digital_version_fk",
+        "n|fk|ontology.ebook_version.ebook_version_digital_version_fk",
+        "e|fk|ontology.ebook_version.ebook_version_digital_version_fk",
+        "n|con|ontology.ebook_version.ebook_version_digital_version_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.ebook_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.digital_version",
+        "n|sch|ontology",
+        "n|col|ontology.ebook_version.id",
+        "n|col|ontology.ebook_version.version",
+        "n|col|ontology.digital_version.id",
+        "n|col|ontology.digital_version.version",
+        "e|uniqueness|ontology.digital_version.id.version"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "printed"
+      ],
+      "writes": [
+        "s|fk|ontology.printed.printed_id_artefact_id_fkey",
+        "n|fk|ontology.printed.printed_id_artefact_id_fkey",
+        "e|fk|ontology.printed.printed_id_artefact_id_fkey",
+        "n|con|ontology.printed.printed_id_artefact_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.printed",
+        "n|sch|ontology",
+        "n|tbl|ontology.artefact",
+        "n|sch|ontology",
+        "n|col|ontology.printed.id",
+        "n|col|ontology.artefact.id",
+        "e|uniqueness|ontology.artefact.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "printed"
+      ],
+      "writes": [
+        "s|fk|ontology.printed.printed_id_type_fk",
+        "n|fk|ontology.printed.printed_id_type_fk",
+        "e|fk|ontology.printed.printed_id_type_fk",
+        "n|con|ontology.printed.printed_id_type_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.printed",
+        "n|sch|ontology",
+        "n|tbl|ontology.artefact",
+        "n|sch|ontology",
+        "n|col|ontology.printed.id",
+        "n|col|ontology.printed.type",
+        "n|col|ontology.artefact.id",
+        "n|col|ontology.artefact.type",
+        "e|uniqueness|ontology.artefact.id.type"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "printed_version"
+      ],
+      "writes": [
+        "s|fk|ontology.printed_version.printed_version_id_printed_id_fkey",
+        "n|fk|ontology.printed_version.printed_version_id_printed_id_fkey",
+        "e|fk|ontology.printed_version.printed_version_id_printed_id_fkey",
+        "n|con|ontology.printed_version.printed_version_id_printed_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|ontology.printed_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.printed",
+        "n|sch|ontology",
+        "n|col|ontology.printed_version.id",
+        "n|col|ontology.printed.id",
+        "e|uniqueness|ontology.printed.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "ontology",
+        "printed_version"
+      ],
+      "writes": [
+        "s|fk|ontology.printed_version.printed_version_artefact_version_fk",
+        "n|fk|ontology.printed_version.printed_version_artefact_version_fk",
+        "e|fk|ontology.printed_version.printed_version_artefact_version_fk",
+        "n|con|ontology.printed_version.printed_version_artefact_version_fk"
+      ],
+      "reads": [
+        "n|tbl|ontology.printed_version",
+        "n|sch|ontology",
+        "n|tbl|ontology.artefact_version",
+        "n|sch|ontology",
+        "n|col|ontology.printed_version.id",
+        "n|col|ontology.printed_version.version",
+        "n|col|ontology.artefact_version.id",
+        "n|col|ontology.artefact_version.version",
+        "e|uniqueness|ontology.artefact_version.id.version"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "artefact_view"
+      ],
+      "writes": [
+        "s|view|ontology.artefact_view",
+        "n|view|ontology.artefact_view",
+        "e|view|ontology.artefact_view",
+        "n|rel|ontology.artefact_view",
+        "n|type|ontology.artefact_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "digital_view"
+      ],
+      "writes": [
+        "s|view|ontology.digital_view",
+        "n|view|ontology.digital_view",
+        "e|view|ontology.digital_view",
+        "n|rel|ontology.digital_view",
+        "n|type|ontology.digital_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "ebook_view"
+      ],
+      "writes": [
+        "s|view|ontology.ebook_view",
+        "n|view|ontology.ebook_view",
+        "e|view|ontology.ebook_view",
+        "n|rel|ontology.ebook_view",
+        "n|type|ontology.ebook_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    },
+    {
+      "statementType": "create_view",
+      "statementTarget": [
+        "view",
+        "ontology",
+        "printed_view"
+      ],
+      "writes": [
+        "s|view|ontology.printed_view",
+        "n|view|ontology.printed_view",
+        "e|view|ontology.printed_view",
+        "n|rel|ontology.printed_view",
+        "n|type|ontology.printed_view"
+      ],
+      "reads": [
+        "n|sch|ontology"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "artefact",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "artefact_version",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "digital",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "digital_version",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "ebook",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "ebook_version",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "printed",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "printed_version",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "artefact",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "artefact",
+        "name": "type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "artefact_version",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "artefact_version",
+        "name": "version",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "artefact_version",
+        "name": "caption",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "digital",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "digital",
+        "name": "type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "digital_version",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "digital_version",
+        "name": "version",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "digital_version",
+        "name": "file_size",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "ebook",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "ebook",
+        "name": "type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "ebook_version",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "ebook_version",
+        "name": "version",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "ebook_version",
+        "name": "drm",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "printed",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "printed",
+        "name": "type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "printed_version",
+        "name": "id",
+        "type": "uuid",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "printed_version",
+        "name": "version",
+        "type": "bigint",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "printed_version",
+        "name": "press_run",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "artefact",
+        "name": "artefact_id_node_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "node",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "artefact",
+        "name": "artefact_id_type_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "node",
+        "columnsTo": [
+          "id",
+          "type"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "artefact_version",
+        "name": "artefact_version_id_artefact_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "artefact",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "artefact_version",
+        "name": "artefact_version_node_version_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "version"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "node_version",
+        "columnsTo": [
+          "id",
+          "version"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "digital",
+        "name": "digital_id_artefact_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "artefact",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "digital",
+        "name": "digital_id_type_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "artefact",
+        "columnsTo": [
+          "id",
+          "type"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "digital_version",
+        "name": "digital_version_id_digital_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "digital",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "digital_version",
+        "name": "digital_version_artefact_version_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "version"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "artefact_version",
+        "columnsTo": [
+          "id",
+          "version"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "ebook",
+        "name": "ebook_id_printed_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "printed",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "ebook",
+        "name": "ebook_id_type_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "printed",
+        "columnsTo": [
+          "id",
+          "type"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "ebook",
+        "name": "ebook_id_digital_id_fkey",
+        "nameExplicit": true,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "digital",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "ebook",
+        "name": "ebook_id_type_digital_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "digital",
+        "columnsTo": [
+          "id",
+          "type"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "ebook_version",
+        "name": "ebook_version_id_ebook_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "ebook",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "ebook_version",
+        "name": "ebook_version_printed_version_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "version"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "printed_version",
+        "columnsTo": [
+          "id",
+          "version"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "ebook_version",
+        "name": "ebook_version_digital_version_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "version"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "digital_version",
+        "columnsTo": [
+          "id",
+          "version"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "printed",
+        "name": "printed_id_artefact_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "artefact",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "printed",
+        "name": "printed_id_type_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "artefact",
+        "columnsTo": [
+          "id",
+          "type"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "printed_version",
+        "name": "printed_version_id_printed_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "id"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "printed",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "CASCADE",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "printed_version",
+        "name": "printed_version_artefact_version_fk",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "version"
+        ],
+        "schemaTo": "ontology",
+        "tableTo": "artefact_version",
+        "columnsTo": [
+          "id",
+          "version"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "artefact_version",
+        "name": "artefact_version_pkey",
+        "columns": [
+          "id",
+          "version"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "digital_version",
+        "name": "digital_version_pkey",
+        "columns": [
+          "id",
+          "version"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "ebook_version",
+        "name": "ebook_version_pkey",
+        "columns": [
+          "id",
+          "version"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "printed_version",
+        "name": "printed_version_pkey",
+        "columns": [
+          "id",
+          "version"
+        ],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "artefact",
+        "name": "artefact_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "digital",
+        "name": "digital_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "ebook",
+        "name": "ebook_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "printed",
+        "name": "printed_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "artefact",
+        "name": "artefact_id_type_unique",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "digital",
+        "name": "digital_id_type_unique",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "ebook",
+        "name": "ebook_id_type_unique",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "printed",
+        "name": "printed_id_type_unique",
+        "nameExplicit": true,
+        "columns": [
+          "id",
+          "type"
+        ],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "artefact",
+        "name": "artefact_type_valid",
+        "value": "\"type\" IN ('printed', 'digital', 'ebook')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "digital",
+        "name": "digital_type_valid",
+        "value": "\"type\" IN ('digital', 'ebook')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "ebook",
+        "name": "ebook_type_valid",
+        "value": "\"type\" IN ('ebook')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "table": "printed",
+        "name": "printed_type_valid",
+        "value": "\"type\" IN ('printed', 'ebook')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "artefact_view",
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"node\".\"type\", \"ontology\".\"artefact_version\".\"caption\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from \"ontology\".\"artefact_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"artefact_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"artefact_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"artefact_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"artefact_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where ((not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"artefact_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"artefact_version\".\"version\")))) and (case \"ontology\".\"node\".\"type\" when 'printed' then exists (select 1 from \"ontology\".\"printed_version\" where ((\"ontology\".\"artefact_version\".\"id\" = \"ontology\".\"printed_version\".\"id\") and (\"ontology\".\"artefact_version\".\"version\" = \"ontology\".\"printed_version\".\"version\")) offset 0) when 'digital' then exists (select 1 from \"ontology\".\"digital_version\" where ((\"ontology\".\"artefact_version\".\"id\" = \"ontology\".\"digital_version\".\"id\") and (\"ontology\".\"artefact_version\".\"version\" = \"ontology\".\"digital_version\".\"version\")) offset 0) when 'ebook' then ((exists (select 1 from \"ontology\".\"printed_version\" where ((\"ontology\".\"artefact_version\".\"id\" = \"ontology\".\"printed_version\".\"id\") and (\"ontology\".\"artefact_version\".\"version\" = \"ontology\".\"printed_version\".\"version\")) offset 0)) and (exists (select 1 from \"ontology\".\"digital_version\" where ((\"ontology\".\"artefact_version\".\"id\" = \"ontology\".\"digital_version\".\"id\") and (\"ontology\".\"artefact_version\".\"version\" = \"ontology\".\"digital_version\".\"version\")) offset 0)) and (exists (select 1 from \"ontology\".\"ebook_version\" where ((\"ontology\".\"artefact_version\".\"id\" = \"ontology\".\"ebook_version\".\"id\") and (\"ontology\".\"artefact_version\".\"version\" = \"ontology\".\"ebook_version\".\"version\")) offset 0))) else false end))",
+        "with": null,
+        "withNoData": null,
+        "using": null,
+        "tablespace": null,
+        "materialized": false,
+        "entityType": "views"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "digital_view",
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"artefact_version\".\"caption\", \"ontology\".\"digital_version\".\"file_size\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from \"ontology\".\"digital_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"digital_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"digital_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"digital_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"artefact_version\" on ((\"ontology\".\"digital_version\".\"id\" = \"ontology\".\"artefact_version\".\"id\") and (\"ontology\".\"digital_version\".\"version\" = \"ontology\".\"artefact_version\".\"version\")) inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"digital_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"digital_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"digital_version\".\"version\")))",
+        "with": null,
+        "withNoData": null,
+        "using": null,
+        "tablespace": null,
+        "materialized": false,
+        "entityType": "views"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "ebook_view",
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"artefact_version\".\"caption\", \"ontology\".\"printed_version\".\"press_run\", \"ontology\".\"digital_version\".\"file_size\", \"ontology\".\"ebook_version\".\"drm\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from \"ontology\".\"ebook_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"ebook_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"ebook_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"ebook_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"artefact_version\" on ((\"ontology\".\"ebook_version\".\"id\" = \"ontology\".\"artefact_version\".\"id\") and (\"ontology\".\"ebook_version\".\"version\" = \"ontology\".\"artefact_version\".\"version\")) inner join \"ontology\".\"printed_version\" on ((\"ontology\".\"ebook_version\".\"id\" = \"ontology\".\"printed_version\".\"id\") and (\"ontology\".\"ebook_version\".\"version\" = \"ontology\".\"printed_version\".\"version\")) inner join \"ontology\".\"digital_version\" on ((\"ontology\".\"ebook_version\".\"id\" = \"ontology\".\"digital_version\".\"id\") and (\"ontology\".\"ebook_version\".\"version\" = \"ontology\".\"digital_version\".\"version\")) inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"ebook_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"ebook_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"ebook_version\".\"version\")))",
+        "with": null,
+        "withNoData": null,
+        "using": null,
+        "tablespace": null,
+        "materialized": false,
+        "entityType": "views"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "ontology",
+        "name": "printed_view",
+        "definition": "select \"ontology\".\"node_version\".\"id\", \"ontology\".\"node_version\".\"version\", \"ontology\".\"node_version\".\"action\", \"ontology\".\"artefact_version\".\"caption\", \"ontology\".\"printed_version\".\"press_run\", \"ontology\".\"node_version\".\"timestamp\", \"version_zero\".\"timestamp\" as \"created_at\" from \"ontology\".\"printed_version\" inner join \"ontology\".\"node_version\" on ((\"ontology\".\"printed_version\".\"id\" = \"ontology\".\"node_version\".\"id\") and (\"ontology\".\"printed_version\".\"version\" = \"ontology\".\"node_version\".\"version\")) inner join \"ontology\".\"node\" on \"ontology\".\"printed_version\".\"id\" = \"ontology\".\"node\".\"id\" inner join \"ontology\".\"artefact_version\" on ((\"ontology\".\"printed_version\".\"id\" = \"ontology\".\"artefact_version\".\"id\") and (\"ontology\".\"printed_version\".\"version\" = \"ontology\".\"artefact_version\".\"version\")) inner join \"ontology\".\"node_version\" \"version_zero\" on ((\"ontology\".\"printed_version\".\"id\" = \"version_zero\".\"id\") and (\"version_zero\".\"version\" = 0)) where not exists (select 1 from \"ontology\".\"node_version\" \"newer\" where ((\"newer\".\"id\" = \"ontology\".\"printed_version\".\"id\") and (\"newer\".\"version\" > \"ontology\".\"printed_version\".\"version\")))",
+        "with": null,
+        "withNoData": null,
+        "using": null,
+        "tablespace": null,
+        "materialized": false,
+        "entityType": "views"
+      }
+    }
+  ]
+}
