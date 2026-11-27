@@ -1,5 +1,16 @@
 # @thomasfosterau/effect-drizzle-ext-kit
 
+## 0.9.0
+
+### Minor Changes
+
+- [#272](https://github.com/thomasfosterau/effect-drizzle-ext/pull/272) [`f7d65f8`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/f7d65f87f33bfa02f82e2ec86aba7cdeda88e1ec) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - Require drizzle-orm and drizzle-kit 1.0.0-rc.6. The migration-drift gate now reads drizzle-kit rc.6's version `"10"` chain snapshots (and still a lone version `"8"` full snapshot); run `drizzle-kit up` once on a migrations folder that rc.5 wrote. rc.6 no longer reads enum arrays, `vector`, `macaddr`, `regconfig` or `interval` columns as text over `@effect/sql-pg`: select them through a cast (the pg overview guide lists each one), and a `Search.regconfig` column through the new `Search.configName`.
+
+### Patch Changes
+
+- Updated dependencies [[`760999a`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/760999af9a3de765218144ed5305797af30caa44), [`29a7e16`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/29a7e16914f3c316b94bc10359454065ea1d035f), [`f7d65f8`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/f7d65f87f33bfa02f82e2ec86aba7cdeda88e1ec), [`d0c4b21`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/d0c4b21f899c4ab1e5d74bd3a533a5516100ae54)]:
+  - @thomasfosterau/effect-drizzle-ext-pg@0.9.0
+
 ## 0.8.0
 
 ### Minor Changes
