@@ -1,5 +1,37 @@
 # @thomasfosterau/effect-drizzle-ext-pg
 
+## 0.9.0
+
+### Minor Changes
+
+- [#271](https://github.com/thomasfosterau/effect-drizzle-ext/pull/271) [`760999a`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/760999af9a3de765218144ed5305797af30caa44) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - Version-chain times are `DateTime.Utc` instead of `Date` (effect-drizzle-ext#249). Drizzle's `Date` is converted at the row decoders; the SQL (column types, view definitions) is unchanged, so no migration is generated.
+  
+  - `VersionChainEntry.timestamp` (and so `VersionSnapshot` and pg's `ChainSnapshot`) is a `DateTime.Utc`: `head`, `load`, `getVersion` and `history` return one.
+  - `versionTimestamps(row)` still reads a Drizzle row's `Date`s, and returns `{ createdAt, updatedAt }` as `DateTime.Utc`.
+  - `AsOfPoint`'s `at` and `setPointer`'s `at` take a `DateTime.Utc`. A `Date` is still accepted for this release and will be dropped in the next minor.
+  
+  **Upgrading.** Code that reads a chain time as a `Date` converts once: `DateTime.toDateUtc(entry.timestamp)` for a `Date`, `DateTime.formatIso(entry.timestamp)` for an ISO string, and `DateTime.Order` / `DateTime.Equivalence` in place of `getTime()` comparisons. Code that already held a `DateTime.Utc` drops its `DateTime.fromDateUnsafe` / `DateTime.toDateUtc` at the call site. Pass `asOf(leaf, { at })` and `setPointer({ at })` a `DateTime.Utc` now, before the `Date` overload goes.
+
+- [#290](https://github.com/thomasfosterau/effect-drizzle-ext/pull/290) [`29a7e16`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/29a7e16914f3c316b94bc10359454065ea1d035f) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - A tree level may name several parents, so a type with several supertypes has a table layout: `defineTree({ …, ebook: { parent: ["printed", "digital"], leaf: { … } } })`.
+  
+  - `defineTree` / `defineResourceTree` take `parent` as a name or a non-empty list of names. A level's `ancestors` are every parent's, a shared one listed once before every level below it, and `TreeLevel.parents` lists its parents (`parent` stays the first). Several parents must share one branch root, and none may be an ancestor of another; either fault throws `DerivationError`, as does a parent named twice.
+  - `makeTreeTables` gives such a level a row at every level of each parent's path: its stable and version tables arc to every parent, the first under the single-parent constraint names and each further one through `${level}_id_${parent}_id_fkey`, `${level}_id_type_${parent}_fk` (cascading when refinable) and `${level}_version_${parent}_version_fk`. Each parent's leaf and branch views list it, and its own views join both parents' levels and fail closed on either.
+  - `TreePathOf` follows every parent.
+  - pg's `LeafChain.refine` refines from any leaf on the target's path, adding every level the source's path lacks (the other parent's included), and `ChainRefinement` types the added levels the same way.
+  
+  Single-parent trees emit exactly the DDL and view SQL they did, so no migration is generated for existing trees.
+
+- [#272](https://github.com/thomasfosterau/effect-drizzle-ext/pull/272) [`f7d65f8`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/f7d65f87f33bfa02f82e2ec86aba7cdeda88e1ec) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - Require drizzle-orm and drizzle-kit 1.0.0-rc.6. The migration-drift gate now reads drizzle-kit rc.6's version `"10"` chain snapshots (and still a lone version `"8"` full snapshot); run `drizzle-kit up` once on a migrations folder that rc.5 wrote. rc.6 no longer reads enum arrays, `vector`, `macaddr`, `regconfig` or `interval` columns as text over `@effect/sql-pg`: select them through a cast (the pg overview guide lists each one), and a `Search.regconfig` column through the new `Search.configName`.
+
+- [#269](https://github.com/thomasfosterau/effect-drizzle-ext/pull/269) [`d0c4b21`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/d0c4b21f899c4ab1e5d74bd3a533a5516100ae54) Thanks [@thomasfosterau](https://github.com/thomasfosterau)! - `provisionTestDatabase` and `resolveDatabaseSource` read `DATABASE_URL_TEST`, `DATABASE_URL` and the `PG*` variables through Effect `Config` (the new `TestDatabaseConfig`), so the URLs and `PGPASSWORD` are `Redacted` from the moment they are read and a malformed `PGPORT` fails with a typed `ConfigError`. Settings come from the current `ConfigProvider`, which defaults to `process.env`.
+  
+  Upgrading: drop `env: process.env` from a Vitest global setup; a test that passed an `env` record provides `ConfigProvider.fromEnvRecord({ … })` instead. The `env` option still works but is deprecated and will be removed in the next release. `connectionUrl` now takes a `TestServer` (from `TestDatabaseConfig`) rather than an environment record, both functions' error channels gain `ConfigError`, and `ResolutionEnvironment` is deprecated.
+
+### Patch Changes
+
+- Updated dependencies [[`760999a`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/760999af9a3de765218144ed5305797af30caa44), [`29a7e16`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/29a7e16914f3c316b94bc10359454065ea1d035f), [`f7d65f8`](https://github.com/thomasfosterau/effect-drizzle-ext/commit/f7d65f87f33bfa02f82e2ec86aba7cdeda88e1ec)]:
+  - @thomasfosterau/effect-drizzle-ext@0.9.0
+
 ## 0.8.0
 
 ### Minor Changes
