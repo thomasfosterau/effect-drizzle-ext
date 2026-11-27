@@ -1,0 +1,180 @@
+table node
+  column id uuid not null
+  column type text not null
+  unique node_id_type_unique (id, type)
+table node_version
+  column id uuid not null
+  column version bigint not null
+  column action text not null
+  column timestamp timestamp with time zone not null
+  column actor text
+  primary key node_version_pkey (id, version)
+  foreign key node_version_id_node_id_fk (id) → node (id) on update no action on delete cascade
+  check node_version_action_valid: "ontology"."node_version"."action" IN ('create', 'update', 'delete')
+table continuant
+  column id uuid not null
+  column type text not null
+  foreign key continuant_id_node_id_fk (id) → node (id) on update no action on delete cascade
+  foreign key continuant_id_type_fk (id, type) → node (id, type) on update no action on delete no action
+  unique continuant_id_type_unique (id, type)
+  check continuant_type_valid: "ontology"."continuant"."type" IN ($1, $2, $3) -- plant, bed, document
+table continuant_version
+  column id uuid not null
+  column version bigint not null
+  column label text not null
+  primary key continuant_version_pkey (id, version)
+  foreign key continuant_version_id_continuant_id_fk (id) → continuant (id) on update cascade on delete cascade
+  foreign key continuant_version_node_version_fk (id, version) → node_version (id, version) on update no action on delete cascade
+table independent_continuant
+  column id uuid not null
+  column type text not null
+  foreign key independent_continuant_id_continuant_id_fk (id) → continuant (id) on update no action on delete cascade
+  foreign key independent_continuant_id_type_fk (id, type) → continuant (id, type) on update no action on delete no action
+  unique independent_continuant_id_type_unique (id, type)
+  check independent_continuant_type_valid: "ontology"."independent_continuant"."type" IN ($1, $2) -- plant, bed
+table independent_continuant_version
+  column id uuid not null
+  column version bigint not null
+  primary key independent_continuant_version_pkey (id, version)
+  foreign key independent_continuant_version_id_independent_continuant_id_fk (id) → independent_continuant (id) on update cascade on delete cascade
+  foreign key independent_continuant_version_continuant_version_fk (id, version) → continuant_version (id, version) on update no action on delete cascade
+table material_entity
+  column id uuid not null
+  column type text not null
+  foreign key material_entity_id_independent_continuant_id_fk (id) → independent_continuant (id) on update no action on delete cascade
+  foreign key material_entity_id_type_fk (id, type) → independent_continuant (id, type) on update no action on delete no action
+  unique material_entity_id_type_unique (id, type)
+  check material_entity_type_valid: "ontology"."material_entity"."type" IN ($1, $2) -- plant, bed
+table material_entity_version
+  column id uuid not null
+  column version bigint not null
+  column mass integer
+  primary key material_entity_version_pkey (id, version)
+  foreign key material_entity_version_id_material_entity_id_fk (id) → material_entity (id) on update cascade on delete cascade
+  foreign key material_entity_version_independent_continuant_version_fk (id, version) → independent_continuant_version (id, version) on update no action on delete cascade
+table plant
+  column id uuid not null
+  column type text not null
+  foreign key plant_id_material_entity_id_fk (id) → material_entity (id) on update no action on delete cascade
+  foreign key plant_id_type_fk (id, type) → material_entity (id, type) on update no action on delete no action
+  unique plant_id_type_unique (id, type)
+  check plant_type_valid: "ontology"."plant"."type" IN ($1) -- plant
+table plant_version
+  column id uuid not null
+  column version bigint not null
+  column species text
+  primary key plant_version_pkey (id, version)
+  foreign key plant_version_id_plant_id_fk (id) → plant (id) on update cascade on delete cascade
+  foreign key plant_version_material_entity_version_fk (id, version) → material_entity_version (id, version) on update no action on delete cascade
+table bed
+  column id uuid not null
+  column type text not null
+  foreign key bed_id_material_entity_id_fk (id) → material_entity (id) on update no action on delete cascade
+  foreign key bed_id_type_fk (id, type) → material_entity (id, type) on update no action on delete no action
+  unique bed_id_type_unique (id, type)
+  check bed_type_valid: "ontology"."bed"."type" IN ($1) -- bed
+table bed_version
+  column id uuid not null
+  column version bigint not null
+  column area integer
+  primary key bed_version_pkey (id, version)
+  foreign key bed_version_id_bed_id_fk (id) → bed (id) on update cascade on delete cascade
+  foreign key bed_version_material_entity_version_fk (id, version) → material_entity_version (id, version) on update no action on delete cascade
+table dependent_continuant
+  column id uuid not null
+  column type text not null
+  foreign key dependent_continuant_id_continuant_id_fk (id) → continuant (id) on update no action on delete cascade
+  foreign key dependent_continuant_id_type_fk (id, type) → continuant (id, type) on update no action on delete no action
+  unique dependent_continuant_id_type_unique (id, type)
+  check dependent_continuant_type_valid: "ontology"."dependent_continuant"."type" IN ($1) -- document
+table dependent_continuant_version
+  column id uuid not null
+  column version bigint not null
+  primary key dependent_continuant_version_pkey (id, version)
+  foreign key dependent_continuant_version_id_dependent_continuant_id_fk (id) → dependent_continuant (id) on update cascade on delete cascade
+  foreign key dependent_continuant_version_continuant_version_fk (id, version) → continuant_version (id, version) on update no action on delete cascade
+table document
+  column id uuid not null
+  column type text not null
+  foreign key document_id_dependent_continuant_id_fk (id) → dependent_continuant (id) on update no action on delete cascade
+  foreign key document_id_type_fk (id, type) → dependent_continuant (id, type) on update no action on delete no action
+  unique document_id_type_unique (id, type)
+  check document_type_valid: "ontology"."document"."type" IN ($1) -- document
+table document_version
+  column id uuid not null
+  column version bigint not null
+  column body text
+  primary key document_version_pkey (id, version)
+  foreign key document_version_id_document_id_fk (id) → document (id) on update cascade on delete cascade
+  foreign key document_version_dependent_continuant_version_fk (id, version) → dependent_continuant_version (id, version) on update no action on delete cascade
+table occurrent
+  column id uuid not null
+  column type text not null
+  foreign key occurrent_id_node_id_fk (id) → node (id) on update no action on delete cascade
+  foreign key occurrent_id_type_fk (id, type) → node (id, type) on update cascade on delete no action
+  unique occurrent_id_type_unique (id, type)
+  check occurrent_type_valid: "ontology"."occurrent"."type" IN ($1, $2) -- sowing, harvest
+table occurrent_version
+  column id uuid not null
+  column version bigint not null
+  column starts_at text
+  primary key occurrent_version_pkey (id, version)
+  foreign key occurrent_version_id_occurrent_id_fk (id) → occurrent (id) on update cascade on delete cascade
+  foreign key occurrent_version_node_version_fk (id, version) → node_version (id, version) on update no action on delete cascade
+table process
+  column id uuid not null
+  column type text not null
+  foreign key process_id_occurrent_id_fk (id) → occurrent (id) on update no action on delete cascade
+  foreign key process_id_type_fk (id, type) → occurrent (id, type) on update cascade on delete no action
+  unique process_id_type_unique (id, type)
+  check process_type_valid: "ontology"."process"."type" IN ($1, $2) -- sowing, harvest
+table process_version
+  column id uuid not null
+  column version bigint not null
+  primary key process_version_pkey (id, version)
+  foreign key process_version_id_process_id_fk (id) → process (id) on update cascade on delete cascade
+  foreign key process_version_occurrent_version_fk (id, version) → occurrent_version (id, version) on update no action on delete cascade
+table sowing
+  column id uuid not null
+  column type text not null
+  foreign key sowing_id_process_id_fk (id) → process (id) on update no action on delete cascade
+  foreign key sowing_id_type_fk (id, type) → process (id, type) on update cascade on delete no action
+  unique sowing_id_type_unique (id, type)
+  check sowing_type_valid: "ontology"."sowing"."type" IN ($1) -- sowing
+table sowing_version
+  column id uuid not null
+  column version bigint not null
+  column depth integer
+  primary key sowing_version_pkey (id, version)
+  foreign key sowing_version_id_sowing_id_fk (id) → sowing (id) on update cascade on delete cascade
+  foreign key sowing_version_process_version_fk (id, version) → process_version (id, version) on update no action on delete cascade
+table harvest
+  column id uuid not null
+  column type text not null
+  foreign key harvest_id_process_id_fk (id) → process (id) on update no action on delete cascade
+  foreign key harvest_id_type_fk (id, type) → process (id, type) on update cascade on delete no action
+  unique harvest_id_type_unique (id, type)
+  check harvest_type_valid: "ontology"."harvest"."type" IN ($1) -- harvest
+table harvest_version
+  column id uuid not null
+  column version bigint not null
+  column yield_grams integer
+  primary key harvest_version_pkey (id, version)
+  foreign key harvest_version_id_harvest_id_fk (id) → harvest (id) on update cascade on delete cascade
+  foreign key harvest_version_process_version_fk (id, version) → process_version (id, version) on update no action on delete cascade
+view plant_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "ontology"."node_version"."action", "ontology"."continuant_version"."label", "ontology"."material_entity_version"."mass", "ontology"."plant_version"."species", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at" from "ontology"."plant_version" inner join "ontology"."node_version" on (("ontology"."plant_version"."id" = "ontology"."node_version"."id") and ("ontology"."plant_version"."version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "ontology"."plant_version"."id" = "ontology"."node"."id" inner join "ontology"."continuant_version" on (("ontology"."plant_version"."id" = "ontology"."continuant_version"."id") and ("ontology"."plant_version"."version" = "ontology"."continuant_version"."version")) inner join "ontology"."material_entity_version" on (("ontology"."plant_version"."id" = "ontology"."material_entity_version"."id") and ("ontology"."plant_version"."version" = "ontology"."material_entity_version"."version")) cross join lateral (select  from "ontology"."independent_continuant_version" where (("ontology"."plant_version"."id" = "ontology"."independent_continuant_version"."id") and ("ontology"."plant_version"."version" = "ontology"."independent_continuant_version"."version")) offset 0) "tail" inner join "ontology"."node_version" "version_zero" on (("ontology"."plant_version"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) where not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."plant_version"."id") and ("newer"."version" > "ontology"."plant_version"."version")))
+view bed_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "ontology"."node_version"."action", "ontology"."continuant_version"."label", "ontology"."material_entity_version"."mass", "ontology"."bed_version"."area", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at" from "ontology"."bed_version" inner join "ontology"."node_version" on (("ontology"."bed_version"."id" = "ontology"."node_version"."id") and ("ontology"."bed_version"."version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "ontology"."bed_version"."id" = "ontology"."node"."id" inner join "ontology"."continuant_version" on (("ontology"."bed_version"."id" = "ontology"."continuant_version"."id") and ("ontology"."bed_version"."version" = "ontology"."continuant_version"."version")) inner join "ontology"."material_entity_version" on (("ontology"."bed_version"."id" = "ontology"."material_entity_version"."id") and ("ontology"."bed_version"."version" = "ontology"."material_entity_version"."version")) cross join lateral (select  from "ontology"."independent_continuant_version" where (("ontology"."bed_version"."id" = "ontology"."independent_continuant_version"."id") and ("ontology"."bed_version"."version" = "ontology"."independent_continuant_version"."version")) offset 0) "tail" inner join "ontology"."node_version" "version_zero" on (("ontology"."bed_version"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) where not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."bed_version"."id") and ("newer"."version" > "ontology"."bed_version"."version")))
+view document_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "ontology"."node_version"."action", "ontology"."continuant_version"."label", "ontology"."document_version"."body", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at" from "ontology"."document_version" inner join "ontology"."node_version" on (("ontology"."document_version"."id" = "ontology"."node_version"."id") and ("ontology"."document_version"."version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "ontology"."document_version"."id" = "ontology"."node"."id" inner join "ontology"."continuant_version" on (("ontology"."document_version"."id" = "ontology"."continuant_version"."id") and ("ontology"."document_version"."version" = "ontology"."continuant_version"."version")) cross join lateral (select  from "ontology"."dependent_continuant_version" where (("ontology"."document_version"."id" = "ontology"."dependent_continuant_version"."id") and ("ontology"."document_version"."version" = "ontology"."dependent_continuant_version"."version")) offset 0) "tail" inner join "ontology"."node_version" "version_zero" on (("ontology"."document_version"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) where not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."document_version"."id") and ("newer"."version" > "ontology"."document_version"."version")))
+view sowing_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "ontology"."node_version"."action", "ontology"."occurrent_version"."starts_at", "ontology"."sowing_version"."depth", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at" from "ontology"."sowing_version" inner join "ontology"."node_version" on (("ontology"."sowing_version"."id" = "ontology"."node_version"."id") and ("ontology"."sowing_version"."version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "ontology"."sowing_version"."id" = "ontology"."node"."id" inner join "ontology"."occurrent_version" on (("ontology"."sowing_version"."id" = "ontology"."occurrent_version"."id") and ("ontology"."sowing_version"."version" = "ontology"."occurrent_version"."version")) cross join lateral (select  from "ontology"."process_version" where (("ontology"."sowing_version"."id" = "ontology"."process_version"."id") and ("ontology"."sowing_version"."version" = "ontology"."process_version"."version")) offset 0) "tail" inner join "ontology"."node_version" "version_zero" on (("ontology"."sowing_version"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) where not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."sowing_version"."id") and ("newer"."version" > "ontology"."sowing_version"."version")))
+view harvest_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "ontology"."node_version"."action", "ontology"."occurrent_version"."starts_at", "ontology"."harvest_version"."yield_grams", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at" from "ontology"."harvest_version" inner join "ontology"."node_version" on (("ontology"."harvest_version"."id" = "ontology"."node_version"."id") and ("ontology"."harvest_version"."version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "ontology"."harvest_version"."id" = "ontology"."node"."id" inner join "ontology"."occurrent_version" on (("ontology"."harvest_version"."id" = "ontology"."occurrent_version"."id") and ("ontology"."harvest_version"."version" = "ontology"."occurrent_version"."version")) cross join lateral (select  from "ontology"."process_version" where (("ontology"."harvest_version"."id" = "ontology"."process_version"."id") and ("ontology"."harvest_version"."version" = "ontology"."process_version"."version")) offset 0) "tail" inner join "ontology"."node_version" "version_zero" on (("ontology"."harvest_version"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) where not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."harvest_version"."id") and ("newer"."version" > "ontology"."harvest_version"."version")))
+view continuant_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "ontology"."node_version"."action", "ontology"."node"."type", "ontology"."continuant_version"."label", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at" from "ontology"."continuant_version" inner join "ontology"."node_version" on (("ontology"."continuant_version"."id" = "ontology"."node_version"."id") and ("ontology"."continuant_version"."version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "ontology"."continuant_version"."id" = "ontology"."node"."id" inner join "ontology"."node_version" "version_zero" on (("ontology"."continuant_version"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) where ((not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."continuant_version"."id") and ("newer"."version" > "ontology"."continuant_version"."version")))) and (case "ontology"."node"."type" when 'plant' then ((exists (select 1 from "ontology"."independent_continuant_version" where (("ontology"."continuant_version"."id" = "ontology"."independent_continuant_version"."id") and ("ontology"."continuant_version"."version" = "ontology"."independent_continuant_version"."version")) offset 0)) and (exists (select 1 from "ontology"."material_entity_version" where (("ontology"."continuant_version"."id" = "ontology"."material_entity_version"."id") and ("ontology"."continuant_version"."version" = "ontology"."material_entity_version"."version")) offset 0)) and (exists (select 1 from "ontology"."plant_version" where (("ontology"."continuant_version"."id" = "ontology"."plant_version"."id") and ("ontology"."continuant_version"."version" = "ontology"."plant_version"."version")) offset 0))) when 'bed' then ((exists (select 1 from "ontology"."independent_continuant_version" where (("ontology"."continuant_version"."id" = "ontology"."independent_continuant_version"."id") and ("ontology"."continuant_version"."version" = "ontology"."independent_continuant_version"."version")) offset 0)) and (exists (select 1 from "ontology"."material_entity_version" where (("ontology"."continuant_version"."id" = "ontology"."material_entity_version"."id") and ("ontology"."continuant_version"."version" = "ontology"."material_entity_version"."version")) offset 0)) and (exists (select 1 from "ontology"."bed_version" where (("ontology"."continuant_version"."id" = "ontology"."bed_version"."id") and ("ontology"."continuant_version"."version" = "ontology"."bed_version"."version")) offset 0))) when 'document' then ((exists (select 1 from "ontology"."dependent_continuant_version" where (("ontology"."continuant_version"."id" = "ontology"."dependent_continuant_version"."id") and ("ontology"."continuant_version"."version" = "ontology"."dependent_continuant_version"."version")) offset 0)) and (exists (select 1 from "ontology"."document_version" where (("ontology"."continuant_version"."id" = "ontology"."document_version"."id") and ("ontology"."continuant_version"."version" = "ontology"."document_version"."version")) offset 0))) else false end))
+view material_entity_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "ontology"."node_version"."action", "ontology"."node"."type", "ontology"."continuant_version"."label", "ontology"."material_entity_version"."mass", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at" from "ontology"."material_entity_version" inner join "ontology"."node_version" on (("ontology"."material_entity_version"."id" = "ontology"."node_version"."id") and ("ontology"."material_entity_version"."version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "ontology"."material_entity_version"."id" = "ontology"."node"."id" inner join "ontology"."node_version" "version_zero" on (("ontology"."material_entity_version"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) inner join "ontology"."continuant_version" on (("ontology"."material_entity_version"."id" = "ontology"."continuant_version"."id") and ("ontology"."material_entity_version"."version" = "ontology"."continuant_version"."version")) inner join "ontology"."independent_continuant_version" on (("ontology"."material_entity_version"."id" = "ontology"."independent_continuant_version"."id") and ("ontology"."material_entity_version"."version" = "ontology"."independent_continuant_version"."version")) where ((not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."material_entity_version"."id") and ("newer"."version" > "ontology"."material_entity_version"."version")))) and (case "ontology"."node"."type" when 'plant' then exists (select 1 from "ontology"."plant_version" where (("ontology"."material_entity_version"."id" = "ontology"."plant_version"."id") and ("ontology"."material_entity_version"."version" = "ontology"."plant_version"."version")) offset 0) when 'bed' then exists (select 1 from "ontology"."bed_version" where (("ontology"."material_entity_version"."id" = "ontology"."bed_version"."id") and ("ontology"."material_entity_version"."version" = "ontology"."bed_version"."version")) offset 0) else false end))
+view process_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "ontology"."node_version"."action", "ontology"."node"."type", "ontology"."occurrent_version"."starts_at", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at" from "ontology"."process_version" inner join "ontology"."node_version" on (("ontology"."process_version"."id" = "ontology"."node_version"."id") and ("ontology"."process_version"."version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "ontology"."process_version"."id" = "ontology"."node"."id" inner join "ontology"."node_version" "version_zero" on (("ontology"."process_version"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) inner join "ontology"."occurrent_version" on (("ontology"."process_version"."id" = "ontology"."occurrent_version"."id") and ("ontology"."process_version"."version" = "ontology"."occurrent_version"."version")) where ((not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."process_version"."id") and ("newer"."version" > "ontology"."process_version"."version")))) and (case "ontology"."node"."type" when 'sowing' then exists (select 1 from "ontology"."sowing_version" where (("ontology"."process_version"."id" = "ontology"."sowing_version"."id") and ("ontology"."process_version"."version" = "ontology"."sowing_version"."version")) offset 0) when 'harvest' then exists (select 1 from "ontology"."harvest_version" where (("ontology"."process_version"."id" = "ontology"."harvest_version"."id") and ("ontology"."process_version"."version" = "ontology"."harvest_version"."version")) offset 0) else false end))

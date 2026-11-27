@@ -603,15 +603,19 @@ export const defineTreeFor =
  * whose name is its discriminator value. A leaf may have children: its name
  * then joins its own subtree leaves, and a node of it can later be refined to
  * a descendant leaf. An entry names its `parent` (absent:
- * a branch root under the tree's root), and may carry level `columns`
+ * a branch root under the tree's root), or several parents for a type with
+ * several supertypes, so the levels form a DAG: a node of it has a row at
+ * every level on each parent's path. It may carry level `columns`
  * contributed to every descendant's view and a level `kind`.
  *
- * Returns the checked {@link Tree}: per level, its ancestors, children,
- * descendants, subtree leaves (the discriminator CHECK value set) and branch,
- * all in declaration order. A parent naming no level of the tree, or the level
- * itself, is a type error. Throws {@link DerivationError} at module load for
- * every structural fault the types can't catch: a missing parent or a cycle, a
- * marker with no leaf below it, an unannotated level
+ * Returns the checked {@link Tree}: per level, its parents, ancestors,
+ * children, descendants, subtree leaves (the discriminator CHECK value set)
+ * and branch, all in declaration order. A parent naming no level of the tree,
+ * or the level itself, is a type error. Throws {@link DerivationError} at
+ * module load for every structural fault the types can't catch: a missing
+ * parent or a cycle, a parent named twice or already an ancestor of another
+ * parent, parents under different branch roots, a marker with no leaf below
+ * it, an unannotated level
  * column, a reserved column name (`id`, `version`, `action`, `type`), or two
  * columns on one root-to-leaf path sharing a field key or a column name.
  *

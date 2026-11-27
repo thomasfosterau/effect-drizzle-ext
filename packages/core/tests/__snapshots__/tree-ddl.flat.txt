@@ -1,0 +1,106 @@
+table node
+  column id uuid not null
+  column type text not null
+  unique node_id_type_unique (id, type)
+table node_version
+  column id uuid not null
+  column version bigint not null
+  column action text not null
+  column timestamp timestamp with time zone not null
+  column actor text
+  primary key node_version_pkey (id, version)
+  foreign key node_version_id_node_id_fk (id) → node (id) on update no action on delete cascade
+  check node_version_action_valid: "ontology"."node_version"."action" IN ('create', 'update', 'delete')
+table works
+  column id uuid not null
+  column type text not null
+  foreign key works_id_node_id_fk (id) → node (id) on update no action on delete cascade
+  foreign key works_id_type_fk (id, type) → node (id, type) on update no action on delete no action
+  unique works_id_type_unique (id, type)
+  check works_type_valid: "ontology"."works"."type" IN ($1, $2, $3) -- novel, story, poem
+table works_version
+  column id uuid not null
+  column version bigint not null
+  column title text not null
+  primary key works_version_pkey (id, version)
+  foreign key works_version_id_works_id_fk (id) → works (id) on update cascade on delete cascade
+  foreign key works_version_node_version_fk (id, version) → node_version (id, version) on update no action on delete cascade
+table novel
+  column id uuid not null
+  column type text not null
+  foreign key novel_id_works_id_fk (id) → works (id) on update no action on delete cascade
+  foreign key novel_id_type_fk (id, type) → works (id, type) on update no action on delete no action
+  unique novel_id_type_unique (id, type)
+  check novel_type_valid: "ontology"."novel"."type" IN ($1) -- novel
+table novel_version
+  column id uuid not null
+  column version bigint not null
+  column word_count integer
+  primary key novel_version_pkey (id, version)
+  foreign key novel_version_id_novel_id_fk (id) → novel (id) on update cascade on delete cascade
+  foreign key novel_version_works_version_fk (id, version) → works_version (id, version) on update no action on delete cascade
+table story
+  column id uuid not null
+  column type text not null
+  foreign key story_id_works_id_fk (id) → works (id) on update no action on delete cascade
+  foreign key story_id_type_fk (id, type) → works (id, type) on update no action on delete no action
+  unique story_id_type_unique (id, type)
+  check story_type_valid: "ontology"."story"."type" IN ($1) -- story
+table story_version
+  column id uuid not null
+  column version bigint not null
+  column anthology text
+  primary key story_version_pkey (id, version)
+  foreign key story_version_id_story_id_fk (id) → story (id) on update cascade on delete cascade
+  foreign key story_version_works_version_fk (id, version) → works_version (id, version) on update no action on delete cascade
+table poem
+  column id uuid not null
+  column type text not null
+  foreign key poem_id_works_id_fk (id) → works (id) on update no action on delete cascade
+  foreign key poem_id_type_fk (id, type) → works (id, type) on update no action on delete no action
+  unique poem_id_type_unique (id, type)
+  check poem_type_valid: "ontology"."poem"."type" IN ($1) -- poem
+table poem_version
+  column id uuid not null
+  column version bigint not null
+  column form text
+  primary key poem_version_pkey (id, version)
+  foreign key poem_version_id_poem_id_fk (id) → poem (id) on update cascade on delete cascade
+  foreign key poem_version_works_version_fk (id, version) → works_version (id, version) on update no action on delete cascade
+table agents
+  column id uuid not null
+  column type text not null
+  foreign key agents_id_node_id_fk (id) → node (id) on update no action on delete cascade
+  foreign key agents_id_type_fk (id, type) → node (id, type) on update no action on delete no action
+  unique agents_id_type_unique (id, type)
+  check agents_type_valid: "ontology"."agents"."type" IN ($1) -- author
+table agents_version
+  column id uuid not null
+  column version bigint not null
+  primary key agents_version_pkey (id, version)
+  foreign key agents_version_id_agents_id_fk (id) → agents (id) on update cascade on delete cascade
+  foreign key agents_version_node_version_fk (id, version) → node_version (id, version) on update no action on delete cascade
+table author
+  column id uuid not null
+  column type text not null
+  foreign key author_id_agents_id_fk (id) → agents (id) on update no action on delete cascade
+  foreign key author_id_type_fk (id, type) → agents (id, type) on update no action on delete no action
+  unique author_id_type_unique (id, type)
+  check author_type_valid: "ontology"."author"."type" IN ($1) -- author
+table author_version
+  column id uuid not null
+  column version bigint not null
+  column pen_name text
+  primary key author_version_pkey (id, version)
+  foreign key author_version_id_author_id_fk (id) → author (id) on update cascade on delete cascade
+  foreign key author_version_agents_version_fk (id, version) → agents_version (id, version) on update no action on delete cascade
+view novel_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "ontology"."node_version"."action", "ontology"."works_version"."title", "ontology"."novel_version"."word_count", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at" from "ontology"."novel_version" inner join "ontology"."node_version" on (("ontology"."novel_version"."id" = "ontology"."node_version"."id") and ("ontology"."novel_version"."version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "ontology"."novel_version"."id" = "ontology"."node"."id" inner join "ontology"."works_version" on (("ontology"."novel_version"."id" = "ontology"."works_version"."id") and ("ontology"."novel_version"."version" = "ontology"."works_version"."version")) inner join "ontology"."node_version" "version_zero" on (("ontology"."novel_version"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) where not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."novel_version"."id") and ("newer"."version" > "ontology"."novel_version"."version")))
+view story_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "ontology"."node_version"."action", "ontology"."works_version"."title", "ontology"."story_version"."anthology", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at" from "ontology"."story_version" inner join "ontology"."node_version" on (("ontology"."story_version"."id" = "ontology"."node_version"."id") and ("ontology"."story_version"."version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "ontology"."story_version"."id" = "ontology"."node"."id" inner join "ontology"."works_version" on (("ontology"."story_version"."id" = "ontology"."works_version"."id") and ("ontology"."story_version"."version" = "ontology"."works_version"."version")) inner join "ontology"."node_version" "version_zero" on (("ontology"."story_version"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) where not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."story_version"."id") and ("newer"."version" > "ontology"."story_version"."version")))
+view poem_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "ontology"."node_version"."action", "ontology"."works_version"."title", "ontology"."poem_version"."form", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at" from "ontology"."poem_version" inner join "ontology"."node_version" on (("ontology"."poem_version"."id" = "ontology"."node_version"."id") and ("ontology"."poem_version"."version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "ontology"."poem_version"."id" = "ontology"."node"."id" inner join "ontology"."works_version" on (("ontology"."poem_version"."id" = "ontology"."works_version"."id") and ("ontology"."poem_version"."version" = "ontology"."works_version"."version")) inner join "ontology"."node_version" "version_zero" on (("ontology"."poem_version"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) where not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."poem_version"."id") and ("newer"."version" > "ontology"."poem_version"."version")))
+view author_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "ontology"."node_version"."action", "ontology"."author_version"."pen_name", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at" from "ontology"."author_version" inner join "ontology"."node_version" on (("ontology"."author_version"."id" = "ontology"."node_version"."id") and ("ontology"."author_version"."version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "ontology"."author_version"."id" = "ontology"."node"."id" cross join lateral (select  from "ontology"."agents_version" where (("ontology"."author_version"."id" = "ontology"."agents_version"."id") and ("ontology"."author_version"."version" = "ontology"."agents_version"."version")) offset 0) "tail" inner join "ontology"."node_version" "version_zero" on (("ontology"."author_version"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) where not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."author_version"."id") and ("newer"."version" > "ontology"."author_version"."version")))
+view works_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "ontology"."node_version"."action", "ontology"."node"."type", "ontology"."works_version"."title", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at" from "ontology"."works_version" inner join "ontology"."node_version" on (("ontology"."works_version"."id" = "ontology"."node_version"."id") and ("ontology"."works_version"."version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "ontology"."works_version"."id" = "ontology"."node"."id" inner join "ontology"."node_version" "version_zero" on (("ontology"."works_version"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) where ((not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."works_version"."id") and ("newer"."version" > "ontology"."works_version"."version")))) and (case "ontology"."node"."type" when 'novel' then exists (select 1 from "ontology"."novel_version" where (("ontology"."works_version"."id" = "ontology"."novel_version"."id") and ("ontology"."works_version"."version" = "ontology"."novel_version"."version")) offset 0) when 'story' then exists (select 1 from "ontology"."story_version" where (("ontology"."works_version"."id" = "ontology"."story_version"."id") and ("ontology"."works_version"."version" = "ontology"."story_version"."version")) offset 0) when 'poem' then exists (select 1 from "ontology"."poem_version" where (("ontology"."works_version"."id" = "ontology"."poem_version"."id") and ("ontology"."works_version"."version" = "ontology"."poem_version"."version")) offset 0) else false end))

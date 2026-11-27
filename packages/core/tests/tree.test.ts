@@ -22,7 +22,8 @@ import {
   type CheckedResourceTreeSpec,
 } from "../src/JsonApi.ts";
 import { buildTree } from "../src/internal/tree.ts";
-import { bfoTree, flatTree, frbrTree } from "./fixtures/trees.ts";
+import type { TreePathOf } from "../src/VersionedChain.ts";
+import { bfoTree, diamondTree, flatTree, frbrTree } from "./fixtures/trees.ts";
 
 const text = (column: string) => dbColumn(Schema.String, { column, pg: "text", notNull: false });
 
@@ -256,5 +257,113 @@ describe("defineTree: the level-name types", () => {
     >();
     type Flagged = { readonly work: { readonly leaf: Schema.Struct.Fields; readonly owned: true } };
     expectTypeOf<Flagged>().toExtend<CheckedTreeSpec<Flagged, Schema.Struct.Fields, Flags>>();
+  });
+});
+
+describe("defineTree: several parents", () => {
+  it("derives a diamond: every parent's ancestors once, root-most first", () => {
+    expect(diamondTree.leaves).toEqual(["printed", "digital", "ebook"]);
+    expect(diamondTree.branchRoots).toEqual(["artefact"]);
+    const ebook = diamondTree.level("ebook");
+    expect(ebook.parent).toStrictEqual(Option.some("printed"));
+    expect(ebook.parents).toEqual(["printed", "digital"]);
+    expect(ebook.ancestors).toEqual(["artefact", "printed", "digital"]);
+    expect(ebook.branch).toBe("artefact");
+    expect(diamondTree.level("printed").children).toEqual(["ebook"]);
+    expect(diamondTree.level("digital").children).toEqual(["ebook"]);
+    expect(diamondTree.level("digital").subtreeLeaves).toEqual(["digital", "ebook"]);
+    expect(diamondTree.level("artefact").subtreeLeaves).toEqual(["printed", "digital", "ebook"]);
+    expect(diamondTree.level("artefact").descendants).toEqual(["printed", "digital", "ebook"]);
+    expect(diamondTree.level("artefact").parents).toEqual([]);
+  });
+
+  it("orders a shared ancestor before every level below it, however deep", () => {
+    const tree = defineTree({
+      thing: {},
+      agent: { parent: "thing" },
+      person: { parent: "agent", leaf: {} },
+      place: { parent: "thing" },
+      office: { parent: "place", leaf: {} },
+      sole_trader: { parent: ["person", "office"], leaf: {} },
+    });
+    expect(tree.level("sole_trader").ancestors).toEqual([
+      "thing",
+      "agent",
+      "person",
+      "place",
+      "office",
+    ]);
+    expect(tree.level("thing").subtreeLeaves).toEqual(["person", "office", "sole_trader"]);
+  });
+
+  it("types a level's path through every parent", () => {
+    expectTypeOf<TreePathOf<typeof diamondTree.spec, "ebook">>().toEqualTypeOf<
+      ["artefact", "printed", "digital", "ebook"]
+    >();
+  });
+
+  it("rejects a parent list naming no level, or the level itself, in the types and at run time", () => {
+    type SelfParent = {
+      readonly work: { readonly leaf: Schema.Struct.Fields };
+      readonly book: {
+        readonly parent: readonly ["work", "book"];
+        readonly leaf: Schema.Struct.Fields;
+      };
+    };
+    expectTypeOf<SelfParent>().not.toExtend<
+      CheckedTreeSpec<SelfParent, Schema.Struct.Fields, object>
+    >();
+    expect(() =>
+      buildWide({ work: { leaf: {} }, book: { parent: ["work", "film"], leaf: {} } }),
+    ).toThrow(/names parent "film", which is not a level/);
+  });
+
+  it("rejects a cycle through a second parent", () => {
+    expect(() =>
+      buildWide({
+        a: { leaf: {} },
+        b: { parent: ["a", "c"], leaf: {} },
+        c: { parent: "b", leaf: {} },
+      }),
+    ).toThrow(/cycle: c → b → c$/);
+  });
+
+  it("rejects a parent named twice", () => {
+    expect(() =>
+      buildWide({ work: { leaf: {} }, book: { parent: ["work", "work"], leaf: {} } }),
+    ).toThrow(/names parent "work" twice/);
+  });
+
+  it("rejects a parent that is already an ancestor of another parent", () => {
+    expect(() =>
+      defineTree({
+        work: { leaf: {} },
+        book: { parent: "work", leaf: {} },
+        ebook: { parent: ["book", "work"], leaf: {} },
+      }),
+    ).toThrow(/names parent "work", which is already an ancestor of its parent "book"/);
+  });
+
+  it("rejects parents under different branch roots", () => {
+    expect(() =>
+      defineTree({
+        work: { leaf: {} },
+        agent: { leaf: {} },
+        hybrid: { parent: ["work", "agent"], leaf: {} },
+      }),
+    ).toThrow(/parents \(work, agent\) lie under different branch roots \(work, agent\)/);
+  });
+
+  it("rejects two parents' columns sharing a key or column name", () => {
+    expect(() =>
+      defineTree({
+        artefact: {},
+        printed: { parent: "artefact", columns: { size: text("size") }, leaf: {} },
+        digital: { parent: "artefact", columns: { bytes: text("size") }, leaf: {} },
+        ebook: { parent: ["printed", "digital"], leaf: {} },
+      }),
+    ).toThrow(
+      /"bytes" \(column "size"\) on level "digital" collides with "size" \(column "size"\) on level "printed"; both reach leaf "ebook"/,
+    );
   });
 });

@@ -1,0 +1,163 @@
+table node
+  column id uuid not null
+  column type text not null
+  unique node_id_type_unique (id, type)
+table node_version
+  column id uuid not null
+  column version bigint not null
+  column action text not null
+  column timestamp timestamp with time zone not null
+  column actor text
+  primary key node_version_pkey (id, version)
+  foreign key node_version_id_node_id_fk (id) → node (id) on update no action on delete cascade
+  check node_version_action_valid: "ontology"."node_version"."action" IN ('create', 'update', 'delete')
+table work
+  column id uuid not null
+  column type text not null
+  foreign key work_id_node_id_fk (id) → node (id) on update no action on delete cascade
+  foreign key work_id_type_fk (id, type) → node (id, type) on update no action on delete no action
+  unique work_id_type_unique (id, type)
+  check work_type_valid: "ontology"."work"."type" IN ($1, $2) -- book, essay
+table work_version
+  column id uuid not null
+  column version bigint not null
+  column title text not null
+  column url text
+  primary key work_version_pkey (id, version)
+  foreign key work_version_id_work_id_fk (id) → work (id) on update cascade on delete cascade
+  foreign key work_version_node_version_fk (id, version) → node_version (id, version) on update no action on delete cascade
+table book
+  column id uuid not null
+  column type text not null
+  foreign key book_id_work_id_fk (id) → work (id) on update no action on delete cascade
+  foreign key book_id_type_fk (id, type) → work (id, type) on update no action on delete no action
+  unique book_id_type_unique (id, type)
+  check book_type_valid: "ontology"."book"."type" IN ($1) -- book
+table book_version
+  column id uuid not null
+  column version bigint not null
+  column pages integer
+  primary key book_version_pkey (id, version)
+  foreign key book_version_id_book_id_fk (id) → book (id) on update cascade on delete cascade
+  foreign key book_version_work_version_fk (id, version) → work_version (id, version) on update no action on delete cascade
+table essay
+  column id uuid not null
+  column type text not null
+  foreign key essay_id_work_id_fk (id) → work (id) on update no action on delete cascade
+  foreign key essay_id_type_fk (id, type) → work (id, type) on update no action on delete no action
+  unique essay_id_type_unique (id, type)
+  check essay_type_valid: "ontology"."essay"."type" IN ($1) -- essay
+table essay_version
+  column id uuid not null
+  column version bigint not null
+  column abstract text
+  primary key essay_version_pkey (id, version)
+  foreign key essay_version_id_essay_id_fk (id) → essay (id) on update cascade on delete cascade
+  foreign key essay_version_work_version_fk (id, version) → work_version (id, version) on update no action on delete cascade
+table manifestation
+  column id uuid not null
+  column type text not null
+  foreign key manifestation_id_node_id_fk (id) → node (id) on update no action on delete cascade
+  foreign key manifestation_id_type_fk (id, type) → node (id, type) on update no action on delete no action
+  unique manifestation_id_type_unique (id, type)
+  check manifestation_type_valid: "ontology"."manifestation"."type" IN ($1) -- edition
+table manifestation_version
+  column id uuid not null
+  column version bigint not null
+  primary key manifestation_version_pkey (id, version)
+  foreign key manifestation_version_id_manifestation_id_fk (id) → manifestation (id) on update cascade on delete cascade
+  foreign key manifestation_version_node_version_fk (id, version) → node_version (id, version) on update no action on delete cascade
+table edition
+  column id uuid not null
+  column type text not null
+  foreign key edition_id_manifestation_id_fk (id) → manifestation (id) on update no action on delete cascade
+  foreign key edition_id_type_fk (id, type) → manifestation (id, type) on update no action on delete no action
+  unique edition_id_type_unique (id, type)
+  check edition_type_valid: "ontology"."edition"."type" IN ($1) -- edition
+table edition_version
+  column id uuid not null
+  column version bigint not null
+  column print_run integer
+  primary key edition_version_pkey (id, version)
+  foreign key edition_version_id_edition_id_fk (id) → edition (id) on update cascade on delete cascade
+  foreign key edition_version_manifestation_version_fk (id, version) → manifestation_version (id, version) on update no action on delete cascade
+table agent
+  column id uuid not null
+  column type text not null
+  foreign key agent_id_node_id_fk (id) → node (id) on update no action on delete cascade
+  foreign key agent_id_type_fk (id, type) → node (id, type) on update cascade on delete no action
+  unique agent_id_type_unique (id, type)
+  check agent_type_valid: "ontology"."agent"."type" IN ($1, $2) -- person, organisation
+table agent_version
+  column id uuid not null
+  column version bigint not null
+  column name text not null
+  primary key agent_version_pkey (id, version)
+  foreign key agent_version_id_agent_id_fk (id) → agent (id) on update cascade on delete cascade
+  foreign key agent_version_node_version_fk (id, version) → node_version (id, version) on update no action on delete cascade
+table person
+  column id uuid not null
+  column type text not null
+  foreign key person_id_agent_id_fk (id) → agent (id) on update no action on delete cascade
+  foreign key person_id_type_fk (id, type) → agent (id, type) on update cascade on delete no action
+  unique person_id_type_unique (id, type)
+  check person_type_valid: "ontology"."person"."type" IN ($1) -- person
+table person_version
+  column id uuid not null
+  column version bigint not null
+  column born integer
+  primary key person_version_pkey (id, version)
+  foreign key person_version_id_person_id_fk (id) → person (id) on update cascade on delete cascade
+  foreign key person_version_agent_version_fk (id, version) → agent_version (id, version) on update no action on delete cascade
+table organisation
+  column id uuid not null
+  column type text not null
+  foreign key organisation_id_agent_id_fk (id) → agent (id) on update no action on delete cascade
+  foreign key organisation_id_type_fk (id, type) → agent (id, type) on update cascade on delete no action
+  unique organisation_id_type_unique (id, type)
+  check organisation_type_valid: "ontology"."organisation"."type" IN ($1) -- organisation
+table organisation_version
+  column id uuid not null
+  column version bigint not null
+  primary key organisation_version_pkey (id, version)
+  foreign key organisation_version_id_organisation_id_fk (id) → organisation (id) on update cascade on delete cascade
+  foreign key organisation_version_agent_version_fk (id, version) → agent_version (id, version) on update no action on delete cascade
+table manifestation_format
+  column id uuid not null
+  column version bigint not null
+  column format text
+  primary key manifestation_format_pkey (id, version)
+  foreign key manifestation_format_manifestation_version_fk (id, version) → manifestation_version (id, version) on update no action on delete cascade
+table manifestation_isbn
+  column id uuid not null
+  column version bigint not null
+  column isbn text
+  primary key manifestation_isbn_pkey (id, version)
+  foreign key manifestation_isbn_manifestation_version_fk (id, version) → manifestation_version (id, version) on update no action on delete cascade
+table live_pointer
+  column seq bigint not null
+  column id uuid not null
+  column version bigint
+  column at timestamp with time zone not null
+  column actor text
+  column recorded_at timestamp with time zone not null
+  foreign key live_pointer_id_node_id_fk (id) → node (id) on update no action on delete cascade
+  foreign key live_pointer_node_version_fk (id, version) → node_version (id, version) on update no action on delete cascade
+view book_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "ontology"."node_version"."action", "ontology"."work_version"."title", "ontology"."work_version"."url", "ontology"."book_version"."pages", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at" from "ontology"."book_version" inner join "ontology"."node_version" on (("ontology"."book_version"."id" = "ontology"."node_version"."id") and ("ontology"."book_version"."version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "ontology"."book_version"."id" = "ontology"."node"."id" inner join "ontology"."work_version" on (("ontology"."book_version"."id" = "ontology"."work_version"."id") and ("ontology"."book_version"."version" = "ontology"."work_version"."version")) inner join "ontology"."node_version" "version_zero" on (("ontology"."book_version"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) where not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."book_version"."id") and ("newer"."version" > "ontology"."book_version"."version")))
+view essay_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "ontology"."node_version"."action", "ontology"."work_version"."title", "ontology"."work_version"."url", "ontology"."essay_version"."abstract", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at" from "ontology"."essay_version" inner join "ontology"."node_version" on (("ontology"."essay_version"."id" = "ontology"."node_version"."id") and ("ontology"."essay_version"."version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "ontology"."essay_version"."id" = "ontology"."node"."id" inner join "ontology"."work_version" on (("ontology"."essay_version"."id" = "ontology"."work_version"."id") and ("ontology"."essay_version"."version" = "ontology"."work_version"."version")) inner join "ontology"."node_version" "version_zero" on (("ontology"."essay_version"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) where not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."essay_version"."id") and ("newer"."version" > "ontology"."essay_version"."version")))
+view edition_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "ontology"."node_version"."action", "tail"."format" as "format", "tail"."isbn" as "isbn", "ontology"."edition_version"."print_run", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at" from "ontology"."edition_version" inner join "ontology"."node_version" on (("ontology"."edition_version"."id" = "ontology"."node_version"."id") and ("ontology"."edition_version"."version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "ontology"."edition_version"."id" = "ontology"."node"."id" cross join lateral (select "ontology"."manifestation_format"."format" as "format", "ontology"."manifestation_isbn"."isbn" as "isbn" from "ontology"."manifestation_version" left join "ontology"."manifestation_format" on (("ontology"."edition_version"."id" = "ontology"."manifestation_format"."id") and ("ontology"."edition_version"."version" = "ontology"."manifestation_format"."version")) left join "ontology"."manifestation_isbn" on (("ontology"."edition_version"."id" = "ontology"."manifestation_isbn"."id") and ("ontology"."edition_version"."version" = "ontology"."manifestation_isbn"."version")) where (("ontology"."edition_version"."id" = "ontology"."manifestation_version"."id") and ("ontology"."edition_version"."version" = "ontology"."manifestation_version"."version")) offset 0) "tail" inner join "ontology"."node_version" "version_zero" on (("ontology"."edition_version"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) where not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."edition_version"."id") and ("newer"."version" > "ontology"."edition_version"."version")))
+view person_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "ontology"."node_version"."action", "ontology"."agent_version"."name", "ontology"."person_version"."born", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at" from "ontology"."person_version" inner join "ontology"."node_version" on (("ontology"."person_version"."id" = "ontology"."node_version"."id") and ("ontology"."person_version"."version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "ontology"."person_version"."id" = "ontology"."node"."id" inner join "ontology"."agent_version" on (("ontology"."person_version"."id" = "ontology"."agent_version"."id") and ("ontology"."person_version"."version" = "ontology"."agent_version"."version")) inner join "ontology"."node_version" "version_zero" on (("ontology"."person_version"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) where not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."person_version"."id") and ("newer"."version" > "ontology"."person_version"."version")))
+view organisation_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "ontology"."node_version"."action", "ontology"."agent_version"."name", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at" from "ontology"."organisation_version" inner join "ontology"."node_version" on (("ontology"."organisation_version"."id" = "ontology"."node_version"."id") and ("ontology"."organisation_version"."version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "ontology"."organisation_version"."id" = "ontology"."node"."id" inner join "ontology"."agent_version" on (("ontology"."organisation_version"."id" = "ontology"."agent_version"."id") and ("ontology"."organisation_version"."version" = "ontology"."agent_version"."version")) inner join "ontology"."node_version" "version_zero" on (("ontology"."organisation_version"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) where not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."organisation_version"."id") and ("newer"."version" > "ontology"."organisation_version"."version")))
+view work_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "ontology"."node_version"."action", "ontology"."node"."type", "ontology"."work_version"."title", "ontology"."work_version"."url", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at" from "ontology"."work_version" inner join "ontology"."node_version" on (("ontology"."work_version"."id" = "ontology"."node_version"."id") and ("ontology"."work_version"."version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "ontology"."work_version"."id" = "ontology"."node"."id" inner join "ontology"."node_version" "version_zero" on (("ontology"."work_version"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) where ((not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."work_version"."id") and ("newer"."version" > "ontology"."work_version"."version")))) and (case "ontology"."node"."type" when 'book' then exists (select 1 from "ontology"."book_version" where (("ontology"."work_version"."id" = "ontology"."book_version"."id") and ("ontology"."work_version"."version" = "ontology"."book_version"."version")) offset 0) when 'essay' then exists (select 1 from "ontology"."essay_version" where (("ontology"."work_version"."id" = "ontology"."essay_version"."id") and ("ontology"."work_version"."version" = "ontology"."essay_version"."version")) offset 0) else false end))
+view agent_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "ontology"."node_version"."action", "ontology"."node"."type", "ontology"."agent_version"."name", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at" from "ontology"."agent_version" inner join "ontology"."node_version" on (("ontology"."agent_version"."id" = "ontology"."node_version"."id") and ("ontology"."agent_version"."version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "ontology"."agent_version"."id" = "ontology"."node"."id" inner join "ontology"."node_version" "version_zero" on (("ontology"."agent_version"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) where ((not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "ontology"."agent_version"."id") and ("newer"."version" > "ontology"."agent_version"."version")))) and (case "ontology"."node"."type" when 'person' then exists (select 1 from "ontology"."person_version" where (("ontology"."agent_version"."id" = "ontology"."person_version"."id") and ("ontology"."agent_version"."version" = "ontology"."person_version"."version")) offset 0) when 'organisation' then exists (select 1 from "ontology"."organisation_version" where (("ontology"."agent_version"."id" = "ontology"."organisation_version"."id") and ("ontology"."agent_version"."version" = "ontology"."organisation_version"."version")) offset 0) else false end))
+view book_live_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "head_row"."action", "ontology"."work_version"."title", "ontology"."work_version"."url", "ontology"."book_version"."pages", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at", "pointer"."at" as "live_at" from (select distinct on ("ontology"."live_pointer"."id") "id", "version" as "pointer_version", "at" from "ontology"."live_pointer" where "ontology"."live_pointer"."at" <= now() order by "ontology"."live_pointer"."id", "ontology"."live_pointer"."seq" desc) "pointer" inner join "ontology"."node_version" on (("pointer"."id" = "ontology"."node_version"."id") and ("pointer"."pointer_version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "pointer"."id" = "ontology"."node"."id" inner join "ontology"."work_version" on (("pointer"."id" = "ontology"."work_version"."id") and ("pointer"."pointer_version" = "ontology"."work_version"."version")) inner join "ontology"."book_version" on (("pointer"."id" = "ontology"."book_version"."id") and ("pointer"."pointer_version" = "ontology"."book_version"."version")) inner join "ontology"."node_version" "head_row" on "pointer"."id" = "head_row"."id" inner join "ontology"."node_version" "version_zero" on (("pointer"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) where not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "head_row"."id") and ("newer"."version" > "head_row"."version")))
+view person_live_view
+  select "ontology"."node_version"."id", "ontology"."node_version"."version", "head_row"."action", "ontology"."agent_version"."name", "ontology"."person_version"."born", "ontology"."node_version"."timestamp", "version_zero"."timestamp" as "created_at", "pointer"."at" as "live_at" from (select distinct on ("ontology"."live_pointer"."id") "id", "version" as "pointer_version", "at" from "ontology"."live_pointer" where "ontology"."live_pointer"."at" <= now() order by "ontology"."live_pointer"."id", "ontology"."live_pointer"."seq" desc) "pointer" inner join "ontology"."node_version" on (("pointer"."id" = "ontology"."node_version"."id") and ("pointer"."pointer_version" = "ontology"."node_version"."version")) inner join "ontology"."node" on "pointer"."id" = "ontology"."node"."id" inner join "ontology"."agent_version" on (("pointer"."id" = "ontology"."agent_version"."id") and ("pointer"."pointer_version" = "ontology"."agent_version"."version")) inner join "ontology"."person_version" on (("pointer"."id" = "ontology"."person_version"."id") and ("pointer"."pointer_version" = "ontology"."person_version"."version")) inner join "ontology"."node_version" "head_row" on "pointer"."id" = "head_row"."id" inner join "ontology"."node_version" "version_zero" on (("pointer"."id" = "version_zero"."id") and ("version_zero"."version" = 0)) where not exists (select 1 from "ontology"."node_version" "newer" where (("newer"."id" = "head_row"."id") and ("newer"."version" > "head_row"."version")))

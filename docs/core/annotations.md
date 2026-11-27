@@ -31,7 +31,7 @@ export const fieldColumnBounds: (fields: Schema.Struct.Fields) => Record<string,
 `defineTree(spec)` declares a versioned ontology once, with no Drizzle import, so a models package can state it and the database layer derive every table, constraint and view from it. Each entry of `spec` is a level:
 
 - A **marker** has no `leaf`; a **leaf** carries its domain fields (`dbColumn`-annotated), and its name is its discriminator value.
-- `parent` names another level; absent, the level is a branch root under the tree's root (the `node` identity and `node_version` tables).
+- `parent` names another level, or several (`parent: ["printed", "digital"]`) for a type with several supertypes; absent, the level is a branch root under the tree's root (the `node` identity and `node_version` tables). A level with several parents has a row at every level of each parent's path, so each parent's view still lists it; its parents must share one branch root, and none may be an ancestor of another.
 - `columns` are **level columns**: fields on that level's version table that reach every descendant's view (a work's `title` on every book).
 - `kind: "fact-scoped"` keeps a level's columns in one 6NF fact table each, where a fact's absence at a version is its `NULL`.
 - A leaf may have children (a branch root that is also a concrete type): its name joins its own subtree leaves, so its discriminator CHECK admits it beside its descendants, and a node of it can later be refined to one of them (`LeafChain.refine` in `-pg/chain`, under a `refinable` level).
@@ -39,7 +39,7 @@ export const fieldColumnBounds: (fields: Schema.Struct.Fields) => Record<string,
 
 `defineResourceTree` (`./JsonApi`) is the same over `Resource.make` definitions, each leaf's resource `type` being its level's name. `defineTreeFor<Ext>()` / `defineResourceTreeFor<Ext>()` pin an extension record every entry must carry (pulpit's registry flags), which the library never reads.
 
-The result is a checked `Tree`: per level, its ancestors, children, descendants, subtree leaves (its discriminator CHECK value set) and branch, all in declaration order. A parent naming no level is a type error. Every other fault throws `DerivationError` at module load: a cycle, a marker with no leaf below it, an unannotated column, a reserved name (`id`, `version`, `action`, `type`), two columns on one root-to-leaf path sharing a key or column name, or a keyed level on a marker.
+The result is a checked `Tree`: per level, its parents, ancestors, children, descendants, subtree leaves (its discriminator CHECK value set) and branch, all in declaration order (a shared ancestor appears once, before every level below it). A parent naming no level is a type error. Every other fault throws `DerivationError` at module load: a cycle, a parent named twice or already an ancestor of another parent, parents under different branch roots, a marker with no leaf below it, an unannotated column, a reserved name (`id`, `version`, `action`, `type`), two columns on one root-to-leaf path sharing a key or column name, or a keyed level on a marker.
 
 ```ts
 import { dbColumn, defineTree } from "@thomasfosterau/effect-drizzle-ext/Annotation";

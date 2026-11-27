@@ -10,6 +10,7 @@
 import { DerivationError } from "@thomasfosterau/effect-drizzle-ext/Derive";
 import { classifyError } from "@thomasfosterau/effect-drizzle-ext/Errors";
 import type {
+  TreePathOf,
   VersionAction,
   VersionChainEntry,
 } from "@thomasfosterau/effect-drizzle-ext/VersionedChain";
@@ -140,13 +141,7 @@ type InsertOf<Tb> = Tb extends { readonly $inferInsert: infer Inserted } ? Inser
 type MemberOf<A, K> = K extends keyof A ? A[K] : never;
 
 /** Level `K`'s path from its branch root down to itself, as a tuple of names. */
-type PathOf<S, K> = K extends keyof S
-  ? S[K] extends { readonly parent: infer P }
-    ? P extends keyof S
-      ? [...PathOf<S, P>, K]
-      : [K]
-    : [K]
-  : [];
+type PathOf<S, K> = TreePathOf<S, K>;
 
 /** The leaf names of declaration `S`. */
 type LeafOf<S> = {
@@ -212,15 +207,18 @@ export type ChainPatch<S, T extends ChainTables, K> = {
   readonly [F in keyof ChainState<S, T, K>]?: ChainState<S, T, K>[F] | undefined;
 };
 
-/** The levels of path `P` past its prefix `Q`. */
-type DropPrefix<P, Q> = Q extends readonly [infer H, ...infer QRest]
-  ? P extends readonly [H, ...infer PRest]
-    ? DropPrefix<PRest, QRest>
-    : P
-  : P;
+/** The members of tuple `P` that are not in `X`, in order. */
+type Without<P, X> = P extends readonly [infer H, ...infer Rest]
+  ? [H] extends [X]
+    ? Without<Rest, X>
+    : [H, ...Without<Rest, X>]
+  : [];
 
-/** The levels leaf `K`'s path adds below leaf `F`'s, root-most first. */
-type AddedPath<S, K, F> = DropPrefix<PathOf<S, K>, PathOf<S, F>>;
+/**
+ * The levels leaf `K`'s path adds to leaf `F`'s, root-most first: below `F`,
+ * and on a DAG also beside it (another parent of a level below `F`).
+ */
+type AddedPath<S, K, F> = Without<PathOf<S, K>, PathOf<S, F>[number]>;
 
 /** The leaves leaf `K` can be refined from: every leaf above it on its path. */
 type RefineSourceOf<S, K> = Exclude<PathOf<S, K>[number], K> & LeafOf<S>;
@@ -1272,8 +1270,10 @@ export const makeVersionChain = <
           .where(and(eq(identityId, id), eq(identityType, from)))
           .returning({ id: identityId });
         if (Arr.isReadonlyArrayEmpty(flipped)) return yield* new VersionConflict({ id, version });
-        // Only the levels below `from` are new; the rest already have their row.
-        const added = Arr.drop(levels, Arr.length(ancestorsOf(from)) + 1);
+        // Only the levels off `from`'s path are new (below it, and on a DAG
+        // beside it); the rest already have their row.
+        const fromPath = [...ancestorsOf(from), from];
+        const added = Arr.filter(levels, (level) => !Arr.contains(fromPath, level.name));
         yield* writeStable(id, input.stable, added);
         yield* writeVersion(
           id,

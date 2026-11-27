@@ -86,7 +86,8 @@ const ontologyBuilders = {
  * leaves, the marker carrying a stable column; and a refinable `realm` branch
  * whose `party` leaf has children, so a party can be refined to a `member`
  * (one added level, with a stable column) or a `band` (two, the `guild`
- * marker's column required).
+ * marker's column required); and a refinable `artefact` branch holding a
+ * diamond: `ebook` has two parents, the `printed` and `digital` leaves.
  */
 export const ontologyTree = defineTree({
   work: {
@@ -153,6 +154,29 @@ export const ontologyTree = defineTree({
     parent: "guild",
     leaf: { genre: dbColumn(Schema.String, { column: "genre", pg: "text", notNull: false }) },
   },
+  artefact: {
+    columns: {
+      caption: dbColumn(Schema.String, { column: "caption", pg: "text", notNull: true }),
+    },
+  },
+  printed: {
+    parent: "artefact",
+    columns: {
+      pressRun: dbColumn(Schema.Finite, { column: "press_run", pg: "integer", notNull: false }),
+    },
+    leaf: {},
+  },
+  digital: {
+    parent: "artefact",
+    columns: {
+      fileSize: dbColumn(Schema.Finite, { column: "file_size", pg: "integer", notNull: false }),
+    },
+    leaf: {},
+  },
+  ebook: {
+    parent: ["printed", "digital"],
+    leaf: { drm: dbColumn(Schema.String, { column: "drm", pg: "text", notNull: false }) },
+  },
 });
 
 /** The tree's own Postgres schema, exported so drizzle-kit creates it. */
@@ -173,6 +197,7 @@ export const ontologyTables = makeTreeTables(ontologyTree, {
     },
     series: { stableColumns: { code: text("code") } },
     realm: { refinable: true },
+    artefact: { refinable: true },
     member: { stableColumns: { badge: text("badge") } },
   },
   root: { pointers: ["live"] },
@@ -217,12 +242,20 @@ export const guild = ontologyTables.levels.guild.stable;
 export const guildVersion = ontologyTables.levels.guild.version;
 export const band = ontologyTables.levels.band.stable;
 export const bandVersion = ontologyTables.levels.band.version;
+export const artefact = ontologyTables.levels.artefact.stable;
+export const artefactVersion = ontologyTables.levels.artefact.version;
+export const printed = ontologyTables.levels.printed.stable;
+export const printedVersion = ontologyTables.levels.printed.version;
+export const digital = ontologyTables.levels.digital.stable;
+export const digitalVersion = ontologyTables.levels.digital.version;
+export const ebook = ontologyTables.levels.ebook.stable;
+export const ebookVersion = ontologyTables.levels.ebook.version;
 export const essayLocale = ontologyTables.keyed.essay;
 export const livePointer = ontologyTables.pointers.live;
 
 /**
  * Every view the tree derives: a view per leaf, the `work`, `collection`,
- * `series` and `realm` branches (`collection` projecting each leaf's own `label`), essay's
+ * `series`, `realm` and `artefact` branches (`collection` projecting each leaf's own `label`), essay's
  * locale view, and book's and essay's views at the `live` pointer.
  */
 export const ontologyViews = makeTreeViews(ontologyTree, ontologyTables, {
@@ -232,6 +265,7 @@ export const ontologyViews = makeTreeViews(ontologyTree, ontologyTables, {
     collection: { project: (_leaf, columns) => ({ label: columns.label }) },
     series: true,
     realm: true,
+    artefact: true,
   },
   pointers: { live: ["book", "essay"] },
 });
@@ -251,6 +285,10 @@ export const partyView = ontologyViews.leaves.party;
 export const memberView = ontologyViews.leaves.member;
 export const bandView = ontologyViews.leaves.band;
 export const realmView = ontologyViews.branches.realm;
+export const printedView = ontologyViews.leaves.printed;
+export const digitalView = ontologyViews.leaves.digital;
+export const ebookView = ontologyViews.leaves.ebook;
+export const artefactView = ontologyViews.branches.artefact;
 export const essayLocaleView = ontologyViews.keyed.essay;
 export const bookLiveView = ontologyViews.pointers.live.leaves.book;
 export const essayLiveView = ontologyViews.pointers.live.leaves.essay;
